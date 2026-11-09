@@ -3,6 +3,8 @@
 // API routes used by the resident portal.
 const API_ENDPOINTS = {
   getReports: '/api/reports',
+  getNotifications: '/api/notifications',
+  markNotificationRead: '/api/notifications/{id}/read',
   createReport: '/api/reports',
   session: '/api/session',
   logout: '/api/logout'
@@ -66,7 +68,12 @@ async function apiRequest(action, payload = {}, method = 'POST') {
     }
   }
 
-  const response = await fetch(API_ENDPOINTS[action], options);
+  let endpoint = API_ENDPOINTS[action].replace('{id}', encodeURIComponent(payload.id || ''));
+  if (method === 'GET' && Object.keys(payload).length > 0) {
+    const query = new URLSearchParams(payload);
+    endpoint += `?${query.toString()}`;
+  }
+  const response = await fetch(endpoint, options);
   if (!(response.headers.get('content-type') || '').includes('application/json')) {
     throw new Error('The Laravel API did not respond. Start the app with Artisan and open the Laravel server URL.');
   }
@@ -95,9 +102,10 @@ function escapeHTML(value) {
 // Set up resident portal controls and report display.
 function initResidentPortalPage() {
   const STAGES = ['Submitted', 'Validated', 'Dispatched', 'Resolved'];
-  const CLOSED_STAGES = ['Resolved', 'Rejected'];
   let currentReports = [];
   let reportFilter = 'active';
+  let reportPage = 1;
+  let reportPagination = { currentPage: 1, lastPage: 1, total: 0 };
 
   // Village / Phase -> list of streets
   const LOCATIONS = {
@@ -146,8 +154,8 @@ function initResidentPortalPage() {
 
   // Load the resident's reports from the server.
   async function syncIssuesFromServer() {
-    const result = await apiRequest('getReports', {}, 'GET');
-    return result.reports || [];
+    const view = reportFilter === 'active' ? 'current' : reportFilter;
+    return apiRequest('getReports', { view, page: reportPage }, 'GET');
   }
 
   // Refresh report data and update the page.
@@ -155,7 +163,9 @@ function initResidentPortalPage() {
     const issueCountBadge = document.getElementById('issueCount');
     const issuesListContainer = document.getElementById('issuesList');
     try {
-      currentReports = await syncIssuesFromServer();
+      const result = await syncIssuesFromServer();
+      currentReports = result.reports || [];
+      reportPagination = result.pagination;
     } catch (error) {
       issueCountBadge.textContent = 'Unavailable';
       issuesListContainer.textContent = error.message || 'Could not load reports. Please check your connection and sign in again.';
@@ -163,31 +173,43 @@ function initResidentPortalPage() {
     }
 
     renderReports();
-    updateNotifications(currentReports);
+    try {
+      updateNotifications(await apiRequest('getNotifications', {}, 'GET'));
+    } catch (error) {
+      const notifContainer = document.getElementById('notifications');
+      notifContainer.textContent = `Notifications unavailable: ${error.message}`;
+      document.getElementById('notifCount').textContent = '!';
+    }
   }
 
   // Show reports that match the selected filter.
   function renderReports() {
     const issuesListContainer = document.getElementById('issuesList');
     const issueCountBadge = document.getElementById('issueCount');
-    const shownReports = currentReports.filter(item => {
-      const isPast = CLOSED_STAGES.includes(item.stage);
-      return reportFilter === 'all' ||
-        (reportFilter === 'past' ? isPast : !isPast);
-    });
     const filterLabel = reportFilter === 'past' ? 'past report' : reportFilter === 'active' ? 'current report' : 'report';
-    issueCountBadge.textContent = `${shownReports.length} ${filterLabel}${shownReports.length === 1 ? '' : 's'}`;
+    issueCountBadge.textContent = `${reportPagination.total} ${filterLabel}${reportPagination.total === 1 ? '' : 's'}`;
 
-    if (shownReports.length === 0 && currentReports.length === 0) {
-      issuesListContainer.innerHTML = '<div class="empty-reports"><strong>No reports yet</strong><span>Submit an issue above and it will appear here with its tracking ID and status.</span></div>';
-    } else if (shownReports.length === 0) {
-      const emptyMessage = reportFilter === 'past'
-        ? 'Resolved and rejected reports will appear here.'
-        : 'You have no open reports right now. Select Past Reports to review completed reports.';
+    if (reportPagination.total === 0) {
+      const emptyMessage = reportFilter === 'active'
+        ? 'You have no open reports right now. Select Past Reports to review completed reports.'
+        : reportFilter === 'past'
+          ? 'Resolved and rejected reports will appear here.'
+          : 'Submit an issue above and it will appear here with its tracking ID and status.';
       issuesListContainer.innerHTML = `<div class="empty-reports">${escapeHTML(emptyMessage)}</div>`;
     } else {
-      issuesListContainer.innerHTML = shownReports.map(createReportCardHTML).join('');
+      issuesListContainer.innerHTML = currentReports.map(createReportCardHTML).join('');
     }
+    renderReportPagination();
+  }
+
+  function renderReportPagination() {
+    const container = document.getElementById('reportPagination');
+    const { currentPage, lastPage, total } = reportPagination;
+    container.innerHTML = `
+      <button class="btn btn-sm btn-outline-secondary" type="button" data-report-page="${currentPage - 1}" ${currentPage <= 1 ? 'disabled' : ''}>Previous</button>
+      <span class="small text-secondary">Page ${currentPage} of ${lastPage} · ${total} reports</span>
+      <button class="btn btn-sm btn-outline-secondary" type="button" data-report-page="${currentPage + 1}" ${currentPage >= lastPage ? 'disabled' : ''}>Next</button>
+    `;
   }
 
   // Build the HTML for one report card.
@@ -236,28 +258,42 @@ function initResidentPortalPage() {
   }
 
   // Show the latest report updates and notification count.
-  function updateNotifications(myReports) {
+  function updateNotifications(result) {
     const notifContainer = document.getElementById('notifications');
     const notifBadge = document.getElementById('notifCount');
-
-    const recentUpdates = myReports
-      .filter(item => item.updatedMessage)
-      .slice(-5)
-      .reverse();
-
-    if (recentUpdates.length === 0) {
+    const notifications = result.notifications || [];
+    if (notifications.length === 0) {
       notifContainer.innerHTML = '<div class="text-secondary small">No new updates available yet.</div>';
-      notifBadge.textContent = '0';
     } else {
-      notifContainer.innerHTML = recentUpdates.map(item => `
-        <div class="notification mb-2">
-          <strong>${escapeHTML(item.tracking)}</strong><br>
-          <span class="small">${escapeHTML(item.updatedMessage)}</span>
+      notifContainer.innerHTML = notifications.map(notification => `
+        <div class="notification mb-2 ${notification.isRead ? 'text-secondary' : ''}">
+          <strong>${escapeHTML(notification.tracking)}</strong>
+          <div class="small">${escapeHTML(notification.message)}</div>
+          <div class="small text-secondary">${new Date(notification.timestamp).toLocaleString()}</div>
+          ${notification.isRead ? '<span class="small">Read</span>' : `<button class="btn btn-sm btn-link p-0" type="button" data-mark-notification-read="${escapeHTML(notification.id)}">Mark as read</button>`}
         </div>
       `).join('');
-      notifBadge.textContent = recentUpdates.length;
     }
+    notifBadge.textContent = result.unreadCount;
   }
+
+  document.getElementById('notifications').addEventListener('click', async event => {
+    const button = event.target.closest('[data-mark-notification-read]');
+    if (!button) return;
+    try {
+      await apiRequest('markNotificationRead', { id: button.dataset.markNotificationRead });
+      updateNotifications(await apiRequest('getNotifications', {}, 'GET'));
+    } catch (error) {
+      window.alert(error.message);
+    }
+  });
+
+  document.getElementById('reportPagination').addEventListener('click', event => {
+    const button = event.target.closest('[data-report-page]');
+    if (!button || button.disabled) return;
+    reportPage = Number(button.dataset.reportPage);
+    render();
+  });
 
   const imageInput = document.getElementById('image');
   const imagePreview = document.getElementById('preview');
@@ -429,9 +465,9 @@ function initResidentPortalPage() {
       return;
     }
 
-    if (description.length < 1 || description.length > 50) {
+    if (description.length < 1 || description.length > 500) {
       this.classList.add('was-validated');
-      document.getElementById('submitAlert').innerHTML = '<div class="alert alert-danger" role="alert">The incident description must be between 1 and 50 characters.</div>';
+      document.getElementById('submitAlert').innerHTML = '<div class="alert alert-danger" role="alert">The incident description must be between 1 and 500 characters.</div>';
       document.getElementById('description').focus();
       return;
     }
@@ -503,12 +539,13 @@ function initResidentPortalPage() {
   document.querySelectorAll('[data-report-filter]').forEach(button => {
     button.addEventListener('click', () => {
       reportFilter = button.dataset.reportFilter;
+      reportPage = 1;
       document.querySelectorAll('[data-report-filter]').forEach(filterButton => {
         const isSelected = filterButton === button;
         filterButton.classList.toggle('active', isSelected);
         filterButton.setAttribute('aria-pressed', String(isSelected));
       });
-      renderReports();
+      render();
     });
   });
 

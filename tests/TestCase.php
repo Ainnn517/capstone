@@ -26,6 +26,8 @@ abstract class TestCase extends BaseTestCase
 
         foreach ([
             'ATTACHMENT',
+            'ADMIN_AUDIT_LOG',
+            'DSS_ANALYTICS_RECORD',
             'NOTIFICATION',
             'STATUS_LOG',
             'ISSUE_REPORT',
@@ -124,6 +126,26 @@ abstract class TestCase extends BaseTestCase
             $table->boolean('is_read')->default(false);
             $table->foreign('report_id')->references('report_id')->on('ISSUE_REPORT')->cascadeOnDelete();
             $table->foreign('user_id')->references('user_id')->on('USERS')->cascadeOnDelete();
+        });
+
+        Schema::create('DSS_ANALYTICS_RECORD', function (Blueprint $table): void {
+            $table->increments('snapshot_id')->unsigned();
+            $table->unsignedInteger('created_by')->nullable();
+            $table->unsignedInteger('source_report_count')->default(0);
+            $table->json('recommendations');
+            $table->dateTime('generated_at')->useCurrent();
+            $table->index('generated_at', 'idx_dss_generated_at');
+            $table->foreign('created_by')->references('user_id')->on('USERS')->nullOnDelete();
+        });
+
+        Schema::create('ADMIN_AUDIT_LOG', function (Blueprint $table): void {
+            $table->increments('audit_id')->unsigned();
+            $table->unsignedInteger('actor_user_id')->nullable();
+            $table->string('action', 100);
+            $table->json('details');
+            $table->dateTime('created_at')->useCurrent();
+            $table->index(['actor_user_id', 'created_at'], 'idx_admin_audit_actor_time');
+            $table->foreign('actor_user_id')->references('user_id')->on('USERS')->nullOnDelete();
         });
 
         Schema::create('REGISTRATION_CAPACITY_LOCK', function (Blueprint $table): void {

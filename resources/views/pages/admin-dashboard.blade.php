@@ -7,7 +7,7 @@
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>Barangay Command Center - Operations Dashboard</title>
   <link rel="stylesheet" href="/frontend/css/admin-dashboard.css">
-  <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-regular-rounded/css/uicons-regular-rounded.css">
+  <link rel="stylesheet" href="/frontend/vendor/uicons-regular-rounded/css/uicons-regular-rounded.css">
 </head>
 <body>
 
@@ -151,6 +151,7 @@
               </tbody>
             </table>
           </div>
+          <div id="incidentPagination" class="d-flex justify-content-between align-items-center gap-3 mt-3" aria-label="Incident report pagination"></div>
         </div>
       </div>
 
@@ -158,10 +159,12 @@
       <div class="col-12">
         <div class="card p-4 h-100 admin-panel dss-card">
           <h4 class="section-title mb-1">DSS Recommendations</h4>
-          <p class="small text-secondary mb-3">Automated priority based on report frequency, unresolved duration, and severity score.</p>
+          <p class="small text-secondary mb-3">Scores combine report count, average age, category severity, and critical reports. Save a snapshot to retain an analytics history.</p>
+          <button id="saveDssSnapshotBtn" class="btn btn-outline-primary btn-sm mb-3 align-self-start" type="button">Save DSS snapshot</button>
           <div id="dssPanel" class="dss-panel">
             <!-- Dynamic recommendation items -->
           </div>
+          <div id="dssHistory" class="mt-3" aria-label="Saved DSS analytics history"></div>
         </div>
       </div>
 
@@ -191,6 +194,7 @@
               <tbody id="archivedBody"></tbody>
             </table>
           </div>
+          <div id="archivedPagination" class="d-flex justify-content-between align-items-center gap-3 mt-3" aria-label="Archived report pagination"></div>
         </div>
       </section>
 
@@ -219,6 +223,7 @@
               <tbody id="resolvedBody"></tbody>
             </table>
           </div>
+          <div id="resolvedPagination" class="d-flex justify-content-between align-items-center gap-3 mt-3" aria-label="Resolved report pagination"></div>
         </div>
       </section>
 
@@ -359,6 +364,9 @@
     </div>
   </div>
 
+  <footer class="text-center text-secondary small py-3">
+    Icons by <a href="https://www.flaticon.com/uicons" rel="noopener">Flaticon Uicons</a>.
+  </footer>
   <script src="/frontend/js/admin-dashboard.js"></script>
 
 </body>

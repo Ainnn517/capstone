@@ -15,6 +15,11 @@ class Notification extends Model
 
     protected $fillable = ['report_id', 'user_id', 'message', 'type', 'is_read'];
 
+    protected $casts = [
+        'is_read' => 'boolean',
+        'timestamp' => 'datetime',
+    ];
+
     // Get the report this notification is about.
     public function report(): BelongsTo
     {

@@ -30,14 +30,11 @@ class AuthController extends ApiController
             'password' => ['required', 'string', 'min:8'],
         ]);
         if ($validator->fails()) {
-            $message = $validator->errors()->first();
-            $emailStatus = $this->accountNotifications->send(
-                $request->input('email'),
-                'Signup could not be completed',
-                "We could not complete your registration. Reason: {$message}",
+            return $this->registrationError(
+                'Registration could not be completed with these details. Review them and try again.',
+                422,
+                'not_sent',
             );
-
-            return $this->registrationError($message, 422, $emailStatus);
         }
 
         $data = $validator->validated();
@@ -67,14 +64,11 @@ class AuthController extends ApiController
             });
         } catch (QueryException $exception) {
             if (($exception->errorInfo[0] ?? null) === '23000') {
-                $message = 'That username or email is already registered.';
-                $emailStatus = $this->accountNotifications->send(
-                    $data['email'],
-                    'Signup could not be completed',
-                    "We could not complete your registration. Reason: {$message} If you believe this is an error, contact the barangay office.",
+                return $this->registrationError(
+                    'Registration could not be completed with these details. Review them and try again.',
+                    422,
+                    'not_sent',
                 );
-
-                return $this->registrationError($message, 409, $emailStatus);
             }
 
             throw $exception;
@@ -82,13 +76,8 @@ class AuthController extends ApiController
 
         if ($user instanceof JsonResponse) {
             $message = $user->getData()->message;
-            $emailStatus = $this->accountNotifications->send(
-                $data['email'],
-                'Signup could not be completed',
-                "We could not complete your registration. Reason: {$message}",
-            );
 
-            return $this->registrationError($message, $user->getStatusCode(), $emailStatus);
+            return $this->registrationError($message, $user->getStatusCode(), 'not_sent');
         }
 
         $emailStatus = $this->accountNotifications->send(

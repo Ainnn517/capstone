@@ -4,6 +4,9 @@
 const API_ENDPOINTS = {
   getReports: '/api/reports',
   getArchivedReports: '/api/reports/archived',
+  getReportSummary: '/api/analytics/summary',
+  getDssRecommendations: '/api/analytics/dss',
+  saveDssSnapshot: '/api/analytics/dss/snapshots',
   getResidents: '/api/residents',
   updateResidentApproval: '/api/residents/{id}/approval',
   session: '/api/session',
@@ -31,7 +34,11 @@ async function apiRequest(action, payload = {}, method = 'POST', resourceId = ''
     options.body = JSON.stringify(payload);
   }
 
-  const endpoint = API_ENDPOINTS[action].replace('{id}', encodeURIComponent(resourceId));
+  let endpoint = API_ENDPOINTS[action].replace('{id}', encodeURIComponent(resourceId));
+  if (method === 'GET' && Object.keys(payload).length > 0) {
+    const query = new URLSearchParams(payload);
+    endpoint += `?${query.toString()}`;
+  }
   const response = await fetch(endpoint, options);
   if (!(response.headers.get('content-type') || '').includes('application/json')) {
     throw new Error('The Laravel API did not respond. Start the app with Artisan and open the Laravel server URL.');
@@ -51,7 +58,7 @@ async function apiRequest(action, payload = {}, method = 'POST', resourceId = ''
   return data;
 }
 
-// Load an external script, such as Chart.js.
+// Load a script asset before initializing the dashboard.
 function loadScript(src, id) {
   return new Promise((resolve, reject) => {
     if (document.querySelector(`script[src="${src}"]`)) {
@@ -78,12 +85,9 @@ function initAdminDashboardPage() {
   let currentReports = [];
   let residents = [];
   let residentReports = [];
-
-  // Load reports for the dashboard.
-  async function syncIssuesFromServer() {
-    const result = await apiRequest('getReports', {}, 'GET');
-    return result.reports || [];
-  }
+  let incidentPage = 1;
+  let resolvedPage = 1;
+  let archivedPage = 1;
 
   // Escape text before placing it in HTML.
   function escapeHTML(value) {
@@ -101,52 +105,73 @@ function initAdminDashboardPage() {
 
   // Refresh report tables, metrics, and recommendations.
   async function render() {
-    let issuesList;
+    let activeResult;
+    let resolvedResult;
+    let summary;
+    let dss;
     try {
-      issuesList = await syncIssuesFromServer();
+      [activeResult, resolvedResult, summary, dss] = await Promise.all([
+        apiRequest('getReports', {
+          view: 'active',
+          page: incidentPage,
+          status: document.getElementById('filterStatus').value,
+          priority: document.getElementById('filterPriority').value
+        }, 'GET'),
+        apiRequest('getReports', { view: 'resolved', page: resolvedPage }, 'GET'),
+        apiRequest('getReportSummary', {}, 'GET'),
+        apiRequest('getDssRecommendations', {}, 'GET')
+      ]);
     } catch (error) {
       const errorRow = '<tr><td colspan="7" class="text-center text-danger py-5">Could not load reports. Check the API connection and your session.</td></tr>';
       document.getElementById('incidentBody').innerHTML = errorRow;
       document.getElementById('resolvedBody').innerHTML = errorRow;
+      window.alert(error.message);
       return;
     }
-    currentReports = issuesList;
-    const statusFilter = document.getElementById('filterStatus').value;
-    const priorityFilter = document.getElementById('filterPriority').value;
 
-    const activeReports = issuesList.filter(item => item.stage !== 'Resolved');
-    const resolvedReports = issuesList.filter(item => item.stage === 'Resolved');
-    const filtered = activeReports.filter(item => {
-      const matchesStatus = (statusFilter === 'All Status' || item.stage === statusFilter);
-      const matchesPriority = (priorityFilter === 'All Priority' || item.priority === priorityFilter);
-      return matchesStatus && matchesPriority;
-    });
-
-    document.getElementById('incidentBody').innerHTML = filtered.length
-      ? filtered.map(item => createIncidentRowHTML(item)).join('')
+    currentReports = activeResult.reports || [];
+    const resolvedReports = resolvedResult.reports || [];
+    document.getElementById('incidentBody').innerHTML = currentReports.length
+      ? currentReports.map(item => createIncidentRowHTML(item)).join('')
       : '<tr><td colspan="7" class="admin-empty-state">No active incidents match the selected filters.</td></tr>';
 
     document.getElementById('resolvedBody').innerHTML = resolvedReports.length
       ? resolvedReports.map(item => createIncidentRowHTML(item, { readOnly: true })).join('')
       : '<tr><td colspan="7" class="admin-empty-state">No resolved incidents yet.</td></tr>';
-    document.getElementById('resolvedCount').textContent = `${resolvedReports.length} resolved`;
-    document.getElementById('resolvedNavCount').textContent = resolvedReports.length;
-
-    const resolvedCount = resolvedReports.length;
-    document.getElementById('mTotal').textContent = issuesList.length;
-    document.getElementById('mDispatch').textContent = issuesList.filter(i => i.stage === 'Dispatched').length;
-    document.getElementById('mResolution').textContent = issuesList.length ? Math.round((resolvedCount / issuesList.length) * 100) + '%' : '0%';
-
-    const purokCounts = {};
-    activeReports.forEach(i => {
-      purokCounts[i.purok] = (purokCounts[i.purok] || 0) + 1;
+    document.getElementById('resolvedCount').textContent = `${summary.summary.resolved} resolved`;
+    document.getElementById('resolvedNavCount').textContent = summary.summary.resolved;
+    document.getElementById('mTotal').textContent = summary.summary.total;
+    document.getElementById('mDispatch').textContent = summary.summary.dispatches;
+    document.getElementById('mResolution').textContent = `${summary.summary.resolutionRate}%`;
+    document.getElementById('mHotspots').textContent = summary.summary.hotspotCount;
+    renderPagination('incidentPagination', activeResult.pagination, page => {
+      incidentPage = page;
+      render();
     });
-    document.getElementById('mHotspots').textContent = Object.values(purokCounts).filter(val => val >= 3).length;
-
-    renderDSSRecommendations(issuesList);
+    renderPagination('resolvedPagination', resolvedResult.pagination, page => {
+      resolvedPage = page;
+      render();
+    });
+    renderDSSRecommendations(dss.recommendations || []);
+    renderDssHistory(dss.history || []);
     if (!document.getElementById('analyticsView').hidden) {
-      renderAnalytics(issuesList);
+      renderAnalytics(summary.summary);
     }
+  }
+
+  function renderPagination(containerId, pagination, onPageChange) {
+    const container = document.getElementById(containerId);
+    if (!container || !pagination) return;
+    const { currentPage, lastPage, total } = pagination;
+    container.innerHTML = `
+      <button class="btn btn-sm btn-outline-secondary" type="button" data-page="${currentPage - 1}" ${currentPage <= 1 ? 'disabled' : ''}>Previous</button>
+      <span class="small text-secondary">Page ${currentPage} of ${lastPage} · ${total} reports</span>
+      <button class="btn btn-sm btn-outline-secondary" type="button" data-page="${currentPage + 1}" ${currentPage >= lastPage ? 'disabled' : ''}>Next</button>
+    `;
+    container.onclick = event => {
+      const button = event.target.closest('[data-page]');
+      if (button && !button.disabled) onPageChange(Number(button.dataset.page));
+    };
   }
 
   // Build one report row for the active or resolved table.
@@ -194,14 +219,14 @@ function initAdminDashboardPage() {
   }
 
   // Refresh the analytics charts and hotspot grid.
-  function renderAnalytics(issuesList) {
-    renderCharts(issuesList);
-    renderHotspotGrid(issuesList);
+  function renderAnalytics(summary) {
+    renderCharts(summary);
+    renderHotspotGrid(summary.hotspots || []);
   }
 
-  // Draw report totals by category and month.
-  function renderCharts(issuesList) {
-    const categoryCounts = CATEGORIES.map(c => issuesList.filter(i => i.category === c).length);
+  // Draw report totals by category and month using server-side aggregates.
+  function renderCharts(summary) {
+    const categoryCounts = CATEGORIES.map(category => Number(summary.categories[category] || 0));
 
     if (pieChartInstance) pieChartInstance.destroy();
     const pieCtx = document.getElementById('pieChart').getContext('2d');
@@ -221,9 +246,7 @@ function initAdminDashboardPage() {
     });
 
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const monthlyData = months.map((_, monthIndex) => {
-      return issuesList.filter(i => new Date(i.created).getMonth() === monthIndex).length;
-    });
+    const monthlyData = summary.monthly;
 
     if (lineChartInstance) lineChartInstance.destroy();
     const lineCtx = document.getElementById('lineChart').getContext('2d');
@@ -252,10 +275,13 @@ function initAdminDashboardPage() {
   }
 
   // Show active report counts by area and category.
-  function renderHotspotGrid(issuesList) {
-    const activeIssues = issuesList.filter(issue => !['Resolved', 'Rejected'].includes(issue.stage));
-    const locations = [...new Set(activeIssues.map(issue => issue.purok).filter(Boolean))]
-      .sort((first, second) => first.localeCompare(second));
+  function renderHotspotGrid(hotspots) {
+    const countsByLocation = new Map();
+    hotspots.forEach(hotspot => {
+      if (!countsByLocation.has(hotspot.location)) countsByLocation.set(hotspot.location, new Map());
+      countsByLocation.get(hotspot.location).set(hotspot.category, hotspot.count);
+    });
+    const locations = [...countsByLocation.keys()].sort((first, second) => first.localeCompare(second));
 
     if (locations.length === 0) {
       document.getElementById('hotspotGrid').innerHTML =
@@ -264,16 +290,14 @@ function initAdminDashboardPage() {
     }
 
     const gridHTML = locations.map(location => CATEGORIES.map(category => {
-      const count = activeIssues.filter(issue =>
-        issue.purok === location && issue.category === category
-      ).length;
+      const count = countsByLocation.get(location)?.get(category) || 0;
       const heatLevel = Math.min(5, 1 + Math.floor(count / 2));
       const shortCategory = category.replace('Clogged Drainage', 'Drainage').replace('Public Safety', 'Safety');
 
       return `
         <div class="hotspot-cell heat-${heatLevel}">
           <span>${escapeHTML(location)}</span>
-          <span>${shortCategory}</span>
+          <span>${escapeHTML(shortCategory)}</span>
           <strong>${count} active</strong>
         </div>
       `;
@@ -282,55 +306,30 @@ function initAdminDashboardPage() {
     document.getElementById('hotspotGrid').innerHTML = gridHTML;
   }
 
-  // Rank active report groups and show suggested responses.
-  function renderDSSRecommendations(issuesList) {
-    const activeIssues = issuesList.filter(i => !['Resolved', 'Rejected'].includes(i.stage));
-    const grouped = {};
-
-    activeIssues.forEach(item => {
-      const key = `${item.purok}|${item.category}`;
-      if (!grouped[key]) grouped[key] = [];
-      grouped[key].push(item);
-    });
-
-    const recommendations = Object.entries(grouped).map(([key, items]) => {
-      const [purok, category] = key.split('|');
-      const avgAgeDays = items.reduce((sum, item) => sum + (Date.now() - new Date(item.created).getTime()) / 86400000, 0) / items.length;
-      const criticalCount = items.filter(item => item.priority === 'Critical').length;
-
-      const score = (items.length * 3) + avgAgeDays + (criticalCount * 5);
-
-      return {
-        purok,
-        category,
-        count: items.length,
-        avgAge: avgAgeDays,
-        score
-      };
-    })
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 5);
-
+  // Display recommendations computed by the backend DSS service.
+  function renderDSSRecommendations(recommendations) {
     const dssContainer = document.getElementById('dssPanel');
 
     if (recommendations.length === 0) {
       dssContainer.innerHTML = '<div class="admin-empty-state">No active unresolved incidents for DSS calculation.</div>';
     } else {
       dssContainer.innerHTML = recommendations.map(rec => {
-        const isHighUrgency = rec.score > 8;
+        const isHighUrgency = rec.urgency === 'High';
         return `
           <div class="border rounded-4 p-3 mb-2 bg-white">
             <div class="d-flex justify-content-between align-items-start">
-              <strong>${escapeHTML(rec.purok)} — ${escapeHTML(rec.category)}</strong>
+              <strong>${escapeHTML(rec.location)} — ${escapeHTML(rec.category)}</strong>
               <span class="badge-soft ${isHighUrgency ? 'soft-red' : 'soft-yellow'}">
                 ${isHighUrgency ? 'High Urgency' : 'Moderate'}
               </span>
             </div>
             <div class="small text-secondary mt-1">
-              ${rec.count} active report(s), avg age ${rec.avgAge.toFixed(1)} day(s).
+              ${rec.reportCount} active report(s), avg age ${Number(rec.averageAgeDays).toFixed(1)} day(s), ${rec.criticalCount} critical.
             </div>
+            <div class="small text-secondary">Score ${Number(rec.score).toFixed(2)} = reports ${Number(rec.scoreBreakdown.reportCount).toFixed(2)} + age ${Number(rec.scoreBreakdown.averageAgeDays).toFixed(2)} + severity ${Number(rec.scoreBreakdown.severity).toFixed(2)} + critical ${Number(rec.scoreBreakdown.criticalReports).toFixed(2)}.</div>
             <div class="small mt-2 pt-2 border-top">
-              <strong>Action:</strong> ${isHighUrgency ? 'Deploy field response team immediately.' : 'Schedule field inspection.'}
+              <strong>Suggested team:</strong> ${escapeHTML(rec.recommendedTeam || 'No configured team')}<br>
+              <strong>Action:</strong> ${escapeHTML(rec.recommendedAction)}
             </div>
           </div>
         `;
@@ -338,17 +337,43 @@ function initAdminDashboardPage() {
     }
   }
 
+  function renderDssHistory(history) {
+    const container = document.getElementById('dssHistory');
+    container.innerHTML = history.length
+      ? history.map(snapshot => `
+        <div class="small border-top pt-2 mt-2">
+          <strong>${new Date(snapshot.generatedAt).toLocaleString()}</strong>
+          · ${snapshot.sourceReportCount} source report(s)
+          · ${snapshot.recommendations.length} recommendation(s)
+        </div>
+      `).join('')
+      : '<div class="small text-secondary">No saved DSS snapshots yet.</div>';
+  }
+
+  document.getElementById('saveDssSnapshotBtn').addEventListener('click', async () => {
+    try {
+      await apiRequest('saveDssSnapshot');
+      await render();
+      window.alert('DSS recommendation snapshot saved.');
+    } catch (error) {
+      window.alert(error.message);
+    }
+  });
+
   // Load resident accounts and their reports.
   async function loadResidents() {
     const residentsList = document.getElementById('residentsList');
     residentsList.innerHTML = '<div class="card p-4 text-secondary">Loading residents and complaints…</div>';
     try {
-      const [residentResult, reportResult] = await Promise.all([
-        apiRequest('getResidents', {}, 'GET'),
-        apiRequest('getReports', {}, 'GET')
-      ]);
+      const residentResult = await apiRequest('getResidents', {}, 'GET');
+      let reportResult = await apiRequest('getReports', { page: 1 }, 'GET');
+      const reportPages = [reportResult.reports || []];
+      for (let page = 2; page <= reportResult.pagination.lastPage; page++) {
+        const nextPage = await apiRequest('getReports', { page }, 'GET');
+        reportPages.push(nextPage.reports || []);
+      }
       residents = residentResult.residents || [];
-      residentReports = reportResult.reports || [];
+      residentReports = reportPages.flat();
       document.getElementById('residentNavCount').textContent = residents.length;
       renderPendingApprovals();
       renderResidents();
@@ -561,8 +586,14 @@ function initAdminDashboardPage() {
 
   // Filter reports and residents as the controls change.
   // Reload reports when filters change and residents when the search changes.
-  document.getElementById('filterStatus').addEventListener('change', render);
-  document.getElementById('filterPriority').addEventListener('change', render);
+  document.getElementById('filterStatus').addEventListener('change', () => {
+    incidentPage = 1;
+    render();
+  });
+  document.getElementById('filterPriority').addEventListener('change', () => {
+    incidentPage = 1;
+    render();
+  });
   document.getElementById('residentSearch').addEventListener('input', renderResidents);
   async function handleResidentApproval(event) {
     const button = event.target.closest('[data-resident-approval]');
@@ -646,12 +677,16 @@ function initAdminDashboardPage() {
   async function renderArchivedReports() {
     const body = document.getElementById('archivedBody');
     try {
-      const result = await apiRequest('getArchivedReports', {}, 'GET');
+      const result = await apiRequest('getArchivedReports', { page: archivedPage }, 'GET');
       const reports = result.reports || [];
       body.innerHTML = reports.length
         ? reports.map(item => createIncidentRowHTML(item, { readOnly: true, archived: true })).join('')
         : '<tr><td colspan="7" class="admin-empty-state">No archived reports.</td></tr>';
-      document.getElementById('archivedNavCount').textContent = reports.length;
+      document.getElementById('archivedNavCount').textContent = result.pagination.total;
+      renderPagination('archivedPagination', result.pagination, page => {
+        archivedPage = page;
+        renderArchivedReports();
+      });
     } catch (error) {
       body.innerHTML = '<tr><td colspan="7" class="admin-empty-state alert-error">Could not load archived reports.</td></tr>';
       window.alert(error.message);
@@ -680,9 +715,8 @@ function initAdminDashboardPage() {
         loadResidents();
       } else if (selectedView === 'archived') {
         renderArchivedReports();
-      } else {
+      } else if (['dashboard', 'incidents', 'resolved', 'analytics'].includes(selectedView)) {
         render();
-        loadResidents();
       }
     });
   });
@@ -693,7 +727,7 @@ function initAdminDashboardPage() {
     if (!confirmed) return;
 
     try {
-      const result = await apiRequest('clearReports');
+      const result = await apiRequest('clearReports', { confirmed: true });
       await render();
       window.alert(`${result.archived} incident(s) archived. Administrators can review them in Archived Incidents.`);
     } catch (error) {
@@ -733,6 +767,6 @@ async function startAdminDashboard() {
 }
 
 // Load Chart.js before starting the dashboard.
-loadScript('https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js', 'chartjs-admin')
+loadScript('/frontend/vendor/chart.js/chart.umd.js', 'chartjs-admin')
   .then(() => startAdminDashboard())
   .catch(() => console.error('Chart.js failed to load for admin-dashboard.html'));

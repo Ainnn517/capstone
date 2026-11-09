@@ -1,0 +1,28 @@
+@font-face {
+  font-family: "uicons-regular-rounded";
+  src: url("../webfonts/uicons-regular-rounded.woff2") format("woff2");
+  font-display: swap;
+}
+
+i[class^="fi-rr-"]::before,
+i[class*=" fi-rr-"]::before {
+  font-family: "uicons-regular-rounded" !important;
+  font-style: normal;
+  font-weight: normal !important;
+  font-variant: normal;
+  text-transform: none;
+  line-height: 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.fi-rr-bell::before { content: "\f1de"; }
+.fi-rr-check::before { content: "\f2de"; }
+.fi-rr-map-marker::before { content: "\f64c"; }
+.fi-rr-dashboard::before { content: "\f3dd"; }
+.fi-rr-flag::before { content: "\f4d8"; }
+.fi-rr-check-circle::before { content: "\f2dc"; }
+.fi-rr-archive::before { content: "\f148"; }
+.fi-rr-users-alt::before { content: "\f996"; }
+.fi-rr-user-time::before { content: "\f993"; }
+.fi-rr-chart-histogram::before { content: "\f2c8"; }

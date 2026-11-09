@@ -1,7 +1,5 @@
 /config.local.php
 /.phpunit.result.cache
-/database/pilot_barangay.db
-/database/pilot_barangay.db-*
 /database/uploads/
 /.env
 /vendor/

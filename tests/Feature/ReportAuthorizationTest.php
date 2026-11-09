@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Database\Events\QueryExecuted;
 use Tests\TestCase;
 
 class ReportAuthorizationTest extends TestCase
@@ -28,6 +29,9 @@ class ReportAuthorizationTest extends TestCase
         $this->deleteJson('/api/reports/1/archived')->assertUnauthorized();
         $this->getJson('/api/residents')->assertUnauthorized();
         $this->getJson('/api/attachments/1')->assertUnauthorized();
+        $this->getJson('/api/notifications')->assertUnauthorized();
+        $this->postJson('/api/notifications/1/read')->assertUnauthorized();
+        $this->getJson('/api/analytics/dss')->assertUnauthorized();
     }
 
     public function test_resident_can_submit_a_report_without_assigning_owner_or_admin_fields(): void
@@ -61,7 +65,7 @@ class ReportAuthorizationTest extends TestCase
         $this->assertSame('resident', $resident->fresh()->role);
     }
 
-    public function test_report_description_must_be_between_one_and_fifty_characters(): void
+    public function test_report_description_must_be_between_one_and_five_hundred_characters(): void
     {
         $resident = User::factory()->create();
         $category = Category::create([
@@ -74,13 +78,13 @@ class ReportAuthorizationTest extends TestCase
             'purok' => 'Main Street, Barangay One',
         ];
 
-        foreach (['x', str_repeat('x', 50)] as $description) {
+        foreach (['x', str_repeat('x', 500)] as $description) {
             $this->actingAs($resident)
                 ->postJson('/api/reports', [...$payload, 'description' => $description])
                 ->assertCreated();
         }
 
-        foreach (['', str_repeat('x', 51)] as $description) {
+        foreach (['', str_repeat('x', 501)] as $description) {
             $this->actingAs($resident)
                 ->postJson('/api/reports', [...$payload, 'description' => $description])
                 ->assertUnprocessable();
@@ -116,6 +120,41 @@ class ReportAuthorizationTest extends TestCase
             ->assertJsonCount(2, 'reports')
             ->assertJsonFragment(['id' => (string) $firstReport->report_id])
             ->assertJsonFragment(['id' => (string) $secondReport->report_id]);
+    }
+
+    public function test_report_list_is_paginated_and_has_no_attachment_blob_in_the_payload(): void
+    {
+        $administrator = User::factory()->create(['role' => 'admin']);
+        $resident = User::factory()->create();
+        $firstReport = $this->createReport($resident);
+        Attachment::create([
+            'report_id' => $firstReport->report_id,
+            'mime_type' => 'image/png',
+            'file_data' => 'test-image',
+        ]);
+        for ($i = 0; $i < 50; $i++) {
+            $this->createReport($resident);
+        }
+
+        $attachmentQueries = [];
+        DB::listen(function (QueryExecuted $query) use (&$attachmentQueries): void {
+            if (str_contains(strtoupper($query->sql), 'ATTACHMENT')) {
+                $attachmentQueries[] = $query->sql;
+            }
+        });
+        $response = $this->actingAs($administrator)->getJson('/api/reports?view=active&page=2');
+
+        $response->assertOk()
+            ->assertJsonCount(1, 'reports')
+            ->assertJsonPath('pagination.currentPage', 2)
+            ->assertJsonPath('pagination.lastPage', 2)
+            ->assertJsonPath('pagination.total', 51);
+        $this->assertArrayNotHasKey('file_data', $response->json('reports.0'));
+        $this->assertNotEmpty($attachmentQueries);
+        $this->assertSame([], array_filter(
+            $attachmentQueries,
+            fn (string $query): bool => str_contains(strtolower($query), 'file_data'),
+        ));
     }
 
     public function test_resident_cannot_access_another_residents_attachment_by_id(): void
@@ -161,7 +200,9 @@ class ReportAuthorizationTest extends TestCase
     {
         $resident = User::factory()->create();
         $this->actingAs($resident)->getJson('/api/residents')->assertForbidden();
-        $this->actingAs($resident)->postJson('/api/reports/clear')->assertForbidden();
+        $this->actingAs($resident)->postJson('/api/reports/clear', ['confirmed' => true])->assertForbidden();
+        $this->actingAs($resident)->getJson('/api/analytics/dss')->assertForbidden();
+        $this->actingAs($resident)->getJson('/api/analytics/summary')->assertForbidden();
     }
 
     public function test_administrator_can_update_a_report_and_create_a_status_log(): void
@@ -181,6 +222,12 @@ class ReportAuthorizationTest extends TestCase
             ->assertJson(['success' => true]);
 
         $this->assertSame('Dispatched', $report->fresh()->status);
+        $this->assertDatabaseHas('NOTIFICATION', [
+            'report_id' => $report->report_id,
+            'user_id' => $resident->user_id,
+            'type' => 'status_update',
+            'message' => 'A response team has been notified.',
+        ]);
         $this->assertDatabaseHas('STATUS_LOG', [
             'report_id' => $report->report_id,
             'changed_by' => $administrator->user_id,
@@ -206,6 +253,48 @@ class ReportAuthorizationTest extends TestCase
         );
     }
 
+    public function test_report_update_rejects_invalid_status_and_empty_dispatch_note(): void
+    {
+        $administrator = User::factory()->create(['role' => 'admin']);
+        $resident = User::factory()->create();
+        $report = $this->createReport($resident);
+
+        foreach ([
+            [
+                'id' => $report->report_id,
+                'status' => 'Unknown',
+                'assignee' => 'Unassigned',
+                'dispatchNote' => 'A valid note.',
+            ],
+            [
+                'id' => $report->report_id,
+                'status' => 'Validated',
+                'assignee' => 'Unassigned',
+                'dispatchNote' => '   ',
+            ],
+            [
+                'id' => $report->report_id,
+                'status' => 'Validated',
+                'assignee' => str_repeat('x', 101),
+                'dispatchNote' => 'A valid note.',
+            ],
+            [
+                'id' => $report->report_id,
+                'status' => 'Validated',
+                'assignee' => 'Unknown Team',
+                'dispatchNote' => 'A valid note.',
+            ],
+        ] as $payload) {
+            $this->actingAs($administrator)
+                ->postJson('/api/reports/update', $payload)
+                ->assertUnprocessable();
+        }
+
+        $this->assertSame('Submitted', $report->fresh()->status);
+        $this->assertDatabaseMissing('STATUS_LOG', ['report_id' => $report->report_id]);
+        $this->assertDatabaseMissing('NOTIFICATION', ['report_id' => $report->report_id]);
+    }
+
     public function test_clearing_reports_archives_unresolved_reports_and_hides_them_from_residents(): void
     {
         $administrator = User::factory()->create(['role' => 'admin']);
@@ -223,9 +312,17 @@ class ReportAuthorizationTest extends TestCase
 
         $this->actingAs($administrator)
             ->postJson('/api/reports/clear')
+            ->assertUnprocessable();
+        $this->assertNull($activeReport->fresh()->archived_at);
+
+        $this->postJson('/api/reports/clear', ['confirmed' => true])
             ->assertOk()
             ->assertJsonPath('archived', 2);
 
+        $this->assertDatabaseHas('ADMIN_AUDIT_LOG', [
+            'actor_user_id' => $administrator->user_id,
+            'action' => 'bulk_archive_unresolved_reports',
+        ]);
         $this->assertNotNull($activeReport->fresh()->archived_at);
         $this->assertSame($administrator->user_id, $activeReport->fresh()->archived_by);
         $this->assertNotNull($rejectedReport->fresh()->archived_at);
@@ -362,7 +459,7 @@ class ReportAuthorizationTest extends TestCase
             ->assertJsonPath('message', 'Your account is awaiting administrator approval.');
     }
 
-    public function test_duplicate_registration_sends_the_reason_to_a_valid_submitted_email(): void
+    public function test_duplicate_registration_does_not_email_the_submitted_address_or_reveal_account_existence(): void
     {
         Mail::fake();
         config([
@@ -377,19 +474,24 @@ class ReportAuthorizationTest extends TestCase
             'email' => 'existing-resident@example.test',
         ]);
 
-        $this->postJson('/api/register', [
+        $response = $this->postJson('/api/register', [
             'fullName' => 'New Resident',
             'username' => 'new-resident',
             'email' => 'existing-resident@example.test',
             'password' => 'a-secure-test-password',
-        ])->assertConflict()
-            ->assertJsonPath('emailStatus', 'sent');
+        ])->assertUnprocessable()
+            ->assertJsonPath('message', 'Registration could not be completed with these details. Review them and try again.')
+            ->assertJsonPath('emailStatus', 'not_sent');
 
-        Mail::assertSent(
-            AccountUpdateMail::class,
-            fn (AccountUpdateMail $mail): bool => $mail->hasTo('existing-resident@example.test')
-                && str_contains($mail->render(), 'already registered'),
-        );
+        $this->postJson('/api/register', [
+            'fullName' => '',
+            'username' => 'invalid-resident',
+            'email' => 'invalid-resident@example.test',
+            'password' => 'a-secure-test-password',
+        ])->assertUnprocessable()
+            ->assertExactJson($response->json());
+
+        Mail::assertNothingOutgoing();
     }
 
     public function test_administrator_can_approve_a_resident_before_they_can_sign_in(): void

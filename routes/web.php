@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DssController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ResidentController;
 use Illuminate\Support\Facades\Route;
@@ -20,6 +22,13 @@ Route::post('/api/register', [AuthController::class, 'register'])->middleware('t
 Route::middleware('api.auth')->group(function (): void {
     Route::get('/api/session', [AuthController::class, 'session']);
     Route::post('/api/logout', [AuthController::class, 'logout']);
+    Route::get('/api/notifications', [NotificationController::class, 'index'])->middleware('role:resident');
+    Route::post('/api/notifications/{id}/read', [NotificationController::class, 'markAsRead'])
+        ->whereNumber('id')
+        ->middleware('role:resident');
+    Route::get('/api/analytics/summary', [ReportController::class, 'summary'])->middleware('role:admin');
+    Route::get('/api/analytics/dss', [DssController::class, 'index'])->middleware('role:admin');
+    Route::post('/api/analytics/dss/snapshots', [DssController::class, 'store'])->middleware('role:admin');
     Route::get('/api/reports', [ReportController::class, 'index'])->middleware('role:resident,admin');
     Route::get('/api/reports/archived', [ReportController::class, 'archived'])->middleware('role:admin');
     Route::post('/api/reports/{id}/archive', [ReportController::class, 'archive'])

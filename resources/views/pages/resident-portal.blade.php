@@ -8,7 +8,7 @@
   <meta name="google-maps-api-key" content="{{ config('services.google_maps.key') }}">
   <title>Barangay Issue Reporting System - Resident Portal</title>
   <link rel="stylesheet" href="/frontend/css/resident-portal.css">
-  <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-regular-rounded/css/uicons-regular-rounded.css">
+  <link rel="stylesheet" href="/frontend/vendor/uicons-regular-rounded/css/uicons-regular-rounded.css">
 </head>
 <body>
 
@@ -84,7 +84,8 @@
 
               <div class="col-12">
                 <label class="form-label fw-medium">Detailed Description</label>
-                <textarea id="description" class="form-control" rows="4" minlength="1" maxlength="50" required placeholder="Describe the incident in 1 to 50 characters."></textarea>
+                <textarea id="description" class="form-control" rows="4" minlength="1" maxlength="500" required placeholder="Describe the incident in 1 to 500 characters."></textarea>
+                <small class="form-text text-secondary">Include enough detail for a response team to understand the issue (up to 500 characters).</small>
               </div>
 
               <div class="col-md-7">
@@ -164,10 +165,14 @@
       <div id="issuesList" class="issues-list mt-3" aria-live="polite">
         <!-- Dynamically rendered reports -->
       </div>
+      <div id="reportPagination" class="d-flex justify-content-between align-items-center gap-3 mt-3" aria-label="Report pagination"></div>
     </section>
 
   </main>
 
+  <footer class="text-center text-secondary small py-3">
+    Icons by <a href="https://www.flaticon.com/uicons" rel="noopener">Flaticon Uicons</a>.
+  </footer>
   <script src="/frontend/js/resident-portal.js"></script>
 
 </body>
