@@ -32,7 +32,11 @@ class ReportController extends ApiController
             'location',
             'team',
             'latestStatusLog',
-            'latestAttachment:attachment_id,report_id,mime_type',
+            'latestAttachment' => fn ($query) => $query->select(
+                'ATTACHMENT.attachment_id',
+                'ATTACHMENT.report_id',
+                'ATTACHMENT.mime_type',
+            ),
         ])->whereNull('archived_at')
             ->orderByDesc('date_submitted')
             ->orderByDesc('report_id');
@@ -94,7 +98,11 @@ class ReportController extends ApiController
             'location',
             'team',
             'latestStatusLog',
-            'latestAttachment:attachment_id,report_id,mime_type',
+            'latestAttachment' => fn ($query) => $query->select(
+                'ATTACHMENT.attachment_id',
+                'ATTACHMENT.report_id',
+                'ATTACHMENT.mime_type',
+            ),
         ])->whereNotNull('archived_at')
             ->orderByDesc('archived_at')
             ->orderByDesc('report_id')
