@@ -1,0 +1,106 @@
+@import url("https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Source+Serif+4:wght@400;600&display=swap");
+
+/* Shared colors and base page styles. */
+:root {
+  --green: #3b5a48;
+  --glass-dark: rgba(60, 92, 74, .62);
+  --glass-bar: rgba(255, 255, 255, .28);
+  --line: rgba(255, 255, 255, .35);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body { font-family: "Archivo", Arial, sans-serif; color: #fff; }
+
+.login-page {
+  position: relative; min-height: 100vh; overflow-x: hidden; overflow-y: auto;
+  display: grid; grid-template-columns: 1fr 360px; align-items: center;
+  gap: 48px; padding: 130px 6vw 40px;
+}
+
+/* Blurred barangay photo background */
+.background-image {
+  position: fixed; inset: -20px; z-index: -2;
+  background: url("../../images/bg0.png") center / cover no-repeat, linear-gradient(135deg, #4d7a62, #25402f);
+  filter: blur(7px);
+}
+.background-shade { position: fixed; inset: 0; z-index: -1; background: rgba(12, 24, 18, .48); }
+
+/* Top bar */
+.topbar {
+  position: fixed; inset: 0 0 auto 0; height: 94px; z-index: 5;
+  display: flex; align-items: center; justify-content: space-between; padding: 0 5vw 0 0;
+  background: var(--glass-bar); backdrop-filter: blur(10px);
+  border-radius: 0 0 14px 14px; border-bottom: 1px solid var(--line);
+}
+.topbar .logo { height: 96px; width: 96px; margin: -2px 0 0 -4px; object-fit: contain; }
+.topbar nav { display: flex; gap: 64px; }
+.topbar a { color: #fff; font-weight: 700; font-size: 1.15rem; text-decoration: none; }
+.topbar a:hover { text-decoration: underline; text-underline-offset: 6px; }
+
+/* Hero */
+.hero-copy { text-align: center; max-width: 680px; justify-self: center; }
+.hero-copy h1 {
+  font-weight: 800; font-size: clamp(2.6rem, 6vw, 5rem); line-height: 1.35;
+  letter-spacing: .01em; text-shadow: 0 3px 14px rgba(0, 0, 0, .25);
+}
+.hero-copy h1 .word {
+  display: inline-block;
+  animation: report-red-pulse 9s infinite;
+}
+.hero-copy h1 .track-word { animation-delay: 3s; }
+.hero-copy h1 .respond-word { display: block; animation-delay: 6s; }
+@keyframes report-red-pulse {
+  0%, 5% { color: #ff4545; }
+  6%, 100% { color: #fff; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-copy h1 .word { animation: none; }
+}
+.intro {
+  margin-top: 36px; font-family: "Source Serif 4", Georgia, serif;
+  font-size: clamp(1.1rem, 1.8vw, 1.5rem); line-height: 1.45; text-shadow: 0 2px 8px rgba(0, 0, 0, .35);
+}
+
+/* Login and registration form. */
+.login-card {
+  padding: 56px 28px 22px; border-radius: 14px;
+  background: var(--glass-dark); backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, .25); box-shadow: 0 18px 40px rgba(0, 0, 0, .25);
+}
+.login-card h2 { margin-bottom: 24px; text-align: center; font-size: 1.35rem; }
+.login-card form[hidden] { display: none; }
+.login-card label { display: block; margin-bottom: 8px; font-size: 1rem; opacity: .95; }
+.input-wrap { position: relative; margin-bottom: 26px; }
+.input-wrap input {
+  width: 100%; height: 34px; padding: 0 40px 0 12px; color: #fff; font: inherit;
+  background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .45); border-radius: 6px; outline: none;
+}
+.input-wrap input:focus { border-color: #fff; background: rgba(255, 255, 255, .14); }
+.toggle-password {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  width: 26px; height: 26px; background: none; border: 0; cursor: pointer;
+}
+.toggle-password svg { width: 100%; fill: none; stroke: #fff; stroke-width: 1.6; }
+
+.login-button {
+  width: 100%; height: 40px; margin-top: 70px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  font: 600 1rem "Archivo", sans-serif; color: #1f2d25;
+  background: linear-gradient(#fff, #d9dedb); border: 0; border-radius: 20px;
+  transition: transform .15s, box-shadow .15s;
+}
+.login-card #registerForm .login-button { margin-top: 8px; }
+.login-button:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0, 0, 0, .25); }
+.form-message { min-height: 1.2em; margin-top: 10px; font-size: .85rem; text-align: center; color: #ffd9d9; }
+.form-switch {
+  display: block; margin: 14px auto 0; padding: 4px; color: #fff; font: inherit;
+  background: none; border: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+}
+.card-footer { margin-top: 6px; text-align: center; font-size: .72rem; opacity: .8; line-height: 1.5; }
+
+@media (max-width: 900px) {
+  .login-page { grid-template-columns: 1fr; padding-top: 120px; gap: 32px; }
+  .login-card { max-width: 420px; width: 100%; justify-self: center; }
+  .topbar nav { gap: 24px; }
+}

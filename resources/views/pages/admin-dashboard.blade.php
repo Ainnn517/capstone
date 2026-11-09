@@ -1,0 +1,365 @@
+<!-- Admin report management and analytics page. -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>Barangay Command Center - Operations Dashboard</title>
+  <link rel="stylesheet" href="/frontend/css/admin-dashboard.css">
+  <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-regular-rounded/css/uicons-regular-rounded.css">
+</head>
+<body>
+
+  <!-- Command Center Header Nav -->
+  <nav class="navbar navbar-dark">
+    <div class="container-fluid px-4">
+      <div class="d-flex gap-2 align-items-center">
+        <span id="adminName" class="text-white-50 small">Welcome ! Admin</span>
+        <button class="btn btn-light btn-sm" id="logoutBtn" type="button">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Container -->
+  <main class="container-fluid page-wrap px-3 px-lg-4 admin-layout">
+    <aside class="admin-sidebar card" aria-label="Admin navigation">
+      <p class="sidebar-label">Workspace</p>
+      <button class="sidebar-link active" type="button" data-admin-view="dashboard" aria-current="page">
+        <i class="fi fi-rr-dashboard sidebar-icon" aria-hidden="true"></i>
+        Dashboard
+      </button>
+      <button class="sidebar-link" type="button" data-admin-view="incidents">
+        <i class="fi fi-rr-flag sidebar-icon" aria-hidden="true"></i>
+        Incident Management
+      </button>
+      <button class="sidebar-link" type="button" data-admin-view="resolved">
+        <i class="fi fi-rr-check-circle sidebar-icon" aria-hidden="true"></i>
+        Resolved Incidents
+        <span class="sidebar-count" id="resolvedNavCount">0</span>
+      </button>
+      <button class="sidebar-link" type="button" data-admin-view="archived">
+        <i class="fi fi-rr-archive sidebar-icon" aria-hidden="true"></i>
+        Archived Incidents
+        <span class="sidebar-count" id="archivedNavCount">0</span>
+      </button>
+      <button class="sidebar-link" type="button" data-admin-view="residents">
+        <i class="fi fi-rr-users-alt sidebar-icon" aria-hidden="true"></i>
+        Residents
+        <span class="sidebar-count" id="residentNavCount">—</span>
+      </button>
+      <button class="sidebar-link" type="button" data-admin-view="pendingApprovals">
+        <i class="fi fi-rr-user-time sidebar-icon" aria-hidden="true"></i>
+        Pending Approvals
+        <span class="sidebar-count" id="pendingApprovalNavCount" aria-label="Pending approvals">0</span>
+      </button>
+      <button class="sidebar-link" type="button" data-admin-view="analytics">
+        <i class="fi fi-rr-chart-histogram sidebar-icon" aria-hidden="true"></i>
+        Analytics
+      </button>
+    </aside>
+
+    <div class="admin-content">
+      <section id="dashboardView" class="admin-view">
+    
+    <!-- Title Section -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+      <div>
+        <h1 class="section-title mb-1">Operations Dashboard</h1>
+        <p class="text-secondary mb-0">A quick overview of reports and response activity.</p>
+      </div>
+    </div>
+
+    <!-- Key Metrics Row -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-xl-3">
+        <div class="card metric">
+          <div class="label">Total Reports</div>
+          <div id="mTotal" class="value">0</div>
+        </div>
+      </div>
+      <div class="col-6 col-xl-3">
+        <div class="card metric">
+          <div class="label">Active Dispatches</div>
+          <div id="mDispatch" class="value">0</div>
+        </div>
+      </div>
+      <div class="col-6 col-xl-3">
+        <div class="card metric">
+          <div class="label">Resolution Rate</div>
+          <div id="mResolution" class="value">0%</div>
+        </div>
+      </div>
+      <div class="col-6 col-xl-3">
+        <div class="card metric">
+          <div class="label">Critical Hotspots</div>
+          <div id="mHotspots" class="value">0</div>
+        </div>
+      </div>
+    </div>
+
+      </section>
+
+      <section id="incidentsView" class="admin-view" hidden>
+    <!-- Incident Table & DSS Panel -->
+    <div class="row g-4">
+      
+      <!-- Incident Table -->
+      <div class="col-12">
+        <div class="card p-4 admin-panel">
+          <div class="incident-toolbar">
+            <div>
+              <h1 class="section-title mb-1">Incident Management</h1>
+              <small class="text-secondary">Open and rejected incidents that still need review or follow-up.</small>
+            </div>
+            
+            <!-- Filters -->
+            <div class="incident-filters">
+              <select id="filterStatus" class="form-select form-select-sm">
+                <option>All Status</option>
+                <option>Submitted</option>
+                <option>Validated</option>
+                <option>Dispatched</option>
+                <option>Rejected</option>
+              </select>
+              <select id="filterPriority" class="form-select form-select-sm">
+                <option>All Priority</option>
+                <option>Critical</option>
+                <option>High</option>
+                <option>Normal</option>
+              </select>
+              <button id="clearReportsBtn" class="btn btn-outline-danger btn-sm" type="button">Archive Incidents</button>
+            </div>
+          </div>
+
+          <!-- Table Content -->
+          <div class="table-responsive">
+            <table class="table align-middle">
+              <thead>
+                <tr>
+                  <th>Tracking</th>
+                  <th>Issue</th>
+                  <th>Location</th>
+                  <th>Status</th>
+                  <th>Priority</th>
+                  <th>Resident Upload</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="incidentBody">
+                <!-- Dynamically populated rows -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- DSS Recommendation System -->
+      <div class="col-12">
+        <div class="card p-4 h-100 admin-panel dss-card">
+          <h4 class="section-title mb-1">DSS Recommendations</h4>
+          <p class="small text-secondary mb-3">Automated priority based on report frequency, unresolved duration, and severity score.</p>
+          <div id="dssPanel" class="dss-panel">
+            <!-- Dynamic recommendation items -->
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+      </section>
+
+      <section id="archivedView" class="admin-view" hidden>
+        <div class="card p-4 admin-panel">
+          <div class="admin-panel-header">
+            <h1 class="section-title mb-1">Archived Incidents</h1>
+            <small class="text-secondary">Archived records are hidden from active lists. Permanent deletion also removes related attachments and history.</small>
+          </div>
+          <div class="table-responsive">
+            <table class="table align-middle">
+              <thead>
+                <tr>
+                  <th>Tracking</th>
+                  <th>Issue</th>
+                  <th>Location</th>
+                  <th>Status</th>
+                  <th>Priority</th>
+                  <th>Resident Upload</th>
+                  <th>Retention</th>
+                </tr>
+              </thead>
+              <tbody id="archivedBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="resolvedView" class="admin-view" hidden>
+        <div class="card p-4 admin-panel">
+          <div class="admin-panel-header">
+            <div>
+              <h1 class="section-title mb-1">Resolved Incidents</h1>
+              <small class="text-secondary">Completed reports are read-only and cannot be changed.</small>
+            </div>
+            <span id="resolvedCount" class="badge-soft soft-green">0 resolved</span>
+          </div>
+          <div class="table-responsive">
+            <table class="table align-middle">
+              <thead>
+                <tr>
+                  <th>Tracking</th>
+                  <th>Issue</th>
+                  <th>Location</th>
+                  <th>Status</th>
+                  <th>Priority</th>
+                  <th>Resident Upload</th>
+                  <th>Record</th>
+                </tr>
+              </thead>
+              <tbody id="resolvedBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="analyticsView" class="admin-view" hidden>
+        <div class="mb-4">
+          <h1 class="section-title mb-1">Analytics</h1>
+          <p class="text-secondary mb-0">Explore report categories, monthly trends, and active issue hotspots.</p>
+        </div>
+    <!-- Analytics Charts Row -->
+    <div class="row g-4 mt-1">
+      <div class="col-lg-5">
+        <div class="card p-4 h-100">
+          <h5 class="fw-bold mb-3">Category Breakdown</h5>
+          <canvas id="pieChart" height="240"></canvas>
+        </div>
+      </div>
+
+      <div class="col-lg-7">
+        <div class="card p-4 h-100">
+          <h5 class="fw-bold mb-3">Monthly Report Trend</h5>
+          <canvas id="lineChart" height="240"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hotspot Matrix Heatmap -->
+    <div class="card p-4 mt-4">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h4 class="section-title mb-1">Hotspot Map / Grid Matrix</h4>
+          <p class="small text-secondary mb-0">Issue density across Puroks and categories.</p>
+        </div>
+        <span class="badge-soft soft-red">High Density Monitor</span>
+      </div>
+      <div id="hotspotGrid" class="hotspot-grid mt-3">
+        <!-- Dynamic Hotspot Cells -->
+      </div>
+    </div>
+
+      </section>
+
+      <section id="residentsView" class="admin-view" hidden>
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+          <div>
+            <h1 class="section-title mb-1">Registered Residents</h1>
+            <p class="text-secondary mb-0">Review account requests, manage resident access, and view complaint history.</p>
+          </div>
+          <label class="resident-search">
+            <span class="visually-hidden">Search residents or complaints</span>
+            <input id="residentSearch" class="form-control" type="search" placeholder="Search residents or complaints">
+          </label>
+        </div>
+        <div id="residentsSummary" class="resident-summary"></div>
+        <div id="residentsList" class="resident-list" aria-live="polite">
+          <div class="card p-4 text-secondary">Select Residents to load the directory.</div>
+        </div>
+      </section>
+
+      <section id="pendingApprovalsView" class="admin-view" hidden>
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+          <div>
+            <h1 class="section-title mb-1">Pending Approvals</h1>
+            <p class="text-secondary mb-0">Review registration requests before residents can sign in.</p>
+          </div>
+          <span id="pendingApprovalsPageCount" class="badge-soft soft-yellow">0 pending</span>
+        </div>
+        <div id="pendingApprovalList" class="resident-list" aria-live="polite">
+          <div class="card p-4 text-secondary">Loading pending registrations…</div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Incident Action & Dispatch Modal -->
+  <div class="modal fade" id="actionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold">Incident Action & Dispatch</h5>
+          <button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="actionForm">
+            <input type="hidden" id="editId">
+            
+            <div id="incidentSummary" class="alert alert-light border mb-3"></div>
+
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label fw-medium">Decision</label>
+                <select id="decision" class="form-select">
+                  <option value="Validate">Validate Report</option>
+                  <option value="Reject">Reject / Close Report</option>
+                </select>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label fw-medium" for="editPriority">Automatic Priority</label>
+                <input id="editPriority" class="form-control" readonly aria-describedby="priorityHelp">
+                <div id="priorityHelp" class="form-text">Set automatically from the report category.</div>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label fw-medium">Workflow Stage</label>
+                <select id="editStatus" class="form-select">
+                  <option>Submitted</option>
+                  <option>Validated</option>
+                  <option>Dispatched</option>
+                  <option>Resolved</option>
+                  <option>Rejected</option>
+                </select>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label fw-medium">Assign Field Personnel / Team</label>
+                <select id="assignee" class="form-select">
+                  <option value="Unassigned">Unassigned</option>
+                  <option>Field Team A</option>
+                  <option>Field Team B</option>
+                  <option>Purok Leader</option>
+                  <option>Barangay Safety Team</option>
+                  <option>Maintenance & Engineering Crew</option>
+                </select>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label fw-medium" for="dispatchNote">Message to resident</label>
+                <input id="dispatchNote" class="form-control" maxlength="255" required placeholder="Explain the current status and next steps">
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+          <button id="saveActionBtn" class="btn btn-primary" type="button">Save Changes & Notify</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/frontend/js/admin-dashboard.js"></script>
+
+</body>
+</html>
