@@ -5,7 +5,7 @@ A Laravel 12, PHP 8.2+, and MySQL application for residents to submit and track 
 ## Local setup
 
 1. Install PHP 8.2+ with `pdo_mysql`, `fileinfo`, `mbstring`, and XML/DOM, plus Composer and MySQL.
-2. Create the database by importing [`database/mysql_schema.sql`](./database/mysql_schema.sql). For an existing installation, back up the database and review/apply [`database/migrate_security_hardening.sql`](./database/migrate_security_hardening.sql).
+2. For a new installation, create the database by importing [`database/mysql_schema.sql`](./database/mysql_schema.sql). For an existing installation, back up the database first, then apply [`database/upgrade_existing_database.sql`](./database/upgrade_existing_database.sql).
 3. Copy `.env.example` to `.env` and set your private database credentials. Configure `GOOGLE_MAPS_API_KEY` if you want to enable map selection.
 4. Install dependencies, generate the app key, and optionally seed pilot accounts:
 
