@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Attachment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Storage;
 
 class AttachmentController extends ApiController
 {
@@ -27,6 +28,12 @@ class AttachmentController extends ApiController
 
         $imageData = $attachment->file_data;
         $mimeType = $attachment->mime_type;
+        if ($imageData === null
+            && preg_match('#\Areport-attachments/[a-f0-9]{64}\.(?:jpg|png|gif|webp)\z#', (string) $attachment->file_path)) {
+            if (Storage::disk('local')->exists($attachment->file_path)) {
+                $imageData = Storage::disk('local')->get($attachment->file_path);
+            }
+        }
         if ($imageData === null && $attachment->file_path !== null
             && preg_match('#\Adatabase/uploads/[a-f0-9]{32}\.(?:jpg|png|gif|webp)\z#', $attachment->file_path)) {
             $legacyPath = base_path($attachment->file_path);

@@ -12,7 +12,7 @@ class RequireAuthenticatedUser
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
-        if (! $user instanceof User || $user->account_status !== 'approved') {
+        if (! $user instanceof User || $user->account_status !== 'approved' || ! $user->hasVerifiedEmail()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Please log in to continue.',

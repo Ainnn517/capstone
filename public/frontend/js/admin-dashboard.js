@@ -8,6 +8,11 @@ const API_ENDPOINTS = {
   getDssRecommendations: '/api/analytics/dss',
   saveDssSnapshot: '/api/analytics/dss/snapshots',
   getResidents: '/api/residents',
+  getReferenceData: '/api/reference-data',
+  createReference: '/api/reference-data/{resource}',
+  updateReference: '/api/reference-data/{resource}/{id}',
+  deleteReference: '/api/reference-data/{resource}/{id}',
+  getReportHistory: '/api/reports/{id}/history',
   updateResidentApproval: '/api/residents/{id}/approval',
   session: '/api/session',
   logout: '/api/logout',
@@ -34,21 +39,24 @@ async function apiRequest(action, payload = {}, method = 'POST', resourceId = ''
     options.body = JSON.stringify(payload);
   }
 
-  let endpoint = API_ENDPOINTS[action].replace('{id}', encodeURIComponent(resourceId));
+  let endpoint = API_ENDPOINTS[action]
+    .replace('{resource}', encodeURIComponent(payload.resource || ''))
+    .replace('{id}', encodeURIComponent(resourceId || payload.id || ''));
   if (method === 'GET' && Object.keys(payload).length > 0) {
     const query = new URLSearchParams(payload);
     endpoint += `?${query.toString()}`;
   }
   const response = await fetch(endpoint, options);
+  window.handleExpiredSession(response);
   if (!(response.headers.get('content-type') || '').includes('application/json')) {
-    throw new Error('The Laravel API did not respond. Start the app with Artisan and open the Laravel server URL.');
+    throw new Error('The server could not complete that request. Please try again in a moment.');
   }
 
   let data;
   try {
     data = await response.json();
   } catch {
-    throw new Error('The Laravel API returned an empty or invalid response. Check the Laravel server output and database connection.');
+    throw new Error('The server returned an unexpected response. Please try again; contact the system administrator if it continues.');
   }
 
   if (!response.ok || !data.success) {
@@ -78,13 +86,14 @@ function loadScript(src, id) {
 
 // Set up dashboard controls, reports, and analytics.
 function initAdminDashboardPage() {
-  const CATEGORIES = ['Sanitation', 'Clogged Drainage', 'Streetlights', 'Road Damage', 'Public Safety', 'Others'];
+  let CATEGORIES = ['Sanitation', 'Clogged Drainage', 'Streetlights', 'Road Damage', 'Public Safety', 'Others'];
 
   let pieChartInstance = null;
   let lineChartInstance = null;
   let currentReports = [];
   let residents = [];
-  let residentReports = [];
+  const residentReportPages = new Map();
+  let referenceData = { categories: [], teams: [], locations: [] };
   let incidentPage = 1;
   let resolvedPage = 1;
   let archivedPage = 1;
@@ -125,7 +134,7 @@ function initAdminDashboardPage() {
       const errorRow = '<tr><td colspan="7" class="text-center text-danger py-5">Could not load reports. Check the API connection and your session.</td></tr>';
       document.getElementById('incidentBody').innerHTML = errorRow;
       document.getElementById('resolvedBody').innerHTML = errorRow;
-      window.alert(error.message);
+      window.showToast(error.message, 'error');
       return;
     }
 
@@ -210,7 +219,7 @@ function initAdminDashboardPage() {
               : readOnly
                 ? '<span class="badge-soft soft-green">Read-only</span>'
                 : `<div class="report-actions">
-                    <button class="btn btn-sm btn-outline-primary" data-report-id="${escapeHTML(item.id)}">Manage</button>
+                    ${item.stage === 'Rejected' ? '' : `<button class="btn btn-sm btn-outline-primary" data-report-id="${escapeHTML(item.id)}">Manage</button>`}
                     <button class="btn btn-sm btn-outline-secondary" data-archive-report-id="${escapeHTML(item.id)}">Archive</button>
                   </div>`}
           </td>
@@ -326,7 +335,7 @@ function initAdminDashboardPage() {
             <div class="small text-secondary mt-1">
               ${rec.reportCount} active report(s), avg age ${Number(rec.averageAgeDays).toFixed(1)} day(s), ${rec.criticalCount} critical.
             </div>
-            <div class="small text-secondary">Score ${Number(rec.score).toFixed(2)} = reports ${Number(rec.scoreBreakdown.reportCount).toFixed(2)} + age ${Number(rec.scoreBreakdown.averageAgeDays).toFixed(2)} + severity ${Number(rec.scoreBreakdown.severity).toFixed(2)} + critical ${Number(rec.scoreBreakdown.criticalReports).toFixed(2)}.</div>
+            <div class="small text-secondary">Score ${Number(rec.score).toFixed(2)} = reports ${Number(rec.scoreBreakdown.reportCount).toFixed(2)} + age ${Number(rec.scoreBreakdown.averageAgeDays).toFixed(2)} + severity ${Number(rec.scoreBreakdown.severity).toFixed(2)}. Critical count is informational and is not scored separately.</div>
             <div class="small mt-2 pt-2 border-top">
               <strong>Suggested team:</strong> ${escapeHTML(rec.recommendedTeam || 'No configured team')}<br>
               <strong>Action:</strong> ${escapeHTML(rec.recommendedAction)}
@@ -354,26 +363,20 @@ function initAdminDashboardPage() {
     try {
       await apiRequest('saveDssSnapshot');
       await render();
-      window.alert('DSS recommendation snapshot saved.');
+      window.showToast('DSS recommendation snapshot saved.', 'success');
     } catch (error) {
-      window.alert(error.message);
+      window.showToast(error.message, 'error');
     }
   });
 
-  // Load resident accounts and their reports.
+  // Load resident accounts and aggregate report counts.
   async function loadResidents() {
     const residentsList = document.getElementById('residentsList');
     residentsList.innerHTML = '<div class="card p-4 text-secondary">Loading residents and complaints…</div>';
     try {
       const residentResult = await apiRequest('getResidents', {}, 'GET');
-      let reportResult = await apiRequest('getReports', { page: 1 }, 'GET');
-      const reportPages = [reportResult.reports || []];
-      for (let page = 2; page <= reportResult.pagination.lastPage; page++) {
-        const nextPage = await apiRequest('getReports', { page }, 'GET');
-        reportPages.push(nextPage.reports || []);
-      }
       residents = residentResult.residents || [];
-      residentReports = reportPages.flat();
+      residentReportPages.clear();
       document.getElementById('residentNavCount').textContent = residents.length;
       renderPendingApprovals();
       renderResidents();
@@ -418,18 +421,13 @@ function initAdminDashboardPage() {
     `).join('');
   }
 
-  // Filter and display residents with their complaints.
+  // Filter and display residents; individual reports are fetched on demand.
   function renderResidents() {
     const search = document.getElementById('residentSearch').value.trim().toLowerCase();
-    const matchingResidents = residents.filter(resident => {
-      const complaints = residentReports.filter(report => report.residentId === resident.id);
-      const residentDetails = `${resident.fullName} ${resident.username} ${resident.email}`.toLowerCase();
-      const complaintDetails = complaints.map(report =>
-        `${report.tracking} ${report.category} ${report.purok} ${report.stage} ${report.description}`
-      ).join(' ').toLowerCase();
-      return !search || residentDetails.includes(search) || complaintDetails.includes(search);
-    });
-    const complaintCount = residentReports.length;
+    const matchingResidents = residents.filter(resident =>
+      `${resident.fullName} ${resident.username} ${resident.email}`.toLowerCase().includes(search)
+    );
+    const complaintCount = residents.reduce((total, resident) => total + Number(resident.reportCount || 0), 0);
     const pendingCount = residents.filter(resident => resident.accountStatus === 'pending').length;
 
     document.getElementById('residentsSummary').innerHTML = `
@@ -443,14 +441,146 @@ function initAdminDashboardPage() {
         '<div class="card p-4 text-secondary">No registered residents found.</div>';
       return;
     }
+
+    function renderReferenceData() {
+      const renderRows = (items, resource, fields) => items.map(item => `
+        <div class="row g-2 align-items-center border-top py-2" data-reference-row="${resource}" data-reference-id="${item[fields.id]}">
+          ${fields.inputs.map(field => `
+            <div class="${field.className}">
+              ${field.type === 'checkbox'
+                ? `<label class="form-check"><input class="form-check-input" type="checkbox" name="${field.name}" ${item[field.name] ? 'checked' : ''}><span class="form-check-label">${field.label}</span></label>`
+                : field.type === 'select'
+                  ? `<label class="visually-hidden" for="${resource}-${item[fields.id]}-${field.name}">${field.label}</label><select id="${resource}-${item[fields.id]}-${field.name}" class="form-select" name="${field.name}" aria-label="${field.label}"><option value="">No suggested team</option>${referenceData.teams.map(team => `<option value="${team.team_id}" ${String(team.team_id) === String(item[field.name] ?? '') ? 'selected' : ''}>${escapeHTML(team.name)}</option>`).join('')}</select>`
+                  : `<label class="visually-hidden" for="${resource}-${item[fields.id]}-${field.name}">${field.label}</label><input id="${resource}-${item[fields.id]}-${field.name}" class="form-control" type="${field.type || 'text'}" name="${field.name}" value="${escapeHTML(item[field.name] ?? '')}" ${field.type === 'number' ? 'min="1" max="5"' : ''} maxlength="${field.maxlength || ''}" aria-label="${field.label}">`}
+            </div>
+          `).join('')}
+          <div class="col-md-2 d-flex gap-2">
+            <button class="btn btn-sm btn-outline-primary" type="button" data-reference-save>Save</button>
+            <button class="btn btn-sm btn-outline-danger" type="button" data-reference-delete>Delete</button>
+          </div>
+        </div>
+      `).join('') || '<p class="text-secondary mb-0">No entries.</p>';
+
+      document.getElementById('referenceCategories').innerHTML = renderRows(referenceData.categories, 'categories', {
+        id: 'category_id',
+        inputs: [
+          { name: 'name', label: 'Category name', maxlength: 100, className: 'col-md-3' },
+          { name: 'description', label: 'Description', maxlength: 1000, className: 'col-md-3' },
+          { name: 'severity_weight', label: 'Severity weight', type: 'number', className: 'col-md-2' },
+          { name: 'recommended_team_id', label: 'Suggested team', type: 'select', className: 'col-md-2' }
+        ]
+      });
+      document.getElementById('referenceTeams').innerHTML = renderRows(referenceData.teams, 'teams', {
+        id: 'team_id',
+        inputs: [{ name: 'name', label: 'Team name', maxlength: 100, className: 'col-md-10' }]
+      });
+      document.getElementById('referenceLocations').innerHTML = renderRows(referenceData.locations, 'locations', {
+        id: 'location_id',
+        inputs: [
+          { name: 'name', label: 'Street or Area-wide', maxlength: 150, className: 'col-md-4' },
+          { name: 'area_name', label: 'Village or phase', maxlength: 150, className: 'col-md-4' },
+          { name: 'is_active', label: 'Available to residents', type: 'checkbox', className: 'col-md-2' }
+        ]
+      });
+    }
+
+    async function loadReferenceData() {
+      const status = document.getElementById('referenceDataStatus');
+      status.textContent = 'Loading reference data…';
+      try {
+        referenceData = await apiRequest('getReferenceData', {}, 'GET');
+        CATEGORIES = referenceData.categories.map(category => category.name);
+        const assignee = document.getElementById('assignee');
+        const selectedTeam = assignee.value;
+        assignee.innerHTML = '<option value="Unassigned">Unassigned</option>' +
+          referenceData.teams.map(team => `<option>${escapeHTML(team.name)}</option>`).join('');
+        const newCategoryTeam = document.getElementById('newCategoryTeam');
+        newCategoryTeam.innerHTML = '<option value="">No suggested team</option>' +
+          referenceData.teams.map(team => `<option value="${team.team_id}">${escapeHTML(team.name)}</option>`).join('');
+        if ([...assignee.options].some(option => option.value === selectedTeam)) {
+          assignee.value = selectedTeam;
+        }
+        renderReferenceData();
+        status.textContent = '';
+      } catch (error) {
+        status.textContent = error.message || 'Reference data could not be loaded.';
+      }
+    }
+
+    async function saveReferenceRow(row) {
+      const resource = row.dataset.referenceRow;
+      const payload = { resource };
+      row.querySelectorAll('[name]').forEach(input => {
+        payload[input.name] = input.type === 'checkbox' ? input.checked : input.value.trim();
+      });
+      try {
+        await apiRequest('updateReference', payload, 'PUT', row.dataset.referenceId);
+        await loadReferenceData();
+        window.showToast('Reference data saved.', 'success');
+      } catch (error) {
+        window.showToast(error.message, 'error');
+      }
+    }
+
+    async function deleteReferenceRow(row) {
+      if (!await window.confirmAction('Delete this reference item? Items used by reports must be deactivated instead.')) return;
+      try {
+        await apiRequest('deleteReference', { resource: row.dataset.referenceRow }, 'DELETE', row.dataset.referenceId);
+        await loadReferenceData();
+        window.showToast('Reference item deleted.', 'success');
+      } catch (error) {
+        window.showToast(error.message, 'error');
+      }
+    }
+
+    async function createReference(resource, values, form) {
+      try {
+        await apiRequest('createReference', { resource, ...values }, 'POST');
+        form.reset();
+        await loadReferenceData();
+        window.showToast('Reference item added.', 'success');
+      } catch (error) {
+        window.showToast(error.message, 'error');
+      }
+    }
+
+    document.getElementById('createCategoryForm').addEventListener('submit', event => {
+      event.preventDefault();
+      createReference('categories', {
+        name: document.getElementById('newCategoryName').value.trim(),
+        description: document.getElementById('newCategoryDescription').value.trim(),
+        severity_weight: document.getElementById('newCategoryWeight').value,
+        recommended_team_id: document.getElementById('newCategoryTeam').value || null
+      }, event.currentTarget);
+    });
+    document.getElementById('createTeamForm').addEventListener('submit', event => {
+      event.preventDefault();
+      createReference('teams', { name: document.getElementById('newTeamName').value.trim() }, event.currentTarget);
+    });
+    document.getElementById('createLocationForm').addEventListener('submit', event => {
+      event.preventDefault();
+      createReference('locations', {
+        name: document.getElementById('newLocationName').value.trim(),
+        area_name: document.getElementById('newLocationArea').value.trim(),
+        is_active: true
+      }, event.currentTarget);
+    });
+    ['referenceCategories', 'referenceTeams', 'referenceLocations'].forEach(id => {
+      document.getElementById(id).addEventListener('click', event => {
+        const row = event.target.closest('[data-reference-row]');
+        if (!row) return;
+        if (event.target.closest('[data-reference-save]')) saveReferenceRow(row);
+        if (event.target.closest('[data-reference-delete]')) deleteReferenceRow(row);
+      });
+    });
     if (matchingResidents.length === 0) {
       document.getElementById('residentsList').innerHTML =
-        '<div class="card p-4 text-secondary">No residents or complaints match your search.</div>';
+        '<div class="card p-4 text-secondary">No residents match your search.</div>';
       return;
     }
 
     document.getElementById('residentsList').innerHTML = matchingResidents.map(resident => {
-      const complaints = residentReports.filter(report => report.residentId === resident.id);
+      const reportPage = residentReportPages.get(resident.id);
       const statusBadge = resident.accountStatus === 'approved'
         ? '<span class="badge-soft soft-green">Approved</span>'
         : resident.accountStatus === 'rejected'
@@ -466,8 +596,8 @@ function initAdminDashboardPage() {
               : ''}
           </div>`
         : '';
-      const complaintHTML = complaints.length
-        ? complaints.map(report => `
+      const complaintHTML = reportPage
+        ? reportPage.reports.map(report => `
           <article class="resident-complaint">
             <div class="complaint-heading">
               <strong>${escapeHTML(report.category)}</strong>
@@ -477,8 +607,16 @@ function initAdminDashboardPage() {
             <p>${escapeHTML(report.description)}</p>
             ${report.location ? `<div class="small text-secondary">Landmark: ${escapeHTML(report.location)}</div>` : ''}
           </article>
-        `).join('')
-        : '<p class="resident-empty text-secondary">This resident has not submitted any complaints.</p>';
+        `).join('') + `
+          <div class="d-flex justify-content-between align-items-center mt-2">
+            <button class="btn btn-sm btn-outline-secondary" data-resident-report-page="${escapeHTML(resident.id)}" data-page="${reportPage.pagination.currentPage - 1}" ${reportPage.pagination.currentPage <= 1 ? 'disabled' : ''}>Previous</button>
+            <span class="small text-secondary">Page ${reportPage.pagination.currentPage} of ${reportPage.pagination.lastPage}</span>
+            <button class="btn btn-sm btn-outline-secondary" data-resident-report-page="${escapeHTML(resident.id)}" data-page="${reportPage.pagination.currentPage + 1}" ${reportPage.pagination.currentPage >= reportPage.pagination.lastPage ? 'disabled' : ''}>Next</button>
+          </div>`
+        : '';
+      const reportButton = Number(resident.reportCount) > 0
+        ? `<button class="btn btn-sm btn-outline-primary mt-3" data-resident-report-page="${escapeHTML(resident.id)}" data-page="1">${reportPage ? 'Refresh reports' : `View ${resident.reportCount} report${resident.reportCount === 1 ? '' : 's'}`}</button>`
+        : '<p class="resident-empty text-secondary mt-3">This resident has not submitted any complaints.</p>';
 
       return `
         <article class="resident-card card">
@@ -489,11 +627,12 @@ function initAdminDashboardPage() {
             </div>
             <div class="d-flex flex-column align-items-end gap-2">
               ${statusBadge}
-              <span class="badge-soft soft-blue">${complaints.length} complaint${complaints.length === 1 ? '' : 's'}</span>
+              <span class="badge-soft soft-blue">${Number(resident.reportCount || 0)} complaint${Number(resident.reportCount || 0) === 1 ? '' : 's'}</span>
             </div>
           </div>
           <div class="resident-card-meta">Registered ${new Date(resident.registered).toLocaleDateString()}</div>
           ${approvalActions}
+          ${reportButton}
           <div class="resident-complaints">${complaintHTML}</div>
         </article>
       `;
@@ -513,10 +652,33 @@ function initAdminDashboardPage() {
     `;
 
     document.getElementById('editPriority').value = issue.priority || 'Normal';
-    document.getElementById('editStatus').value = issue.stage;
+    const nextStatuses = {
+      Submitted: ['Validated'],
+      Validated: ['Dispatched'],
+      Dispatched: ['Resolved'],
+      Rejected: []
+    }[issue.stage] || [];
+    const editStatus = document.getElementById('editStatus');
+    editStatus.innerHTML = nextStatuses.map(status => `<option>${status}</option>`).join('');
+    editStatus.disabled = nextStatuses.length === 0;
+    if (nextStatuses.length > 0) editStatus.value = nextStatuses[0];
     document.getElementById('assignee').value = issue.assignee || 'Unassigned';
     document.getElementById('dispatchNote').value = issue.dispatchNote || '';
-    document.getElementById('decision').value = 'Validate';
+    document.getElementById('decision').value = 'Advance';
+    const historyPanel = document.getElementById('reportStatusHistory');
+    historyPanel.textContent = 'Loading status history…';
+    apiRequest('getReportHistory', { id: issue.id }, 'GET')
+      .then(result => {
+        historyPanel.innerHTML = (result.history || []).map(entry => `
+          <div class="border-top py-2">
+            <strong>${escapeHTML(entry.newStatus)}</strong> · ${new Date(entry.changedAt).toLocaleString()}
+            <div>${escapeHTML(entry.remarks || '')}</div>
+          </div>
+        `).join('') || '<p class="text-secondary">No status history is available.</p>';
+      })
+      .catch(error => {
+        historyPanel.textContent = error.message || 'Status history could not be loaded.';
+      });
 
     const modal = document.getElementById('actionModal');
     modal.classList.add('show');
@@ -565,9 +727,9 @@ function initAdminDashboardPage() {
   document.getElementById('saveActionBtn').addEventListener('click', async () => {
     try {
       await saveAction();
-      window.alert('Status update saved and sent to the resident.');
+      window.showToast('Status update saved and sent to the resident.', 'success');
     } catch (error) {
-      window.alert(error.message);
+      window.showToast(error.message, 'error');
     }
   });
 
@@ -596,6 +758,21 @@ function initAdminDashboardPage() {
   });
   document.getElementById('residentSearch').addEventListener('input', renderResidents);
   async function handleResidentApproval(event) {
+    const reportButton = event.target.closest('[data-resident-report-page]');
+    if (reportButton) {
+      try {
+        const result = await apiRequest('getReports', {
+          user_id: reportButton.dataset.residentReportPage,
+          page: reportButton.dataset.page
+        }, 'GET');
+        residentReportPages.set(reportButton.dataset.residentReportPage, result);
+        renderResidents();
+      } catch (error) {
+        window.showToast(error.message, 'error');
+      }
+      return;
+    }
+
     const button = event.target.closest('[data-resident-approval]');
     if (!button) return;
 
@@ -606,12 +783,12 @@ function initAdminDashboardPage() {
       reason = window.prompt('Enter the reason for rejection (for example, not a resident):');
       if (reason === null) return;
       if (!reason.trim()) {
-        window.alert('A rejection reason is required.');
+        window.showToast('A rejection reason is required.', 'error');
         return;
       }
     }
 
-    const confirmed = window.confirm(
+    const confirmed = await window.confirmAction(
       `${action === 'approve' ? 'Approve' : 'Reject'} this resident account?`
     );
     if (!confirmed) return;
@@ -626,9 +803,9 @@ function initAdminDashboardPage() {
           : result.emailStatus === 'failed'
             ? ' The account was updated, but email delivery failed.'
             : '';
-      window.alert(`Resident account ${status}.${emailNotice}`);
+      window.showToast(`Resident account ${status}.${emailNotice}`, 'success');
     } catch (error) {
-      window.alert(error.message);
+      window.showToast(error.message, 'error');
     }
   }
   document.getElementById('residentsList').addEventListener('click', handleResidentApproval);
@@ -637,14 +814,14 @@ function initAdminDashboardPage() {
     const button = event.target.closest('[data-archive-report-id]');
     if (!button) return;
 
-    const confirmed = window.confirm('Archive this report? You can restore it later from Archived Incidents.');
+    const confirmed = await window.confirmAction('Archive this report? You can restore it later from Archived Incidents.');
     if (!confirmed) return;
 
     try {
       await apiRequest('archiveReport', {}, 'POST', button.dataset.archiveReportId);
       await render();
     } catch (error) {
-      window.alert(error.message);
+      window.showToast(error.message, 'error');
     }
   });
 
@@ -655,7 +832,7 @@ function initAdminDashboardPage() {
         await apiRequest('restoreReport', {}, 'POST', restoreButton.dataset.restoreReportId);
         await renderArchivedReports();
       } catch (error) {
-        window.alert(error.message);
+        window.showToast(error.message, 'error');
       }
       return;
     }
@@ -663,14 +840,14 @@ function initAdminDashboardPage() {
     const deleteButton = event.target.closest('[data-delete-archived-id]');
     if (!deleteButton) return;
 
-    const confirmed = window.confirm('Permanently delete this archived report, its attachments, and its history? This cannot be undone.');
+    const confirmed = await window.confirmAction('Permanently delete this archived report, its attachments, and its history? This cannot be undone.');
     if (!confirmed) return;
 
     try {
       await apiRequest('deleteArchivedReport', {}, 'DELETE', deleteButton.dataset.deleteArchivedId);
       await renderArchivedReports();
     } catch (error) {
-      window.alert(error.message);
+      window.showToast(error.message, 'error');
     }
   });
 
@@ -689,7 +866,7 @@ function initAdminDashboardPage() {
       });
     } catch (error) {
       body.innerHTML = '<tr><td colspan="7" class="admin-empty-state alert-error">Could not load archived reports.</td></tr>';
-      window.alert(error.message);
+      window.showToast(error.message, 'error');
     }
   }
 
@@ -715,6 +892,8 @@ function initAdminDashboardPage() {
         loadResidents();
       } else if (selectedView === 'archived') {
         renderArchivedReports();
+      } else if (selectedView === 'referenceData') {
+        loadReferenceData();
       } else if (['dashboard', 'incidents', 'resolved', 'analytics'].includes(selectedView)) {
         render();
       }
@@ -723,26 +902,25 @@ function initAdminDashboardPage() {
 
   // Archive unresolved and rejected reports after confirmation.
   document.getElementById('clearReportsBtn').addEventListener('click', async () => {
-    const confirmed = window.confirm('Archive all unresolved and rejected incidents? Resolved incidents will be kept. Archived reports remain available to administrators.');
+    const confirmed = await window.confirmAction('Archive all unresolved and rejected incidents? Resolved incidents will be kept. Archived reports remain available to administrators.');
     if (!confirmed) return;
 
     try {
       const result = await apiRequest('clearReports', { confirmed: true });
       await render();
-      window.alert(`${result.archived} incident(s) archived. Administrators can review them in Archived Incidents.`);
+      window.showToast(`${result.archived} incident(s) archived. Administrators can review them in Archived Incidents.`, 'success');
     } catch (error) {
-      window.alert(error.message);
+      window.showToast(error.message, 'error');
     }
   });
 
   // End the admin session and return to the login page.
   document.getElementById('logoutBtn').addEventListener('click', async () => {
-    const confirmed = window.confirm('Are you sure you want to log out?');
+    const confirmed = await window.confirmAction('Are you sure you want to log out?');
     if (confirmed) {
       try {
         await apiRequest('logout');
       } finally {
-        localStorage.removeItem('birResidentName');
         window.location.href = 'index.html';
       }
     }

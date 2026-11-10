@@ -5,7 +5,7 @@ A Laravel 12, PHP 8.2+, and MySQL application for residents to submit and track 
 ## Local setup
 
 1. Install PHP 8.2+ with `pdo_mysql`, `fileinfo`, `mbstring`, and XML/DOM, plus Composer and MySQL.
-2. Create the database by importing [`database/mysql_schema.sql`](./database/mysql_schema.sql).
+2. Create the database by importing [`database/mysql_schema.sql`](./database/mysql_schema.sql). For an existing installation, back up the database and review/apply [`database/migrate_security_hardening.sql`](./database/migrate_security_hardening.sql).
 3. Copy `.env.example` to `.env` and set your private database credentials. Configure `GOOGLE_MAPS_API_KEY` if you want to enable map selection.
 4. Install dependencies, generate the app key, and optionally seed pilot accounts:
 
@@ -17,7 +17,7 @@ A Laravel 12, PHP 8.2+, and MySQL application for residents to submit and track 
 
 5. Start the local application with `php artisan serve`.
 
-The schema is managed with SQL rather than automatic Laravel migrations. Existing installations must back up the database and apply reviewed SQL updates, including [`database/migrate_dss_analytics.sql`](./database/migrate_dss_analytics.sql) for DSS history and admin audit records.
+The schema is managed with SQL rather than automatic Laravel migrations. Seeding after schema setup adds the configured categories, teams, and active approved locations; for existing data, it also reactivates configured locations while keeping unrecognized legacy locations inactive.
 
 ## Main capabilities
 

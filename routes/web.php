@@ -6,6 +6,7 @@ use App\Http\Controllers\DssController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ResidentController;
+use App\Http\Controllers\ReferenceDataController;
 use Illuminate\Support\Facades\Route;
 
 // Show the login and portal pages.
@@ -18,10 +19,25 @@ Route::view('/privacy', 'pages.privacy')->name('privacy');
 // Handle login, registration, and session requests.
 Route::post('/api/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
 Route::post('/api/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
+Route::post('/api/password/forgot', [AuthController::class, 'forgotPassword'])->middleware('throttle:5,1');
+Route::post('/api/password/reset', [AuthController::class, 'resetPassword'])->middleware('throttle:5,1');
+Route::get('/api/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
+    ->middleware(['signed', 'throttle:6,1'])
+    ->name('verification.verify');
+Route::view('/reset-password/{token}', 'pages.password-reset')->name('password.reset');
 
 Route::middleware('api.auth')->group(function (): void {
     Route::get('/api/session', [AuthController::class, 'session']);
+    Route::get('/api/reference-data', [ReferenceDataController::class, 'index'])->middleware('role:resident,admin');
+    Route::post('/api/reference-data/{resource}', [ReferenceDataController::class, 'store'])->middleware('role:admin');
+    Route::put('/api/reference-data/{resource}/{id}', [ReferenceDataController::class, 'update'])
+        ->whereNumber('id')
+        ->middleware('role:admin');
+    Route::delete('/api/reference-data/{resource}/{id}', [ReferenceDataController::class, 'destroy'])
+        ->whereNumber('id')
+        ->middleware('role:admin');
     Route::post('/api/logout', [AuthController::class, 'logout']);
+    Route::post('/api/password/change', [AuthController::class, 'changePassword'])->middleware('throttle:5,1');
     Route::get('/api/notifications', [NotificationController::class, 'index'])->middleware('role:resident');
     Route::post('/api/notifications/{id}/read', [NotificationController::class, 'markAsRead'])
         ->whereNumber('id')
@@ -37,7 +53,10 @@ Route::middleware('api.auth')->group(function (): void {
     Route::post('/api/reports/{id}/restore', [ReportController::class, 'restore'])
         ->whereNumber('id')
         ->middleware('role:admin');
-    Route::post('/api/reports', [ReportController::class, 'store'])->middleware('role:resident');
+    Route::post('/api/reports', [ReportController::class, 'store'])->middleware(['role:resident', 'throttle:10,1']);
+    Route::get('/api/reports/{id}/history', [ReportController::class, 'history'])
+        ->whereNumber('id')
+        ->middleware('role:resident,admin');
     Route::post('/api/reports/update', [ReportController::class, 'update'])->middleware('role:admin');
     Route::post('/api/reports/clear', [ReportController::class, 'clear'])->middleware('role:admin');
     Route::delete('/api/reports/{id}/archived', [ReportController::class, 'destroyArchived'])

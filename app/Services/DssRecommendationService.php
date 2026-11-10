@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\Team;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -24,14 +23,14 @@ class DssRecommendationService
                 'report.date_submitted',
                 'category.name as category',
                 'category.severity_weight',
+                'team.name as recommended_team',
                 'location.name as street',
                 'location.area_name as area',
             ])
+            ->leftJoin('TEAM as team', 'team.team_id', '=', 'category.recommended_team_id')
             ->get();
 
         $weights = config('dss.weights');
-        $teamNames = array_values(config('dss.team_by_category', []));
-        $teamsByName = Team::query()->whereIn('name', $teamNames)->get()->keyBy('name');
         $groups = [];
 
         foreach ($reports as $report) {
@@ -46,6 +45,7 @@ class DssRecommendationService
             $groups[$key] ??= [
                 'location' => $location,
                 'category' => $report->category,
+                'recommendedTeam' => $report->recommended_team,
                 'ages' => [],
                 'severityTotal' => 0,
                 'criticalCount' => 0,
@@ -61,16 +61,13 @@ class DssRecommendationService
             }
         }
 
-        $recommendations = collect($groups)->map(function (array $group) use ($weights, $teamsByName): array {
+        $recommendations = collect($groups)->map(function (array $group) use ($weights): array {
             $count = count($group['ages']);
             $averageAgeDays = array_sum($group['ages']) / $count;
             $countScore = $count * $weights['report_count'];
             $ageScore = $averageAgeDays * $weights['average_age_days'];
             $severityScore = $group['severityTotal'] * $weights['severity_weight'];
-            $criticalScore = $group['criticalCount'] * $weights['critical_report'];
-            $score = $countScore + $ageScore + $severityScore + $criticalScore;
-            $teamName = config('dss.team_by_category')[$group['category']] ?? null;
-            $team = $teamName ? $teamsByName->get($teamName) : null;
+            $score = $countScore + $ageScore + $severityScore;
 
             return [
                 'location' => $group['location'],
@@ -84,9 +81,8 @@ class DssRecommendationService
                     'reportCount' => $countScore,
                     'averageAgeDays' => round($ageScore, 2),
                     'severity' => $severityScore,
-                    'criticalReports' => $criticalScore,
                 ],
-                'recommendedTeam' => $team?->name,
+                'recommendedTeam' => $group['recommendedTeam'],
                 'recommendedAction' => config('dss.action_by_category')[$group['category']]
                     ?? 'Review the reports and identify the appropriate response.',
             ];

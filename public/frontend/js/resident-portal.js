@@ -2,9 +2,11 @@
 
 // API routes used by the resident portal.
 const API_ENDPOINTS = {
+  getReferenceData: '/api/reference-data',
   getReports: '/api/reports',
   getNotifications: '/api/notifications',
   markNotificationRead: '/api/notifications/{id}/read',
+  getReportHistory: '/api/reports/{id}/history',
   createReport: '/api/reports',
   session: '/api/session',
   logout: '/api/logout'
@@ -74,15 +76,16 @@ async function apiRequest(action, payload = {}, method = 'POST') {
     endpoint += `?${query.toString()}`;
   }
   const response = await fetch(endpoint, options);
+  window.handleExpiredSession(response);
   if (!(response.headers.get('content-type') || '').includes('application/json')) {
-    throw new Error('The Laravel API did not respond. Start the app with Artisan and open the Laravel server URL.');
+    throw new Error('The server could not complete that request. Please try again in a moment.');
   }
 
   let data;
   try {
     data = await response.json();
   } catch {
-    throw new Error('The Laravel API returned an empty or invalid response. Check the Laravel server output and database connection.');
+    throw new Error('The server returned an unexpected response. Please try again; contact the system administrator if it continues.');
   }
 
   if (!response.ok || !data.success) {
@@ -107,21 +110,9 @@ function initResidentPortalPage() {
   let reportPage = 1;
   let reportPagination = { currentPage: 1, lastPage: 1, total: 0 };
 
-  // Village / Phase -> list of streets
-  const LOCATIONS = {
-    'St. Joseph Village 10 - Phase 1': ['Laurel Street', 'Coconut Street', 'Star Apple Street', 'Mango Street', 'Sandalwood Street', 'Chestnut Street'],
-    'St. Joseph Village 10 - Phase 2': ['Apitong Street', 'Antipolo Street', 'Lawaan Street', 'Kamagong Street', 'Tindalo Street'],
-    'St. Joseph Village 10 - Phase 3': ['Almond Street', 'Birch Street', 'Cedar Street', 'Mulberry Street', 'Cherry Street', 'Pine Street', 'Walnut Street', 'Pear Street', 'Cashew Street', 'Camachile Street', 'Molave Street', 'Neem Street', 'Maple Street', 'Linden Street'],
-    'St. Joseph Village 9': ['Gumamela Street', 'Dahua Street', 'Daffodil Street', 'Chrysanthemum Street', 'Carnation Street', 'Camellia Street', 'Calendula Street', 'Bougainvillea Street', 'Buttercup Street', 'Aster Street', 'Everlasting Street', 'Iris Street', 'Lotus Street', 'Lobelia Street', 'Meadowsweet Street', 'Magnolia Street', 'Marigold Street', 'Sampaguita Street', 'Speedwell Street', 'Sunflower Street', 'Tulip Street', 'Jade Street', 'Lavender Street', 'Lily Street', 'Rose Street', 'Orchid Street', 'Navidad Avenue', 'R. Magsaysay Avenue'],
-    'St. Joseph Ridgeview - Phase 1': [],
-    'St. Joseph Ridgeview - Phase 2': [],
-    'Southern Heights': []
-  };
-
   const phaseSel = document.getElementById('phase');
   const streetSel = document.getElementById('purok');
-
-  Object.keys(LOCATIONS).forEach(p => phaseSel.add(new Option(p, p)));
+  let LOCATIONS = {};
 
   // Update the street list when the resident chooses an area.
   function updateStreets() {
@@ -134,15 +125,15 @@ function initResidentPortalPage() {
       streetSel.required = false;
       locationInput.required = false;
       locationInput.placeholder = 'e.g. Near Barangay Hall';
-    } else if (streets.length === 0) {
-      streetSel.add(new Option('No street list for this area', ''));
+    } else if (streets.length === 0 || (streets.length === 1 && streets[0].name === 'Area-wide')) {
+      streetSel.add(new Option('Area-wide', streets[0]?.location_id || ''));
       streetSel.disabled = true;
       streetSel.required = false;
       locationInput.required = true;
       locationInput.placeholder = 'Enter a specific landmark or location marker';
     } else {
       streetSel.add(new Option('Choose street', ''));
-      streets.forEach(s => streetSel.add(new Option(s, s)));
+      streets.forEach(location => streetSel.add(new Option(location.name, location.location_id)));
       streetSel.disabled = false;
       streetSel.required = true;
       locationInput.required = false;
@@ -151,6 +142,20 @@ function initResidentPortalPage() {
   }
 
   phaseSel.addEventListener('change', updateStreets);
+
+  function applyReferenceData(referenceData) {
+    LOCATIONS = (referenceData.locations || []).filter(location => location.is_active).reduce((groups, location) => {
+      groups[location.area_name] ||= [];
+      groups[location.area_name].push(location);
+      return groups;
+    }, {});
+    phaseSel.length = 1;
+    Object.keys(LOCATIONS).forEach(area => phaseSel.add(new Option(area, area)));
+    const categorySelect = document.getElementById('category');
+    categorySelect.length = 1;
+    (referenceData.categories || []).forEach(category => categorySelect.add(new Option(category.name, category.name)));
+    updateStreets();
+  }
 
   // Load the resident's reports from the server.
   async function syncIssuesFromServer() {
@@ -253,6 +258,8 @@ function initResidentPortalPage() {
         <div class="issue-status-note">
           <strong>Latest Status:</strong> ${escapeHTML(item.updatedMessage || 'Report received and queued for administrative validation.')}
         </div>
+        <button class="btn btn-sm btn-outline-secondary mt-2" type="button" data-report-history="${escapeHTML(item.id)}">Status history</button>
+        <ol class="report-history mt-2" data-history-for="${escapeHTML(item.id)}" hidden></ol>
       </article>
     `;
   }
@@ -284,7 +291,29 @@ function initResidentPortalPage() {
       await apiRequest('markNotificationRead', { id: button.dataset.markNotificationRead });
       updateNotifications(await apiRequest('getNotifications', {}, 'GET'));
     } catch (error) {
-      window.alert(error.message);
+      window.showToast(error.message, 'error');
+    }
+  });
+
+  document.getElementById('issuesList').addEventListener('click', async event => {
+    const button = event.target.closest('[data-report-history]');
+    if (!button) return;
+    const historyList = document.querySelector(`[data-history-for="${CSS.escape(button.dataset.reportHistory)}"]`);
+    if (!historyList) return;
+    if (!historyList.hidden) {
+      historyList.hidden = true;
+      return;
+    }
+    try {
+      const result = await apiRequest('getReportHistory', { id: button.dataset.reportHistory }, 'GET');
+      historyList.innerHTML = (result.history || []).map(entry => `
+        <li><strong>${escapeHTML(entry.newStatus)}</strong> · ${new Date(entry.changedAt).toLocaleString()}
+          <div>${escapeHTML(entry.remarks || '')}</div>
+        </li>
+      `).join('');
+      historyList.hidden = false;
+    } catch (error) {
+      window.showToast(error.message);
     }
   });
 
@@ -432,7 +461,6 @@ function initResidentPortalPage() {
 
     const categoryValue = document.getElementById('category').value.trim();
     const phase = phaseSel.value;
-    const street = streetSel.value.trim();
     const description = document.getElementById('description').value.trim();
     const landmark = locationInput.value.trim();
     const streets = LOCATIONS[phase] || [];
@@ -475,11 +503,9 @@ function initResidentPortalPage() {
     document.getElementById('submitAlert').innerHTML = '';
 
     try {
-      const fullLocation = street ? `${street}, ${phase}` : phase;
-
       const payload = new FormData();
       payload.append('category', categoryValue);
-      payload.append('purok', fullLocation);
+      payload.append('location_id', streetSel.value);
       payload.append('description', description);
       payload.append('location', landmark);
       if (gpsCoordinates) {
@@ -522,6 +548,7 @@ function initResidentPortalPage() {
         window.location.href = result.user.role === 'admin' ? 'admin-dashboard.html' : 'index.html';
         return;
       }
+      applyReferenceData(await apiRequest('getReferenceData', {}, 'GET'));
       document.getElementById('residentName').textContent = `Welcome, ${result.user.username}`;
       await render();
       setInterval(render, 15000);
@@ -551,12 +578,11 @@ function initResidentPortalPage() {
 
   // End the session and return to the login page.
   document.getElementById('logoutBtn').addEventListener('click', async () => {
-    const confirmed = window.confirm('Are you sure you want to log out?');
+    const confirmed = await window.confirmAction('Are you sure you want to log out?');
     if (confirmed) {
       try {
         await apiRequest('logout');
       } finally {
-        localStorage.removeItem('birResidentName');
         window.location.href = 'index.html';
       }
     }

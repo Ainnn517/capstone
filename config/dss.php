@@ -5,9 +5,9 @@ return [
         'report_count' => 3,
         'average_age_days' => 1,
         'severity_weight' => 1,
-        'critical_report' => 5,
     ],
     'high_urgency_threshold' => 8,
+    'hotspot_report_threshold' => 3,
     'team_by_category' => [
         'Sanitation' => 'Purok Leader',
         'Clogged Drainage' => 'Maintenance & Engineering Crew',

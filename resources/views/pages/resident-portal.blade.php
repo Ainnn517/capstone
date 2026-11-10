@@ -8,6 +8,7 @@
   <meta name="google-maps-api-key" content="{{ config('services.google_maps.key') }}">
   <title>Barangay Issue Reporting System - Resident Portal</title>
   <link rel="stylesheet" href="/frontend/css/resident-portal.css">
+  <link rel="stylesheet" href="/frontend/css/notifications.css">
   <link rel="stylesheet" href="/frontend/vendor/uicons-regular-rounded/css/uicons-regular-rounded.css">
 </head>
 <body>
@@ -21,6 +22,7 @@
           <span id="notifCount" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">0</span>
         </button>
         <span id="residentName" class="small text-white-50 fw-semibold">Welcome,</span>
+        <button class="btn btn-outline-light btn-sm" id="changePasswordButton" type="button">Change password</button>
         <button class="btn btn-light btn-sm" id="logoutBtn" type="button">Logout</button>
       </div>
     </div>
@@ -59,12 +61,6 @@
                 <label class="form-label fw-medium">Issue Category</label>
                 <select id="category" class="form-select" required>
                   <option value="">Choose category</option>
-                  <option>Sanitation</option>
-                  <option>Clogged Drainage</option>
-                  <option>Streetlights</option>
-                  <option>Road Damage</option>
-                  <option>Public Safety</option>
-                  <option>Others</option>
                 </select>
               </div>
 
@@ -173,7 +169,24 @@
   <footer class="text-center text-secondary small py-3">
     Icons by <a href="https://www.flaticon.com/uicons" rel="noopener">Flaticon Uicons</a>.
   </footer>
-  <script src="/frontend/js/resident-portal.js"></script>
+  <dialog id="accountSecurityDialog" aria-labelledby="accountSecurityTitle">
+    <h2 id="accountSecurityTitle">Change password</h2>
+    <form id="changePasswordForm">
+      <label for="currentPassword">Current password</label>
+      <input id="currentPassword" type="password" autocomplete="current-password" required>
+      <label for="newPassword">New password</label>
+      <input id="newPassword" type="password" minlength="12" autocomplete="new-password" required>
+      <label for="newPasswordConfirmation">Confirm new password</label>
+      <input id="newPasswordConfirmation" type="password" minlength="12" autocomplete="new-password" required>
+      <p id="changePasswordMessage" role="status" aria-live="polite"></p>
+      <button type="submit">Update password</button>
+      <button type="button" id="closeAccountSecurity">Close</button>
+    </form>
+  </dialog>
+  <script src="/frontend/js/notifications.js" nonce="{{ app('csp.nonce') }}"></script>
+  <script src="/frontend/js/session-handler.js" nonce="{{ app('csp.nonce') }}"></script>
+  <script src="/frontend/js/account-security.js" nonce="{{ app('csp.nonce') }}"></script>
+  <script src="/frontend/js/resident-portal.js" nonce="{{ app('csp.nonce') }}"></script>
 
 </body>
 </html>

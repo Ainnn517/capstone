@@ -7,6 +7,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Barangay Issue Reporting System</title>
     <link rel="stylesheet" href="/frontend/css/style.css">
+    <link rel="stylesheet" href="/frontend/css/notifications.css">
 </head>
 <body>
 
@@ -71,7 +72,7 @@
 
                 <label for="registerPassword">Password:</label>
                 <div class="input-wrap">
-                    <input type="password" id="registerPassword" autocomplete="new-password" minlength="8" required>
+                    <input type="password" id="registerPassword" autocomplete="new-password" minlength="12" required>
                     <button type="button" class="toggle-password" id="toggleRegisterPassword" aria-label="Show password">
                         <svg viewBox="0 0 24 24" aria-hidden="true">
                             <path d="M2.5 12s3.3-6 9.5-6 9.5 6 9.5 6-3.3 6-9.5 6-9.5-6-9.5-6z"></path>
@@ -82,7 +83,7 @@
 
                 <label for="confirmPassword">Confirm password:</label>
                 <div class="input-wrap">
-                    <input type="password" id="confirmPassword" autocomplete="new-password" minlength="8" required>
+                    <input type="password" id="confirmPassword" autocomplete="new-password" minlength="12" required>
                     <button type="button" class="toggle-password" id="toggleConfirmPassword" aria-label="Show password">
                         <svg viewBox="0 0 24 24" aria-hidden="true">
                             <path d="M2.5 12s3.3-6 9.5-6 9.5 6 9.5 6-3.3 6-9.5 6-9.5-6-9.5-6z"></path>
@@ -91,10 +92,26 @@
                     </button>
                 </div>
 
+                <label class="privacy-consent">
+                    <input type="checkbox" id="privacyConsent" required>
+                    I have read and agree to the <a href="{{ route('privacy', [], false) }}" target="_blank" rel="noopener">Privacy Notice</a> and consent to the processing of my report and account information.
+                </label>
+
                 <button type="submit" class="login-button">Create account</button>
                 <p id="registerMessage" class="form-message" aria-live="polite"></p>
             </form>
 
+            <form id="forgotPasswordForm" hidden>
+                <label for="forgotEmail">Email address:</label>
+                <div class="input-wrap">
+                    <input type="email" id="forgotEmail" autocomplete="email" required>
+                </div>
+                <button type="submit" class="login-button">Send reset link</button>
+                <p id="forgotPasswordMessage" class="form-message" aria-live="polite"></p>
+                <button type="button" class="form-switch" id="returnToLoginButton">Back to log in</button>
+            </form>
+
+            <button type="button" class="form-switch" id="forgotPasswordButton">Forgot password?</button>
             <button type="button" class="form-switch" id="formSwitch" aria-controls="registerForm">Create an account</button>
 
             <p class="card-footer">
@@ -106,6 +123,7 @@
 
     </main>
 
-    <script src="/frontend/js/index.js"></script>
+    <script src="/frontend/js/notifications.js" nonce="{{ app('csp.nonce') }}"></script>
+    <script src="/frontend/js/index.js" nonce="{{ app('csp.nonce') }}"></script>
 </body>
 </html>

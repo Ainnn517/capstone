@@ -3,6 +3,10 @@
 use App\Models\User;
 
 return [
+    'dummy_password_hash' => env(
+        'DUMMY_PASSWORD_HASH',
+        '$2y$12$4Pq7aYm/6/nT/KZbdoJY9eXbmcluwrGTdiYW6WQSEVC8tUQO44TIW',
+    ),
 
     /*
     |--------------------------------------------------------------------------
@@ -95,7 +99,7 @@ return [
     'passwords' => [
         'users' => [
             'provider' => 'users',
-            'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
+            'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'PASSWORD_RESET_TOKENS'),
             'expire' => 60,
             'throttle' => 60,
         ],

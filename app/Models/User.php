@@ -5,10 +5,15 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Contracts\Auth\MustVerifyEmail as MustVerifyEmailContract;
+use Illuminate\Auth\MustVerifyEmail;
+use Illuminate\Notifications\Notifiable;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmailContract
 {
     use HasFactory;
+    use MustVerifyEmail;
+    use Notifiable;
 
     protected $table = 'USERS';
 
@@ -21,12 +26,20 @@ class User extends Authenticatable
         'full_name',
         'email',
         'password_hash',
-        'role',
-        'account_status',
         'contact_number',
+        'privacy_consent_at',
+        'privacy_notice_version',
+        'email_verified_at',
     ];
 
     protected $hidden = ['password_hash'];
+
+    protected function casts(): array
+    {
+        return [
+            'email_verified_at' => 'datetime',
+        ];
+    }
 
     // Tell Laravel which column stores this user's password hash.
     public function getAuthPasswordName(): string

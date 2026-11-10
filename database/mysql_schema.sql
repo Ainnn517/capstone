@@ -11,7 +11,10 @@ CREATE TABLE IF NOT EXISTS USERS (
   email VARCHAR(120) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
   role ENUM('resident', 'admin') NOT NULL DEFAULT 'resident',
-  account_status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'approved',
+  account_status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
+  privacy_consent_at DATETIME NULL,
+  privacy_notice_version VARCHAR(50) NULL,
+  email_verified_at DATETIME NULL,
   contact_number VARCHAR(30) NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (user_id),
@@ -33,6 +36,7 @@ CREATE TABLE IF NOT EXISTS CATEGORY (
   name VARCHAR(100) NOT NULL,
   description TEXT NULL,
   severity_weight TINYINT UNSIGNED NOT NULL DEFAULT 1,
+  recommended_team_id INT UNSIGNED NULL,
   PRIMARY KEY (category_id),
   UNIQUE KEY uq_category_name (name),
   CONSTRAINT chk_category_severity CHECK (severity_weight BETWEEN 1 AND 5)
@@ -46,11 +50,16 @@ CREATE TABLE IF NOT EXISTS TEAM (
   UNIQUE KEY uq_team_name (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+ALTER TABLE CATEGORY
+  ADD CONSTRAINT fk_category_recommended_team FOREIGN KEY (recommended_team_id) REFERENCES TEAM (team_id)
+    ON UPDATE CASCADE ON DELETE RESTRICT;
+
 -- Store streets and areas where reports happen.
 CREATE TABLE IF NOT EXISTS LOCATION (
   location_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
   name VARCHAR(150) NOT NULL,
   area_name VARCHAR(150) NOT NULL,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
   PRIMARY KEY (location_id),
   UNIQUE KEY uq_location_name_area (name, area_name),
   KEY idx_location_area (area_name)
@@ -76,6 +85,8 @@ CREATE TABLE IF NOT EXISTS ISSUE_REPORT (
   PRIMARY KEY (report_id),
   UNIQUE KEY uq_report_tracking_code (tracking_code),
   KEY idx_report_user (user_id),
+  KEY idx_report_user_archived (user_id, archived_at),
+  KEY idx_report_archive_status_submitted (archived_at, status, date_submitted),
   KEY idx_report_category (category_id),
   KEY idx_report_team (team_id),
   KEY idx_report_location (location_id),

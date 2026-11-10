@@ -36,6 +36,7 @@ abstract class TestCase extends BaseTestCase
             'CATEGORY',
             'USERS',
             'REGISTRATION_CAPACITY_LOCK',
+            'PASSWORD_RESET_TOKENS',
         ] as $tableName) {
             Schema::dropIfExists($tableName);
         }
@@ -47,9 +48,17 @@ abstract class TestCase extends BaseTestCase
             $table->string('email', 120)->unique();
             $table->string('password_hash');
             $table->enum('role', ['resident', 'admin'])->default('resident');
-            $table->enum('account_status', ['pending', 'approved', 'rejected'])->default('approved');
+            $table->enum('account_status', ['pending', 'approved', 'rejected'])->default('pending');
             $table->string('contact_number', 30)->nullable();
+            $table->dateTime('privacy_consent_at')->nullable();
+            $table->string('privacy_notice_version', 50)->nullable();
+            $table->dateTime('email_verified_at')->nullable();
             $table->dateTime('created_at')->useCurrent();
+        });
+        Schema::create('PASSWORD_RESET_TOKENS', function (Blueprint $table): void {
+            $table->string('email')->primary();
+            $table->string('token');
+            $table->dateTime('created_at')->nullable();
         });
 
         Schema::create('CATEGORY', function (Blueprint $table): void {
@@ -57,17 +66,23 @@ abstract class TestCase extends BaseTestCase
             $table->string('name', 100)->unique();
             $table->text('description')->nullable();
             $table->unsignedTinyInteger('severity_weight')->default(1);
+            $table->unsignedInteger('recommended_team_id')->nullable();
+            $table->check('severity_weight BETWEEN 1 AND 5');
         });
 
         Schema::create('TEAM', function (Blueprint $table): void {
             $table->increments('team_id')->unsigned();
             $table->string('name', 100)->unique();
         });
+        Schema::table('CATEGORY', function (Blueprint $table): void {
+            $table->foreign('recommended_team_id')->references('team_id')->on('TEAM')->restrictOnDelete();
+        });
 
         Schema::create('LOCATION', function (Blueprint $table): void {
             $table->increments('location_id')->unsigned();
             $table->string('name', 150);
             $table->string('area_name', 150);
+            $table->boolean('is_active')->default(true);
             $table->unique(['name', 'area_name']);
         });
 
@@ -87,6 +102,12 @@ abstract class TestCase extends BaseTestCase
             $table->dateTime('date_resolved')->nullable();
             $table->dateTime('archived_at')->nullable();
             $table->unsignedInteger('archived_by')->nullable();
+            $table->index(['user_id', 'archived_at'], 'idx_report_user_archived');
+            $table->index(['archived_at', 'status', 'date_submitted'], 'idx_report_archive_status_submitted');
+            $table->check('latitude IS NULL OR latitude BETWEEN -90 AND 90');
+            $table->check('longitude IS NULL OR longitude BETWEEN -180 AND 180');
+            $table->check("status <> 'Resolved' OR date_resolved IS NOT NULL");
+            $table->check('date_resolved IS NULL OR date_resolved >= date_submitted');
             $table->foreign('user_id')->references('user_id')->on('USERS');
             $table->foreign('category_id')->references('category_id')->on('CATEGORY');
             $table->foreign('team_id')->references('team_id')->on('TEAM');
@@ -103,6 +124,9 @@ abstract class TestCase extends BaseTestCase
             $table->string('remarks', 1000)->nullable();
             $table->dateTime('changed_at')->useCurrent();
             $table->foreign('report_id')->references('report_id')->on('ISSUE_REPORT')->cascadeOnDelete();
+            $table->check(
+                '(file_data IS NOT NULL AND mime_type IS NOT NULL AND file_path IS NULL) OR (file_data IS NULL AND file_path IS NOT NULL)',
+            );
             $table->foreign('changed_by')->references('user_id')->on('USERS')->nullOnDelete();
         });
 
@@ -124,6 +148,7 @@ abstract class TestCase extends BaseTestCase
             $table->enum('type', ['submitted', 'assigned', 'status_update', 'resolved']);
             $table->dateTime('timestamp')->useCurrent();
             $table->boolean('is_read')->default(false);
+            $table->check('is_read IN (0, 1)');
             $table->foreign('report_id')->references('report_id')->on('ISSUE_REPORT')->cascadeOnDelete();
             $table->foreign('user_id')->references('user_id')->on('USERS')->cascadeOnDelete();
         });

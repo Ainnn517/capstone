@@ -15,7 +15,7 @@ class NotificationController extends ApiController
             ->with(['report:report_id,tracking_code'])
             ->where('user_id', $user->user_id)
             ->latest('timestamp')
-            ->paginate(10, ['notif_id', 'report_id', 'message', 'type', 'timestamp', 'is_read'])
+            ->paginate((int) config('security.notification_page_size'), ['notif_id', 'report_id', 'message', 'type', 'timestamp', 'is_read'])
             ->withQueryString();
 
         return response()->json([

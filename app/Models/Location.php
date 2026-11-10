@@ -13,7 +13,12 @@ class Location extends Model
 
     public $timestamps = false;
 
-    protected $fillable = ['name', 'area_name'];
+    protected $fillable = ['name', 'area_name', 'is_active'];
+
+    protected function casts(): array
+    {
+        return ['is_active' => 'boolean'];
+    }
 
     // Get reports filed for this location.
     public function reports(): HasMany

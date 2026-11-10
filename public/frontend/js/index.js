@@ -11,6 +11,9 @@ const registerForm = document.getElementById("registerForm");
 const registerMessage = document.getElementById("registerMessage");
 const formSwitch = document.getElementById("formSwitch");
 const formTitle = document.getElementById("formTitle");
+const forgotPasswordForm = document.getElementById("forgotPasswordForm");
+const forgotPasswordButton = document.getElementById("forgotPasswordButton");
+const returnToLoginButton = document.getElementById("returnToLoginButton");
 // API routes used by the login and registration forms.
 const API_ENDPOINTS = {
     login: "/api/login",
@@ -30,14 +33,14 @@ async function apiRequest(action, payload) {
         body: JSON.stringify(payload)
     });
     if (!(response.headers.get("content-type") || "").includes("application/json")) {
-        throw new Error("The Laravel API did not respond. Start the app with Artisan and open the Laravel server URL.");
+        throw new Error("The server could not complete that request. Please try again in a moment.");
     }
 
     let data;
     try {
         data = await response.json();
     } catch {
-        throw new Error("The Laravel API returned an empty or invalid response. Check the Laravel server output and database configuration.");
+        throw new Error("The server returned an unexpected response. Please try again; contact the system administrator if it continues.");
     }
     if (!response.ok || !data.success) {
         const error = new Error(data.message || "Request failed.");
@@ -56,7 +59,6 @@ function emailDeliveryNotice(status) {
 
 // Open the correct portal after a successful login or registration.
 function enterPortal(user) {
-    localStorage.setItem("birResidentName", user.fullName);
     window.location.href = user.role === "admin" ? "admin-dashboard.html" : "resident-portal.html";
 }
 
@@ -97,6 +99,8 @@ loginForm.addEventListener("submit", async (event) => {
 
 // Switch between the login and registration forms.
 formSwitch.addEventListener("click", () => {
+    forgotPasswordForm.hidden = true;
+    forgotPasswordButton.hidden = false;
     const showingRegistration = registerForm.hidden;
     loginForm.hidden = showingRegistration;
     registerForm.hidden = !showingRegistration;
@@ -105,6 +109,46 @@ formSwitch.addEventListener("click", () => {
     formSwitch.setAttribute("aria-controls", showingRegistration ? "loginForm" : "registerForm");
     formMessage.textContent = "";
     registerMessage.textContent = "";
+});
+
+forgotPasswordButton.addEventListener("click", () => {
+    loginForm.hidden = true;
+    registerForm.hidden = true;
+    forgotPasswordForm.hidden = false;
+    forgotPasswordButton.hidden = true;
+    formSwitch.hidden = true;
+    formTitle.textContent = "Reset your password";
+});
+
+returnToLoginButton.addEventListener("click", () => {
+    forgotPasswordForm.hidden = true;
+    loginForm.hidden = false;
+    forgotPasswordButton.hidden = false;
+    formSwitch.hidden = false;
+    formTitle.textContent = "Log in";
+});
+
+forgotPasswordForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    const message = document.getElementById("forgotPasswordMessage");
+    message.textContent = "If an account matches that email, a reset link will be sent.";
+    try {
+        const response = await fetch("/api/password/forgot", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content
+            },
+            body: JSON.stringify({ email: document.getElementById("forgotEmail").value.trim() })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || "The request could not be completed.");
+        message.textContent = result.message;
+    } catch (error) {
+        message.textContent = error.message || "The request could not be completed.";
+    }
 });
 
 // Check the registration form and create the new account.
@@ -126,7 +170,8 @@ registerForm.addEventListener("submit", async (event) => {
             fullName: document.getElementById("registerName").value.trim(),
             email: document.getElementById("registerEmail").value.trim(),
             username,
-            password
+            password,
+            privacyConsent: document.getElementById("privacyConsent").checked
         });
         registerForm.reset();
         loginForm.hidden = false;

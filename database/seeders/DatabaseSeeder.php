@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Category;
+use App\Models\Location;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -36,6 +37,22 @@ class DatabaseSeeder extends Seeder
             Team::firstOrCreate(['name' => $name]);
         }
 
+        foreach (config('dss.team_by_category', []) as $categoryName => $teamName) {
+            $team = Team::query()->where('name', $teamName)->first();
+            Category::query()->where('name', $categoryName)->update([
+                'recommended_team_id' => $team?->team_id,
+            ]);
+        }
+
+        foreach (config('locations', []) as $area => $streets) {
+            foreach ($streets ?: ['Area-wide'] as $street) {
+                Location::updateOrCreate(
+                    ['name' => $street, 'area_name' => $area],
+                    ['is_active' => true],
+                );
+            }
+        }
+
         $this->seedPilotUser('admin');
         $this->seedPilotUser('resident');
     }
@@ -43,24 +60,25 @@ class DatabaseSeeder extends Seeder
     // Add a pilot account when its environment settings are provided.
     private function seedPilotUser(string $role): void
     {
-        $prefix = 'PILOT_'.strtoupper($role).'_';
-        $username = env($prefix.'USERNAME');
-        $email = env($prefix.'EMAIL');
-        $password = env($prefix.'PASSWORD');
+        $username = config('pilot.'.$role.'.username');
+        $email = config('pilot.'.$role.'.email');
+        $password = config('pilot.'.$role.'.password');
 
         if (! is_string($username) || $username === '' || ! is_string($email) || $email === ''
-            || ! is_string($password) || strlen($password) < 8) {
+            || ! is_string($password) || strlen($password) < 12) {
             return;
         }
 
-        User::firstOrCreate(
-            ['username' => $username],
-            [
-                'full_name' => env($prefix.'NAME', 'Pilot '.ucfirst($role)),
-                'email' => $email,
-                'password_hash' => Hash::make($password),
-                'role' => $role,
-            ],
-        );
+        $user = User::firstOrNew(['username' => $username]);
+        $user->fill([
+            'full_name' => config('pilot.'.$role.'.name'),
+            'email' => $email,
+            'password_hash' => Hash::make($password),
+        ]);
+        $user->forceFill([
+            'role' => $role,
+            'account_status' => 'approved',
+            'email_verified_at' => now(),
+        ])->save();
     }
 }

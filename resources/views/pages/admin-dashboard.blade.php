@@ -7,6 +7,7 @@
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>Barangay Command Center - Operations Dashboard</title>
   <link rel="stylesheet" href="/frontend/css/admin-dashboard.css">
+  <link rel="stylesheet" href="/frontend/css/notifications.css">
   <link rel="stylesheet" href="/frontend/vendor/uicons-regular-rounded/css/uicons-regular-rounded.css">
 </head>
 <body>
@@ -16,6 +17,7 @@
     <div class="container-fluid px-4">
       <div class="d-flex gap-2 align-items-center">
         <span id="adminName" class="text-white-50 small">Welcome ! Admin</span>
+        <button class="btn btn-outline-light btn-sm" id="changePasswordButton" type="button">Change password</button>
         <button class="btn btn-light btn-sm" id="logoutBtn" type="button">Logout</button>
       </div>
     </div>
@@ -56,6 +58,10 @@
       <button class="sidebar-link" type="button" data-admin-view="analytics">
         <i class="fi fi-rr-chart-histogram sidebar-icon" aria-hidden="true"></i>
         Analytics
+      </button>
+      <button class="sidebar-link" type="button" data-admin-view="referenceData">
+        <i class="fi fi-rr-settings sidebar-icon" aria-hidden="true"></i>
+        Reference Data
       </button>
     </aside>
 
@@ -294,6 +300,42 @@
           <div class="card p-4 text-secondary">Loading pending registrations…</div>
         </div>
       </section>
+
+      <section id="referenceDataView" class="admin-view" hidden>
+        <div class="mb-4">
+          <h1 class="section-title mb-1">Reference Data</h1>
+          <p class="text-secondary mb-0">Manage report categories, response teams, and approved report locations.</p>
+        </div>
+        <div id="referenceDataStatus" role="status" aria-live="polite"></div>
+        <div class="card p-4 mb-4">
+          <h2 class="h5">Categories</h2>
+          <form id="createCategoryForm" class="row g-2 mb-3">
+            <div class="col-md-3"><label class="visually-hidden" for="newCategoryName">Category name</label><input id="newCategoryName" class="form-control" maxlength="100" placeholder="Category name" required></div>
+            <div class="col-md-3"><label class="visually-hidden" for="newCategoryDescription">Description</label><input id="newCategoryDescription" class="form-control" maxlength="1000" placeholder="Description"></div>
+            <div class="col-md-2"><label class="visually-hidden" for="newCategoryWeight">Severity weight</label><input id="newCategoryWeight" class="form-control" type="number" min="1" max="5" value="1" required></div>
+            <div class="col-md-2"><label class="visually-hidden" for="newCategoryTeam">Suggested team</label><select id="newCategoryTeam" class="form-select"><option value="">No suggested team</option></select></div>
+            <div class="col-md-2"><button class="btn btn-primary w-100" type="submit">Add</button></div>
+          </form>
+          <div id="referenceCategories"></div>
+        </div>
+        <div class="card p-4 mb-4">
+          <h2 class="h5">Teams</h2>
+          <form id="createTeamForm" class="row g-2 mb-3">
+            <div class="col-md-10"><label class="visually-hidden" for="newTeamName">Team name</label><input id="newTeamName" class="form-control" maxlength="100" placeholder="Team name" required></div>
+            <div class="col-md-2"><button class="btn btn-primary w-100" type="submit">Add</button></div>
+          </form>
+          <div id="referenceTeams"></div>
+        </div>
+        <div class="card p-4">
+          <h2 class="h5">Locations</h2>
+          <form id="createLocationForm" class="row g-2 mb-3">
+            <div class="col-md-5"><label class="visually-hidden" for="newLocationName">Street</label><input id="newLocationName" class="form-control" maxlength="150" placeholder="Street or Area-wide" required></div>
+            <div class="col-md-5"><label class="visually-hidden" for="newLocationArea">Village or phase</label><input id="newLocationArea" class="form-control" maxlength="150" placeholder="Village or phase" required></div>
+            <div class="col-md-2"><button class="btn btn-primary w-100" type="submit">Add</button></div>
+          </form>
+          <div id="referenceLocations"></div>
+        </div>
+      </section>
     </div>
   </main>
 
@@ -310,12 +352,16 @@
             <input type="hidden" id="editId">
             
             <div id="incidentSummary" class="alert alert-light border mb-3"></div>
+            <section aria-labelledby="reportStatusHistoryTitle" class="mb-3">
+              <h6 id="reportStatusHistoryTitle">Status history</h6>
+              <div id="reportStatusHistory" aria-live="polite"></div>
+            </section>
 
             <div class="row g-3">
               <div class="col-md-4">
                 <label class="form-label fw-medium">Decision</label>
                 <select id="decision" class="form-select">
-                  <option value="Validate">Validate Report</option>
+                  <option value="Advance">Continue Workflow</option>
                   <option value="Reject">Reject / Close Report</option>
                 </select>
               </div>
@@ -367,7 +413,24 @@
   <footer class="text-center text-secondary small py-3">
     Icons by <a href="https://www.flaticon.com/uicons" rel="noopener">Flaticon Uicons</a>.
   </footer>
-  <script src="/frontend/js/admin-dashboard.js"></script>
+  <dialog id="accountSecurityDialog" aria-labelledby="accountSecurityTitle">
+    <h2 id="accountSecurityTitle">Change password</h2>
+    <form id="changePasswordForm">
+      <label for="currentPassword">Current password</label>
+      <input id="currentPassword" type="password" autocomplete="current-password" required>
+      <label for="newPassword">New password</label>
+      <input id="newPassword" type="password" minlength="12" autocomplete="new-password" required>
+      <label for="newPasswordConfirmation">Confirm new password</label>
+      <input id="newPasswordConfirmation" type="password" minlength="12" autocomplete="new-password" required>
+      <p id="changePasswordMessage" role="status" aria-live="polite"></p>
+      <button type="submit">Update password</button>
+      <button type="button" id="closeAccountSecurity">Close</button>
+    </form>
+  </dialog>
+  <script src="/frontend/js/notifications.js" nonce="{{ app('csp.nonce') }}"></script>
+  <script src="/frontend/js/session-handler.js" nonce="{{ app('csp.nonce') }}"></script>
+  <script src="/frontend/js/account-security.js" nonce="{{ app('csp.nonce') }}"></script>
+  <script src="/frontend/js/admin-dashboard.js" nonce="{{ app('csp.nonce') }}"></script>
 
 </body>
 </html>

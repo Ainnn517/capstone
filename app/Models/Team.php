@@ -20,4 +20,9 @@ class Team extends Model
     {
         return $this->hasMany(IssueReport::class, 'team_id', 'team_id');
     }
+
+    public function categories(): HasMany
+    {
+        return $this->hasMany(Category::class, 'recommended_team_id', 'team_id');
+    }
 }

@@ -8,12 +8,11 @@ For each group, the score is:
 score = (report_count × 3)
       + (average_unresolved_age_in_days × 1)
       + (sum_of_category_severity_weights × 1)
-      + (critical_report_count × 5)
 ```
 
-The coefficients and the high-urgency threshold are defined in `config/dss.php`. A score of 8 or greater is classified as High; a lower score is Moderate. Category weights come from `CATEGORY.severity_weight` (1–5); a report is counted as critical when its category weight is 5. The interface displays each contribution so administrators can see why a group ranked where it did.
+The coefficients and the high-urgency threshold are defined in `config/dss.php`. A score of 8 or greater is classified as High; a lower score is Moderate. Category weights come from `CATEGORY.severity_weight` (1–5). Reports with weight 5 are counted as critical for context, but do not earn a second score bonus. The interface displays each scored contribution and the separate informational critical count.
 
-The category-to-team and action mappings are also configured in `config/dss.php`. They are suggestions only; an administrator still chooses the actual report assignment. If the configured team is absent from `TEAM`, the interface explicitly reports that no configured team is available.
+Default category-to-team assignments and response actions are configured in `config/dss.php` and seeded into `CATEGORY.recommended_team_id`. Administrators can maintain the suggested team in Reference Data. These are suggestions only; an administrator still chooses the actual report assignment. If a category has no recommended team, the interface reports that no configured team is available.
 
 These are initial policy weights, not empirically calibrated coefficients. Before relying on the ranking operationally, review the coefficients and threshold with barangay staff and validate them against historical response outcomes. The corresponding thesis Chapter 3 should state this limitation and use the exact formula above.
 

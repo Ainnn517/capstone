@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AdminAuditLog;
 use App\Models\User;
 use App\Services\AccountNotificationService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
@@ -18,6 +21,7 @@ class ResidentController extends ApiController
     {
         $residents = User::query()
             ->where('role', 'resident')
+            ->withCount('reports')
             ->orderByRaw("CASE account_status WHEN 'pending' THEN 0 WHEN 'rejected' THEN 1 ELSE 2 END")
             ->orderBy('full_name')
             ->orderBy('user_id')
@@ -28,7 +32,8 @@ class ResidentController extends ApiController
                 'fullName' => $resident->full_name,
                 'email' => $resident->email,
                 'accountStatus' => $resident->account_status,
-                'registered' => date(DATE_ATOM, strtotime((string) $resident->created_at)),
+                'registered' => Carbon::parse($resident->created_at, config('app.timezone'))->toIso8601String(),
+                'reportCount' => $resident->reports_count,
             ]);
 
         return response()->json(['success' => true, 'residents' => $residents]);
@@ -37,6 +42,7 @@ class ResidentController extends ApiController
     // Approve or reject a resident account awaiting review.
     public function updateApproval(Request $request, int $id): JsonResponse
     {
+        $actor = $this->currentUser();
         $validator = Validator::make($request->all(), [
             'status' => ['required', Rule::in(['approved', 'rejected'])],
             'reason' => ['required_if:status,rejected', 'nullable', 'string', 'max:255'],
@@ -64,7 +70,14 @@ class ResidentController extends ApiController
                 return $this->error('This resident account is already approved.', 409);
             }
 
-            $resident->update(['account_status' => $status]);
+            DB::transaction(function () use ($resident, $status, $actor): void {
+                $resident->update(['account_status' => $status]);
+                AdminAuditLog::create([
+                    'actor_user_id' => $actor->user_id,
+                    'action' => 'approve_resident',
+                    'details' => ['resident_user_id' => $resident->user_id],
+                ]);
+            });
 
             $emailStatus = $this->accountNotifications->send(
                 $resident->email,
@@ -79,7 +92,14 @@ class ResidentController extends ApiController
             return $this->error('Only pending resident accounts can be rejected.', 409);
         }
 
-        $resident->update(['account_status' => $status]);
+        DB::transaction(function () use ($resident, $status, $actor, $reason): void {
+            $resident->update(['account_status' => $status]);
+            AdminAuditLog::create([
+                'actor_user_id' => $actor->user_id,
+                'action' => 'reject_resident',
+                'details' => ['resident_user_id' => $resident->user_id, 'reason' => $reason],
+            ]);
+        });
 
         $emailStatus = $this->accountNotifications->send(
             $resident->email,

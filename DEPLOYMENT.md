@@ -4,7 +4,7 @@
 
 The application requires PHP 8.2+ with `pdo_mysql`, `fileinfo`, `mbstring`, and XML/DOM, Composer, and MySQL. The browser screens and Laravel API are served by Laravel; point the web server document root to `public/`.
 
-1. Create a MySQL database and import `database/mysql_schema.sql`.
+1. Create a MySQL database and import `database/mysql_schema.sql`. For an existing installation, back up the database, review and apply `database/migrate_dss_analytics.sql` and `database/migrate_security_hardening.sql`.
 2. Copy `.env.example` to `.env`. Configure `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, and `DB_PASSWORD`. Set a Google Maps JavaScript API key if the map picker is needed.
 3. Install dependencies, generate an application key, and optionally seed pilot accounts:
 
@@ -16,7 +16,7 @@ The application requires PHP 8.2+ with `pdo_mysql`, `fileinfo`, `mbstring`, and 
 
 4. Start locally with `php artisan serve`.
 
-The database schema is managed manually. For an existing installation, back up the database, inspect the SQL migration, apply it, and verify the resulting schema before deploying the matching code. `database/migrate_dss_analytics.sql` creates the DSS history and admin audit tables required by this release.
+The database schema is managed manually. After applying reviewed migrations, run `php artisan db:seed` to add or refresh default categories, teams, recommended team assignments, and approved locations. Existing location rows not present in the configuration remain inactive. Verify the resulting schema before deploying the matching code.
 
 ## Mail and maps
 
@@ -27,6 +27,7 @@ The location picker requires the Google Maps JavaScript API, billing, and an API
 ## Production checklist
 
 - Set `APP_ENV=production`, `APP_DEBUG=false`, the real HTTPS `APP_URL`, and `SESSION_SECURE_COOKIE=true`.
+- If the app is behind a reverse proxy, set `TRUSTED_PROXIES` to its exact IP address(es) or CIDR ranges. Do not trust arbitrary forwarded headers.
 - Keep `.env`, keys, database passwords, and pilot credentials out of GitHub.
 - Use a supported PHP runtime and install production dependencies with `composer install --no-dev --optimize-autoloader`.
 - Expose only `public/`; use HTTPS and keep MySQL private with a least-privilege application account.

@@ -8,7 +8,7 @@ use Tests\TestCase;
 
 class LoginRateLimitTest extends TestCase
 {
-    public function test_login_is_limited_to_three_failed_attempts_per_account_each_minute(): void
+    public function test_login_is_limited_to_three_failed_attempts_per_account_and_ip_each_minute(): void
     {
         $user = User::factory()->create([
             'username' => 'limited-resident',

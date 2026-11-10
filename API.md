@@ -10,6 +10,10 @@ All API routes use Laravel session authentication. State-changing browser reques
 | POST | `/api/register` | Public; 5 requests/minute per IP; creates pending resident accounts |
 | GET | `/api/session` | Signed in |
 | POST | `/api/logout` | Signed in |
+| POST | `/api/password/forgot` | Public; always returns a generic response |
+| POST | `/api/password/reset` | Public; valid email token required |
+| POST | `/api/password/change` | Signed in |
+| GET | `/api/email/verify/{id}/{hash}` | Public; signed, expiring link |
 
 Registration failure responses use the same generic message for invalid and already-used details and do not send email to the submitted address. Successful registration and administrator approval messages use the configured mail transport.
 
@@ -26,8 +30,10 @@ Registration failure responses use the same generic message for invalid and alre
 | POST | `/api/reports/clear` | Admin; requires `{"confirmed": true}` |
 | DELETE | `/api/reports/{id}/archived` | Admin |
 | GET | `/api/attachments/{id}` | Owner or admin |
+| GET | `/api/reports/{id}/history` | Owner or admin |
 
 Report descriptions may contain 1–500 characters. Report lists return at most 50 rows with `pagination.currentPage`, `pagination.lastPage`, and `pagination.total`. Residents may request `view=all`, `view=current`, or `view=past`. Administrators may request `view=all`, `view=active`, or `view=resolved`, and optionally filter by a valid `status` and `priority` (`Normal`, `High`, `Critical`). List responses include attachment IDs, not image BLOBs; authorized image data is fetched from the attachment route.
+Report creation takes a `location_id` from the active server-managed location list; clients cannot create new location records. Administrators may filter `/api/reports` by a resident `user_id`, and only one page of that resident's reports is returned per request.
 
 `GET /api/analytics/summary` is admin-only and returns aggregate counts for the dashboard charts/metrics.
 
@@ -37,6 +43,15 @@ Report descriptions may contain 1–500 characters. Report lists return at most 
 |---|---|---|
 | GET | `/api/notifications` | Resident; returns latest 10, unread count, and pagination |
 | POST | `/api/notifications/{id}/read` | Resident; only the notification owner |
+
+## Reference data
+
+| Method | Route | Access |
+|---|---|---|
+| GET | `/api/reference-data` | Signed in |
+| POST | `/api/reference-data/{categories,teams,locations}` | Admin |
+| PUT | `/api/reference-data/{categories,teams,locations}/{id}` | Admin |
+| DELETE | `/api/reference-data/{categories,teams,locations}/{id}` | Admin; items used by reports cannot be deleted |
 
 ## DSS and analytics history
 

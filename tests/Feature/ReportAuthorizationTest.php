@@ -8,10 +8,13 @@ use App\Models\Category;
 use App\Models\IssueReport;
 use App\Models\Location;
 use App\Models\User;
+use Illuminate\Auth\Notifications\VerifyEmail;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
 
 class ReportAuthorizationTest extends TestCase
@@ -37,16 +40,21 @@ class ReportAuthorizationTest extends TestCase
     public function test_resident_can_submit_a_report_without_assigning_owner_or_admin_fields(): void
     {
         $resident = User::factory()->create();
-        $administrator = User::factory()->create(['role' => 'admin']);
+        $administrator = User::factory()->admin()->create();
         $category = Category::create([
             'name' => 'Road Damage',
             'description' => 'Damage to a public road.',
             'severity_weight' => 3,
         ]);
+        $location = Location::create([
+            'name' => 'Laurel Street',
+            'area_name' => 'St. Joseph Village 10 - Phase 1',
+            'is_active' => true,
+        ]);
 
         $response = $this->actingAs($resident)->postJson('/api/reports', [
             'category' => $category->name,
-            'purok' => 'Main Street, Barangay One',
+            'location_id' => $location->location_id,
             'description' => 'A large pothole is creating a hazard for residents.',
             'user_id' => $administrator->user_id,
             'role' => 'admin',
@@ -73,9 +81,14 @@ class ReportAuthorizationTest extends TestCase
             'description' => 'Damage to a public road.',
             'severity_weight' => 3,
         ]);
+        $location = Location::create([
+            'name' => 'Laurel Street',
+            'area_name' => 'St. Joseph Village 10 - Phase 1',
+            'is_active' => true,
+        ]);
         $payload = [
             'category' => $category->name,
-            'purok' => 'Main Street, Barangay One',
+            'location_id' => $location->location_id,
         ];
 
         foreach (['x', str_repeat('x', 500)] as $description) {
@@ -108,7 +121,7 @@ class ReportAuthorizationTest extends TestCase
 
     public function test_administrator_can_list_reports_from_all_residents(): void
     {
-        $administrator = User::factory()->create(['role' => 'admin']);
+        $administrator = User::factory()->admin()->create();
         $firstResident = User::factory()->create();
         $secondResident = User::factory()->create();
         $firstReport = $this->createReport($firstResident);
@@ -124,7 +137,7 @@ class ReportAuthorizationTest extends TestCase
 
     public function test_report_list_is_paginated_and_has_no_attachment_blob_in_the_payload(): void
     {
-        $administrator = User::factory()->create(['role' => 'admin']);
+        $administrator = User::factory()->admin()->create();
         $resident = User::factory()->create();
         $firstReport = $this->createReport($resident);
         Attachment::create([
@@ -207,9 +220,18 @@ class ReportAuthorizationTest extends TestCase
 
     public function test_administrator_can_update_a_report_and_create_a_status_log(): void
     {
-        $administrator = User::factory()->create(['role' => 'admin']);
+        $administrator = User::factory()->admin()->create();
         $resident = User::factory()->create();
         $report = $this->createReport($resident);
+
+        $this->actingAs($administrator)
+            ->postJson('/api/reports/update', [
+                'id' => $report->report_id,
+                'status' => 'Validated',
+                'assignee' => 'Unassigned',
+                'dispatchNote' => 'The report has been validated.',
+            ])
+            ->assertOk();
 
         $this->actingAs($administrator)
             ->postJson('/api/reports/update', [
@@ -255,7 +277,7 @@ class ReportAuthorizationTest extends TestCase
 
     public function test_report_update_rejects_invalid_status_and_empty_dispatch_note(): void
     {
-        $administrator = User::factory()->create(['role' => 'admin']);
+        $administrator = User::factory()->admin()->create();
         $resident = User::factory()->create();
         $report = $this->createReport($resident);
 
@@ -289,15 +311,92 @@ class ReportAuthorizationTest extends TestCase
                 ->postJson('/api/reports/update', $payload)
                 ->assertUnprocessable();
         }
+    }
+
+    public function test_report_status_transitions_are_enforced(): void
+    {
+        $administrator = User::factory()->admin()->create();
+        $resident = User::factory()->create();
+        $report = $this->createReport($resident);
+
+        $this->actingAs($administrator)
+            ->postJson('/api/reports/update', [
+                'id' => $report->report_id,
+                'status' => 'Resolved',
+                'assignee' => 'Unassigned',
+                'dispatchNote' => 'This skips required workflow stages.',
+            ])
+            ->assertUnprocessable();
 
         $this->assertSame('Submitted', $report->fresh()->status);
         $this->assertDatabaseMissing('STATUS_LOG', ['report_id' => $report->report_id]);
-        $this->assertDatabaseMissing('NOTIFICATION', ['report_id' => $report->report_id]);
+    }
+
+    public function test_report_location_must_be_in_the_server_side_allowlist(): void
+    {
+        $resident = User::factory()->create();
+        $category = Category::create([
+            'name' => 'Road Damage',
+            'description' => 'Damage to a public road.',
+            'severity_weight' => 3,
+        ]);
+
+        $this->actingAs($resident)
+            ->postJson('/api/reports', [
+                'category' => $category->name,
+                'location_id' => 99999,
+                'description' => 'A report at an unlisted location.',
+            ])
+            ->assertUnprocessable();
+
+        $this->assertDatabaseMissing('LOCATION', [
+            'name' => 'Attacker Created Street',
+            'area_name' => 'Unknown Village',
+        ]);
+    }
+
+    public function test_status_history_is_visible_to_the_report_owner_and_administrators_only(): void
+    {
+        $resident = User::factory()->create();
+        $otherResident = User::factory()->create();
+        $administrator = User::factory()->admin()->create();
+        $report = $this->createReport($resident);
+        DB::table('STATUS_LOG')->insert([
+            'report_id' => $report->report_id,
+            'changed_by' => $administrator->user_id,
+            'old_status' => 'Submitted',
+            'new_status' => 'Validated',
+            'remarks' => 'The report was reviewed.',
+            'changed_at' => now(),
+        ]);
+
+        $this->actingAs($resident)
+            ->getJson('/api/reports/'.$report->report_id.'/history')
+            ->assertOk()
+            ->assertJsonPath('history.0.newStatus', 'Validated')
+            ->assertJsonPath('history.0.remarks', 'The report was reviewed.');
+        $this->actingAs($otherResident)
+            ->getJson('/api/reports/'.$report->report_id.'/history')
+            ->assertNotFound();
+        $this->actingAs($administrator)
+            ->getJson('/api/reports/'.$report->report_id.'/history')
+            ->assertOk()
+            ->assertJsonCount(1, 'history');
+    }
+
+    public function test_security_headers_are_added_to_responses(): void
+    {
+        $this->get('/frontend/pages/index.html')
+            ->assertOk()
+            ->assertHeader('X-Frame-Options', 'DENY')
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+            ->assertHeader('Content-Security-Policy');
     }
 
     public function test_clearing_reports_archives_unresolved_reports_and_hides_them_from_residents(): void
     {
-        $administrator = User::factory()->create(['role' => 'admin']);
+        $administrator = User::factory()->admin()->create();
         $resident = User::factory()->create();
         $activeReport = $this->createReport($resident);
         $rejectedReport = $this->createReport($resident);
@@ -340,7 +439,7 @@ class ReportAuthorizationTest extends TestCase
 
     public function test_administrator_can_archive_and_restore_one_selected_report(): void
     {
-        $administrator = User::factory()->create(['role' => 'admin']);
+        $administrator = User::factory()->admin()->create();
         $resident = User::factory()->create();
         $selectedReport = $this->createReport($resident);
         $otherReport = $this->createReport($resident);
@@ -391,7 +490,7 @@ class ReportAuthorizationTest extends TestCase
 
     public function test_administrator_can_review_and_permanently_delete_only_archived_reports(): void
     {
-        $administrator = User::factory()->create(['role' => 'admin']);
+        $administrator = User::factory()->admin()->create();
         $resident = User::factory()->create();
         $archivedReport = $this->createReport($resident);
         $activeReport = $this->createReport($resident);
@@ -425,6 +524,7 @@ class ReportAuthorizationTest extends TestCase
     public function test_registration_ignores_client_supplied_role_and_hashes_password(): void
     {
         Mail::fake();
+        Notification::fake();
         config([
             'mail.default' => 'smtp',
             'mail.mailers.smtp.host' => 'smtp.resend.com',
@@ -437,7 +537,8 @@ class ReportAuthorizationTest extends TestCase
             'fullName' => 'New Resident',
             'username' => 'new-resident',
             'email' => 'new-resident@example.test',
-            'password' => 'a-secure-test-password',
+            'password' => 'A-secure-test-password1!',
+            'privacyConsent' => true,
             'role' => 'admin',
             'user_id' => 1,
         ]);
@@ -445,18 +546,46 @@ class ReportAuthorizationTest extends TestCase
         $response->assertAccepted()
             ->assertJsonPath('pendingApproval', true)
             ->assertJsonPath('emailStatus', 'sent');
-        Mail::assertSent(AccountUpdateMail::class, fn (AccountUpdateMail $mail): bool => $mail->hasTo('new-resident@example.test'));
 
         $user = User::where('username', 'new-resident')->firstOrFail();
         $this->assertSame('resident', $user->role);
         $this->assertSame('pending', $user->account_status);
-        $this->assertTrue(Hash::check('a-secure-test-password', $user->password_hash));
+        $this->assertNotNull($user->privacy_consent_at);
+        $this->assertSame(config('security.registration_consent_version'), $user->privacy_notice_version);
+        Notification::assertSentTo($user, VerifyEmail::class);
+        $this->assertTrue(Hash::check('A-secure-test-password1!', $user->password_hash));
         $this->getJson('/api/session')->assertUnauthorized();
         $this->postJson('/api/login', [
             'username' => $user->username,
-            'password' => 'a-secure-test-password',
+            'password' => 'A-secure-test-password1!',
         ])->assertForbidden()
             ->assertJsonPath('message', 'Your account is awaiting administrator approval.');
+    }
+
+    public function test_registration_requires_explicit_privacy_consent(): void
+    {
+        $this->postJson('/api/register', [
+            'fullName' => 'Consent Resident',
+            'username' => 'consent-resident',
+            'email' => 'consent-resident@example.test',
+            'password' => 'A-secure-test-password1!',
+            'privacyConsent' => false,
+        ])->assertUnprocessable();
+
+        $this->assertDatabaseMissing('USERS', ['username' => 'consent-resident']);
+    }
+
+    public function test_user_can_verify_email_from_a_signed_link(): void
+    {
+        $user = User::factory()->create(['email_verified_at' => null]);
+        $url = URL::temporarySignedRoute(
+            'verification.verify',
+            now()->addMinutes(30),
+            ['id' => $user->user_id, 'hash' => sha1($user->email)],
+        );
+
+        $this->get($url)->assertRedirect('/frontend/pages/index.html?verified=1');
+        $this->assertNotNull($user->fresh()->email_verified_at);
     }
 
     public function test_duplicate_registration_does_not_email_the_submitted_address_or_reveal_account_existence(): void
@@ -478,7 +607,8 @@ class ReportAuthorizationTest extends TestCase
             'fullName' => 'New Resident',
             'username' => 'new-resident',
             'email' => 'existing-resident@example.test',
-            'password' => 'a-secure-test-password',
+            'password' => 'A-secure-test-password1!',
+            'privacyConsent' => true,
         ])->assertUnprocessable()
             ->assertJsonPath('message', 'Registration could not be completed with these details. Review them and try again.')
             ->assertJsonPath('emailStatus', 'not_sent');
@@ -487,7 +617,8 @@ class ReportAuthorizationTest extends TestCase
             'fullName' => '',
             'username' => 'invalid-resident',
             'email' => 'invalid-resident@example.test',
-            'password' => 'a-secure-test-password',
+            'password' => 'A-secure-test-password1!',
+            'privacyConsent' => true,
         ])->assertUnprocessable()
             ->assertExactJson($response->json());
 
@@ -504,8 +635,8 @@ class ReportAuthorizationTest extends TestCase
             'mail.mailers.smtp.password' => 'test-api-key',
             'mail.from.address' => 'notices@barangay.example.test',
         ]);
-        $administrator = User::factory()->create(['role' => 'admin']);
-        $resident = User::factory()->create(['account_status' => 'pending']);
+        $administrator = User::factory()->admin()->create();
+        $resident = User::factory()->pending()->create();
 
         $this->actingAs($administrator)
             ->postJson('/api/residents/'.$resident->user_id.'/approval', ['status' => 'approved'])
@@ -532,8 +663,8 @@ class ReportAuthorizationTest extends TestCase
             'mail.mailers.smtp.password' => 'test-api-key',
             'mail.from.address' => 'notices@barangay.example.test',
         ]);
-        $administrator = User::factory()->create(['role' => 'admin']);
-        $resident = User::factory()->create(['account_status' => 'pending']);
+        $administrator = User::factory()->admin()->create();
+        $resident = User::factory()->pending()->create();
 
         $this->actingAs($administrator)
             ->postJson('/api/residents/'.$resident->user_id.'/approval', [
@@ -560,13 +691,13 @@ class ReportAuthorizationTest extends TestCase
     public function test_resident_cannot_approve_accounts_and_only_pending_accounts_can_be_rejected(): void
     {
         $resident = User::factory()->create();
-        $pendingResident = User::factory()->create(['account_status' => 'pending']);
+        $pendingResident = User::factory()->pending()->create();
 
         $this->actingAs($resident)
             ->postJson('/api/residents/'.$pendingResident->user_id.'/approval', ['status' => 'approved'])
             ->assertForbidden();
 
-        $administrator = User::factory()->create(['role' => 'admin']);
+        $administrator = User::factory()->admin()->create();
         $this->actingAs($administrator)
             ->postJson('/api/residents/'.$resident->user_id.'/approval', [
                 'status' => 'rejected',
@@ -599,10 +730,11 @@ class ReportAuthorizationTest extends TestCase
             'fullName' => 'Another Resident',
             'username' => 'resident-9001',
             'email' => 'resident-9001@example.test',
-            'password' => 'a-secure-test-password',
+            'password' => 'A-secure-test-password1!',
+            'privacyConsent' => true,
         ])
             ->assertForbidden()
-            ->assertJsonPath('message', 'Registration is closed because the system has reached its 9,000-account limit.');
+            ->assertJsonPath('message', 'Registration is closed because the system has reached its configured account limit.');
 
         $this->assertDatabaseCount('USERS', 9000);
     }

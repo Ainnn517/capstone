@@ -3,23 +3,21 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
-use App\Services\AccountNotificationService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password as PasswordBroker;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rules\Password;
 use RuntimeException;
 
 class AuthController extends ApiController
 {
-    private const MAX_REGISTERED_ACCOUNTS = 9000;
-
-    public function __construct(private readonly AccountNotificationService $accountNotifications) {}
-
     // Create a resident account that requires administrator approval.
     public function register(Request $request): JsonResponse
     {
@@ -27,7 +25,8 @@ class AuthController extends ApiController
             'fullName' => ['required', 'string', 'max:100'],
             'username' => ['required', 'string', 'min:3', 'max:50'],
             'email' => ['required', 'string', 'email', 'max:120'],
-            'password' => ['required', 'string', 'min:8'],
+            'password' => ['required', 'string', Password::min(12)->mixedCase()->numbers()->symbols()],
+            'privacyConsent' => ['required', 'accepted'],
         ]);
         if ($validator->fails()) {
             return $this->registrationError(
@@ -49,18 +48,26 @@ class AuthController extends ApiController
                     throw new RuntimeException('The registration capacity lock is missing. Run the database migrations.');
                 }
 
-                if (User::count() >= self::MAX_REGISTERED_ACCOUNTS) {
-                    return $this->error('Registration is closed because the system has reached its 9,000-account limit.', 403);
+                if (User::count() >= config('security.max_registered_accounts')) {
+                    return $this->error('Registration is closed because the system has reached its configured account limit.', 403);
                 }
 
-                return User::create([
+                $resident = User::create([
                     'username' => trim($data['username']),
                     'full_name' => trim($data['fullName']),
                     'email' => trim($data['email']),
                     'password_hash' => Hash::make($data['password']),
+                    'privacy_consent_at' => now(),
+                    'privacy_notice_version' => config('security.registration_consent_version'),
+                ]);
+                $resident->forceFill([
                     'role' => 'resident',
                     'account_status' => 'pending',
+                    'email_verified_at' => null,
                 ]);
+                $resident->save();
+
+                return $resident;
             });
         } catch (QueryException $exception) {
             if (($exception->errorInfo[0] ?? null) === '23000') {
@@ -80,11 +87,8 @@ class AuthController extends ApiController
             return $this->registrationError($message, $user->getStatusCode(), 'not_sent');
         }
 
-        $emailStatus = $this->accountNotifications->send(
-            $user->email,
-            'Registration received',
-            "Hello {$user->full_name}, your registration was received successfully. Your account is pending administrator approval. You will be notified when the review is complete.",
-        );
+        $user->sendEmailVerificationNotification();
+        $emailStatus = config('mail.default') === 'log' ? 'not_configured' : 'sent';
 
         return response()->json([
             'success' => true,
@@ -113,7 +117,7 @@ class AuthController extends ApiController
         }
 
         $username = trim($usernameInput);
-        $rateLimitKey = 'login:'.hash('sha256', mb_strtolower($username));
+        $rateLimitKey = 'login:'.hash('sha256', mb_strtolower($username).'|'.$request->ip());
         if (RateLimiter::tooManyAttempts($rateLimitKey, 3)) {
             $retryAfter = RateLimiter::availableIn($rateLimitKey);
 
@@ -123,7 +127,10 @@ class AuthController extends ApiController
 
         $user = User::where('username', $username)->first();
 
-        if (! $user || ! Hash::check($password, $user->password_hash)) {
+        $passwordMatches = $user
+            ? Hash::check($password, $user->password_hash)
+            : Hash::check($password, config('auth.dummy_password_hash'));
+        if (! $user || ! $passwordMatches) {
             RateLimiter::hit($rateLimitKey, 60);
 
             return $this->error('Incorrect username or password.', 401);
@@ -136,6 +143,11 @@ class AuthController extends ApiController
                 : 'Your account was not approved. Contact the barangay office for assistance.';
 
             return $this->error($message, 403);
+        }
+        if (! $user->hasVerifiedEmail()) {
+            $user->sendEmailVerificationNotification();
+
+            return $this->error('Verify your email address before signing in. A verification link has been sent if email delivery is configured.', 403);
         }
 
         Auth::login($user);
@@ -160,5 +172,85 @@ class AuthController extends ApiController
         $request->session()->regenerateToken();
 
         return response()->json(['success' => true]);
+    }
+
+    public function forgotPassword(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => ['required', 'email', 'max:120'],
+        ]);
+        if (! $validator->fails()) {
+            PasswordBroker::sendResetLink(['email' => $validator->validated()['email']]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'If an account matches that email, a password reset link will be sent.',
+        ]);
+    }
+
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'token' => ['required', 'string'],
+            'email' => ['required', 'email', 'max:120'],
+            'password' => ['required', 'confirmed', Password::min(12)->mixedCase()->numbers()->symbols()],
+        ]);
+        if ($validator->fails()) {
+            return $this->error('The reset link or new password is invalid.', 422);
+        }
+
+        $data = $validator->validated();
+        $status = PasswordBroker::reset(
+            [
+                'email' => $data['email'],
+                'token' => $data['token'],
+                'password' => $data['password'],
+                'password_confirmation' => $request->input('password_confirmation'),
+            ],
+            function (User $user) use ($data): void {
+                $user->forceFill(['password_hash' => Hash::make($data['password'])])->save();
+            },
+        );
+
+        if ($status !== PasswordBroker::PASSWORD_RESET) {
+            return $this->error('The reset link or new password is invalid.', 422);
+        }
+
+        return response()->json(['success' => true, 'message' => 'Your password has been reset.']);
+    }
+
+    public function changePassword(Request $request): JsonResponse
+    {
+        $user = $this->currentUser();
+        $validator = Validator::make($request->all(), [
+            'currentPassword' => ['required', 'string'],
+            'password' => ['required', 'confirmed', Password::min(12)->mixedCase()->numbers()->symbols()],
+        ]);
+        if ($validator->fails()) {
+            return $this->error('Check the new password and try again.', 422);
+        }
+
+        $data = $validator->validated();
+        if (! Hash::check($data['currentPassword'], $user->password_hash)) {
+            return $this->error('The current password is incorrect.', 422);
+        }
+
+        $user->forceFill(['password_hash' => Hash::make($data['password'])])->save();
+
+        return response()->json(['success' => true, 'message' => 'Your password has been changed.']);
+    }
+
+    public function verifyEmail(int $id, string $hash): RedirectResponse
+    {
+        $user = User::findOrFail($id);
+        if (! hash_equals(sha1($user->getEmailForVerification()), $hash)) {
+            abort(403);
+        }
+        if (! $user->hasVerifiedEmail()) {
+            $user->markEmailAsVerified();
+        }
+
+        return redirect('/frontend/pages/index.html?verified=1');
     }
 }

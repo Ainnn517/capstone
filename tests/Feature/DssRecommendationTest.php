@@ -19,17 +19,17 @@ class DssRecommendationTest extends TestCase
             'dss.weights.report_count' => 3,
             'dss.weights.average_age_days' => 1,
             'dss.weights.severity_weight' => 1,
-            'dss.weights.critical_report' => 5,
             'dss.high_urgency_threshold' => 8,
             'dss.team_by_category.Public Safety' => 'Barangay Safety Team',
         ]);
         $resident = User::factory()->create();
+        $team = Team::create(['name' => 'Barangay Safety Team']);
         $category = Category::create([
             'name' => 'Public Safety',
             'description' => null,
             'severity_weight' => 5,
+            'recommended_team_id' => $team->team_id,
         ]);
-        $team = Team::create(['name' => 'Barangay Safety Team']);
         $location = Location::create(['name' => 'Purok|One', 'area_name' => 'Village']);
         IssueReport::create([
             'tracking_code' => 'BR-'.strtoupper(bin2hex(random_bytes(6))),
@@ -50,7 +50,7 @@ class DssRecommendationTest extends TestCase
         $this->assertSame($team->name, $recommendation['recommendedTeam']);
         $this->assertSame(3, $recommendation['scoreBreakdown']['reportCount']);
         $this->assertSame(5, $recommendation['scoreBreakdown']['severity']);
-        $this->assertSame(5, $recommendation['scoreBreakdown']['criticalReports']);
+        $this->assertSame(10.0, $recommendation['score']);
         $this->assertSame('High', $recommendation['urgency']);
     }
 
@@ -84,7 +84,7 @@ class DssRecommendationTest extends TestCase
 
     public function test_administrator_can_save_and_read_dss_snapshot_history(): void
     {
-        $administrator = User::factory()->create(['role' => 'admin']);
+        $administrator = User::factory()->admin()->create();
 
         $this->actingAs($administrator)
             ->postJson('/api/analytics/dss/snapshots')
