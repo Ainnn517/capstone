@@ -71,7 +71,7 @@ class ResidentController extends ApiController
             }
 
             DB::transaction(function () use ($resident, $status, $actor): void {
-                $resident->update(['account_status' => $status]);
+                $resident->forceFill(['account_status' => $status])->save();
                 AdminAuditLog::create([
                     'actor_user_id' => $actor->user_id,
                     'action' => 'approve_resident',
@@ -93,7 +93,7 @@ class ResidentController extends ApiController
         }
 
         DB::transaction(function () use ($resident, $status, $actor, $reason): void {
-            $resident->update(['account_status' => $status]);
+            $resident->forceFill(['account_status' => $status])->save();
             AdminAuditLog::create([
                 'actor_user_id' => $actor->user_id,
                 'action' => 'reject_resident',

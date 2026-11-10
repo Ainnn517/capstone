@@ -75,9 +75,14 @@ class ReferenceDataTest extends TestCase
             'area_name' => $location->area_name,
             'is_active' => false,
         ])->assertOk();
-        $this->getJson('/api/reference-data')->assertJsonMissing([
+        // Administrators still see the location, now marked inactive.
+        $this->getJson('/api/reference-data')->assertJsonFragment([
             'location_id' => $location->location_id,
-            'is_active' => true,
+            'is_active' => false,
+        ]);
+        // Residents no longer see it.
+        $this->actingAs($resident)->getJson('/api/reference-data')->assertJsonMissing([
+            'location_id' => $location->location_id,
         ]);
     }
 }
