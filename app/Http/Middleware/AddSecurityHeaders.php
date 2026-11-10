@@ -22,7 +22,7 @@ class AddSecurityHeaders
                 ."font-src 'self' data: https://fonts.gstatic.com; "
                 ."img-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.googleusercontent.com; "
                 ."connect-src 'self' https://*.googleapis.com https://*.google.com https://*.gstatic.com data: blob:; "
-                ."frame-src https://*.google.com; "
+                .'frame-src https://*.google.com; '
                 .'worker-src blob:;',
         );
         $response->headers->set('X-Frame-Options', 'DENY');

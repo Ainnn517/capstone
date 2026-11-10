@@ -4,9 +4,9 @@ use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DssController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\ReferenceDataController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ResidentController;
-use App\Http\Controllers\ReferenceDataController;
 use Illuminate\Support\Facades\Route;
 
 // Show the login and portal pages.
