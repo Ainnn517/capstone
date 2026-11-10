@@ -18,17 +18,18 @@ class AddSecurityHeaders
             'Content-Security-Policy',
             "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; "
                 ."script-src 'self' 'nonce-{$nonce}' https://maps.googleapis.com https://maps.gstatic.com; "
-                ."style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
-                ."font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; "
-                ."img-src 'self' data: blob: https://maps.googleapis.com https://maps.gstatic.com; "
-                ."connect-src 'self' https://maps.googleapis.com https://maps.gstatic.com; "
-                ."frame-src https://www.google.com;",
+                ."style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+                ."font-src 'self' data: https://fonts.gstatic.com; "
+                ."img-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.googleusercontent.com; "
+                ."connect-src 'self' https://*.googleapis.com https://*.google.com https://*.gstatic.com data: blob:; "
+                ."frame-src https://*.google.com; "
+                .'worker-src blob:;',
         );
         $response->headers->set('X-Frame-Options', 'DENY');
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
         $response->headers->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self)');
-        if ($request->isSecure()) {
+        if ($request->isSecure() && app()->environment('production')) {
             $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
         }
 

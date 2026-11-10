@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\AddSecurityHeaders;
 use App\Mail\AccountUpdateMail;
 use App\Models\Attachment;
 use App\Models\Category;
@@ -10,6 +11,7 @@ use App\Models\Location;
 use App\Models\User;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
@@ -386,12 +388,43 @@ class ReportAuthorizationTest extends TestCase
 
     public function test_security_headers_are_added_to_responses(): void
     {
-        $this->get('/frontend/pages/index.html')
+        $response = $this->get('/frontend/pages/index.html');
+
+        $response
             ->assertOk()
             ->assertHeader('X-Frame-Options', 'DENY')
             ->assertHeader('X-Content-Type-Options', 'nosniff')
             ->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
             ->assertHeader('Content-Security-Policy');
+
+        $policy = $response->headers->get('Content-Security-Policy');
+        $this->assertStringContainsString('img-src \'self\' data: blob: https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.googleusercontent.com;', $policy);
+        $this->assertStringContainsString('connect-src \'self\' https://*.googleapis.com https://*.google.com https://*.gstatic.com data: blob:', $policy);
+        $this->assertStringContainsString('worker-src blob:', $policy);
+        $this->assertStringNotContainsString('cdn.jsdelivr.net', $policy);
+        $this->assertFalse($response->headers->has('Strict-Transport-Security'));
+    }
+
+    // Send Strict-Transport-Security only for secure production requests.
+    public function test_hsts_is_limited_to_secure_production_requests(): void
+    {
+        $this->app->detectEnvironment(static fn (): string => 'production');
+        $middleware = new AddSecurityHeaders;
+
+        $secureResponse = $middleware->handle(
+            Request::create('https://localhost/frontend/pages/index.html'),
+            static fn (Request $request) => response('OK'),
+        );
+        $this->assertSame(
+            'max-age=31536000; includeSubDomains',
+            $secureResponse->headers->get('Strict-Transport-Security'),
+        );
+
+        $insecureResponse = $middleware->handle(
+            Request::create('http://localhost/frontend/pages/index.html'),
+            static fn (Request $request) => response('OK'),
+        );
+        $this->assertFalse($insecureResponse->headers->has('Strict-Transport-Security'));
     }
 
     public function test_clearing_reports_archives_unresolved_reports_and_hides_them_from_residents(): void
