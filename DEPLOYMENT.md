@@ -20,7 +20,7 @@ The database schema is managed manually. After schema setup or upgrade, run `php
 
 ## Mail and maps
 
-The example `.env` uses Laravel's `log` mailer and does not send inbox email. To enable account/approval mail, configure a provider privately via `.env` or the hosting secret manager. For Gmail SMTP, use an App Password—not the normal account password—and set the SMTP host, port, username, password, and sender address. Never commit or share credentials.
+The example `.env` uses Laravel's `log` mailer and does not send inbox email. Email verification is required by default; configure a mail provider before deployment, or set `EMAIL_VERIFICATION_REQUIRED=false` if the installation intentionally does not use inbox verification. With verification disabled, administrators can approve accounts without residents needing to receive an email. To verify an account manually, run `php artisan accounts:verify {username}`. To enable account/approval mail, configure a provider privately via `.env` or the hosting secret manager. For Gmail SMTP, use an App Password—not the normal account password—and set the SMTP host, port, username, password, and sender address. Never commit or share credentials.
 
 The location picker requires the Google Maps JavaScript API, billing, and an API key restricted to the required API and allowed referrers. This map integration still requires network access. The charts and Uicons used by the operations/resident pages are hosted locally.
 

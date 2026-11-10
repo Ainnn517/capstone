@@ -3,6 +3,8 @@
 use App\Models\User;
 
 return [
+    'require_email_verification' => env('EMAIL_VERIFICATION_REQUIRED', true),
+
     'dummy_password_hash' => env(
         'DUMMY_PASSWORD_HASH',
         '$2y$12$4Pq7aYm/6/nT/KZbdoJY9eXbmcluwrGTdiYW6WQSEVC8tUQO44TIW',

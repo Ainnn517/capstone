@@ -9,10 +9,13 @@ use Symfony\Component\HttpFoundation\Response;
 
 class RequireAuthenticatedUser
 {
+    // Require an approved user and, when configured, a verified email address.
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
-        if (! $user instanceof User || $user->account_status !== 'approved' || ! $user->hasVerifiedEmail()) {
+        if (! $user instanceof User
+            || $user->account_status !== 'approved'
+            || (config('auth.require_email_verification') && ! $user->hasVerifiedEmail())) {
             return response()->json([
                 'success' => false,
                 'message' => 'Please log in to continue.',

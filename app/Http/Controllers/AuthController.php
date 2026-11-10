@@ -144,7 +144,7 @@ class AuthController extends ApiController
 
             return $this->error($message, 403);
         }
-        if (! $user->hasVerifiedEmail()) {
+        if (config('auth.require_email_verification') && ! $user->hasVerifiedEmail()) {
             $user->sendEmailVerificationNotification();
 
             return $this->error('Verify your email address before signing in. A verification link has been sent if email delivery is configured.', 403);
