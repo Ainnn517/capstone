@@ -19,10 +19,9 @@
 -- the connection to +08:00 (Asia/Manila), so both sides agree.
 -- =============================================================================
 
-CREATE DATABASE IF NOT EXISTS barangay_reporting
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
-USE barangay_reporting;
+-- Create the database first, then import this file into it:
+--   mysql -u your_user -p -e "CREATE DATABASE your_database CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+--   mysql -u your_user -p your_database < database/mysql_schema.sql
 SET NAMES utf8mb4;
 
 -- Resident and administrator accounts.

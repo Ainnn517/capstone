@@ -4,15 +4,29 @@
 
 The application requires PHP 8.2+ with `pdo_mysql`, `fileinfo`, `mbstring`, and XML/DOM, Composer, and MySQL. The browser screens and Laravel API are served by Laravel; point the web server document root to `public/`.
 
-1. For a new installation, create a MySQL database and import `database/mysql_schema.sql`. For an existing installation, back up the database first, then apply `database/upgrade_existing_database.sql`.
+1. For a new installation, create a MySQL database (`CREATE DATABASE your_database CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`) and import `database/mysql_schema.sql` into it. For an existing installation, back up the database first, then run `mysql -u user -p your_database < database/upgrade_existing_database.sql`. Neither file selects a database itself, so they work with any database name.
 2. Copy `.env.example` to `.env`. Configure `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, and `DB_PASSWORD`. Set a Google Maps JavaScript API key if the map picker is needed.
-3. Install dependencies, generate an application key, and optionally seed pilot accounts:
+3. Install dependencies, generate an application key, and seed the reference data (categories, teams, locations). Outside production the seeder also creates the pilot accounts from `.env`; it never changes an account that already exists:
 
    ```sh
    composer install
    php artisan key:generate
    php artisan db:seed
    ```
+
+## Fresh online database (recommended for the first deployment)
+
+Start the hosted system with a clean database rather than copying development data:
+
+1. Create the database on the host and import `database/mysql_schema.sql`.
+2. Run `php artisan db:seed` to add the categories, teams, recommended teams, and the street catalog. In production the seeder creates **no accounts**.
+3. Create the first administrator interactively (the password is never stored in `.env`):
+
+   ```sh
+   php artisan admin:create
+   ```
+
+4. Residents then register through the site and the administrator approves them.
 
 4. Start locally with `php artisan serve`.
 

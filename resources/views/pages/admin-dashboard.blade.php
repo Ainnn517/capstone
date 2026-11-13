@@ -132,14 +132,14 @@
             
             <!-- Filters -->
             <div class="incident-filters">
-              <select id="filterStatus" class="form-select form-select-sm">
+              <select id="filterStatus" class="form-select form-select-sm" aria-label="Filter by status">
                 <option>All Status</option>
                 <option>Submitted</option>
                 <option>Validated</option>
                 <option>Dispatched</option>
                 <option>Rejected</option>
               </select>
-              <select id="filterPriority" class="form-select form-select-sm">
+              <select id="filterPriority" class="form-select form-select-sm" aria-label="Filter by priority">
                 <option>All Priority</option>
                 <option>Critical</option>
                 <option>High</option>
@@ -295,7 +295,7 @@
           </div>
           <label class="resident-search">
             <span class="visually-hidden">Search residents or complaints</span>
-            <input id="residentSearch" class="form-control" type="search" placeholder="Search residents or complaints">
+            <input id="residentSearch" class="form-control" type="search" placeholder="Search residents or complaints" aria-label="Search residents">
           </label>
         </div>
         <div id="residentsSummary" class="resident-summary"></div>
@@ -386,7 +386,7 @@
 
             <div class="action-controls row g-3">
               <div class="col-6">
-                <label class="form-label fw-medium">Decision</label>
+                <label class="form-label fw-medium" for="decision">Decision</label>
                 <select id="decision" class="form-select">
                   <option value="Advance">Continue Workflow</option>
                   <option value="Reject">Reject / Close Report</option>
@@ -400,7 +400,7 @@
               </div>
 
               <div class="col-6">
-                <label class="form-label fw-medium">Workflow Stage</label>
+                <label class="form-label fw-medium" for="editStatus">Workflow Stage</label>
                 <select id="editStatus" class="form-select">
                   <option>Submitted</option>
                   <option>Validated</option>
@@ -411,7 +411,7 @@
               </div>
 
               <div class="col-6">
-                <label class="form-label fw-medium">Assign Field Personnel / Team</label>
+                <label class="form-label fw-medium" for="assignee">Assign Field Personnel / Team</label>
                 <select id="assignee" class="form-select">
                   <option value="Unassigned">Unassigned</option>
                   <option>Field Team A</option>

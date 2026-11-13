@@ -70,35 +70,35 @@
             <div class="row g-3">
 
               <div class="col-md-4">
-                <label class="form-label fw-medium">Issue Category</label>
+                <label class="form-label fw-medium" for="category">Issue Category</label>
                 <select id="category" class="form-select" required>
                   <option value="">Choose category</option>
                 </select>
               </div>
 
               <div class="col-md-4">
-                <label class="form-label fw-medium">Village / Phase</label>
+                <label class="form-label fw-medium" for="phase">Village / Phase</label>
                 <select id="phase" class="form-select" required>
                   <option value="">Choose village / phase</option>
                 </select>
               </div>
 
               <div class="col-md-4">
-                <label class="form-label fw-medium">Street</label>
+                <label class="form-label fw-medium" for="purok">Street</label>
                 <select id="purok" class="form-select" required disabled>
                   <option value="">Choose village / phase first</option>
                 </select>
               </div>
 
               <div class="col-12">
-                <label class="form-label fw-medium">Detailed Description</label>
+                <label class="form-label fw-medium" for="description">Detailed Description</label>
                 <textarea id="description" class="form-control" rows="4" minlength="1" maxlength="500" required placeholder="Describe the incident in 1 to 500 characters."></textarea>
                 <small class="form-text text-secondary">Include enough detail for a response team to understand the issue (up to 500 characters).</small>
                 <div id="categorySuggestion" class="category-suggestion" aria-live="polite" hidden></div>
               </div>
 
               <div class="col-md-7">
-                <label class="form-label fw-medium">Specific Landmark / Marker</label>
+                <label class="form-label fw-medium" for="location">Specific Landmark / Marker</label>
                 <div class="input-group">
                   <input id="location" class="form-control" maxlength="150" placeholder="e.g. Near Barangay Hall">
                   <button type="button" id="geoBtn" class="btn btn-outline-primary">
@@ -125,7 +125,7 @@
               </dialog>
 
               <div class="col-md-5">
-                <label class="form-label fw-medium">Image Attachment</label>
+                <label class="form-label fw-medium" for="image">Image Attachment</label>
                 <input id="image" type="file" class="form-control" accept="image/*">
                 <img id="preview" class="img-fluid rounded mt-2 d-none" style="max-height: 140px; width: 100%; object-fit: cover;">
               </div>

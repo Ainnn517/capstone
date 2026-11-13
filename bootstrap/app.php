@@ -17,13 +17,8 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(AddSecurityHeaders::class);
-        $trustedProxies = array_filter(array_map(
-            'trim',
-            explode(',', (string) env('TRUSTED_PROXIES', '')),
-        ));
-        if ($trustedProxies !== []) {
-            $middleware->trustProxies(at: $trustedProxies);
-        }
+        // Trusted proxies are applied in AppServiceProvider from config('security.trusted_proxies'),
+        // so the setting also works after `php artisan config:cache`.
         $middleware->alias([
             'api.auth' => RequireAuthenticatedUser::class,
             'role' => RequireRole::class,

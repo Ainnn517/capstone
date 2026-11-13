@@ -13,6 +13,7 @@ use App\Models\User;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
@@ -644,9 +645,10 @@ class ReportAuthorizationTest extends TestCase
         $this->assertNotNull($user->fresh()->email_verified_at);
     }
 
-    public function test_duplicate_registration_does_not_email_the_submitted_address_or_reveal_account_existence(): void
+    public function test_duplicate_registration_looks_like_a_new_one_and_only_emails_the_existing_owner(): void
     {
         Mail::fake();
+        Notification::fake();
         config([
             'mail.default' => 'smtp',
             'mail.mailers.smtp.host' => 'smtp.resend.com',
@@ -658,27 +660,52 @@ class ReportAuthorizationTest extends TestCase
             'username' => 'existing-resident',
             'email' => 'existing-resident@example.test',
         ]);
+        $registration = fn (string $username, string $email) => [
+            'fullName' => 'New Resident',
+            'username' => $username,
+            'email' => $email,
+            'password' => 'A-secure-test-password1!',
+            'privacyConsent' => true,
+        ];
 
-        $response = $this->postJson('/api/register', [
+        $genuine = $this->postJson('/api/register', $registration('brand-new', 'brand-new@example.test'))
+            ->assertStatus(202);
+
+        // Same email as an existing account (different capitalisation): identical response,
+        // no new account, and only the existing owner is told.
+        $this->postJson('/api/register', $registration('another-name', 'Existing-Resident@example.test'))
+            ->assertStatus(202)
+            ->assertExactJson($genuine->json());
+        $this->assertDatabaseMissing('USERS', ['username' => 'another-name']);
+        Mail::assertSent(AccountUpdateMail::class, fn (AccountUpdateMail $mail): bool => $mail->hasTo('existing-resident@example.test'));
+        Mail::assertSent(AccountUpdateMail::class, 1);
+    }
+
+    public function test_registration_explains_what_to_fix(): void
+    {
+        $this->withoutMiddleware(ThrottleRequests::class); // more than 5 attempts in one test
+        $base = [
             'fullName' => 'New Resident',
             'username' => 'new-resident',
-            'email' => 'existing-resident@example.test',
+            'email' => 'new-resident@example.test',
             'password' => 'A-secure-test-password1!',
             'privacyConsent' => true,
-        ])->assertUnprocessable()
-            ->assertJsonPath('message', 'Registration could not be completed with these details. Review them and try again.')
-            ->assertJsonPath('emailStatus', 'not_sent');
+        ];
+        $expect = fn (array $changes, string $message) => $this->postJson('/api/register', array_merge($base, $changes))
+            ->assertUnprocessable()
+            ->assertJsonPath('message', $message);
 
-        $this->postJson('/api/register', [
-            'fullName' => '',
-            'username' => 'invalid-resident',
-            'email' => 'invalid-resident@example.test',
-            'password' => 'A-secure-test-password1!',
-            'privacyConsent' => true,
-        ])->assertUnprocessable()
-            ->assertExactJson($response->json());
+        $expect(['fullName' => ''], 'Enter your full name.');
+        $expect(['email' => 'not-an-email'], 'Enter a valid email address.');
+        $expect(['username' => 'ab'], 'The username must be at least 3 characters.');
+        $expect(['username' => 'has space'], 'The username may only contain letters, numbers, dots, dashes, and underscores.');
+        $expect(['password' => 'short'], 'The password field must be at least 12 characters.');
+        $expect(['password' => 'alllowercase12345'], 'The password field must contain at least one uppercase and one lowercase letter.');
+        $expect(['privacyConsent' => false], 'Please agree to the privacy notice to continue.');
 
-        Mail::assertNothingOutgoing();
+        User::factory()->create(['username' => 'taken-name']);
+        $expect(['username' => 'Taken-Name'], 'That username is already taken. Please choose another.');
+        $this->assertDatabaseMissing('USERS', ['email' => 'new-resident@example.test']);
     }
 
     public function test_administrator_can_approve_a_resident_before_they_can_sign_in(): void

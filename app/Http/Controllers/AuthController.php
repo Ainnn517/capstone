@@ -6,6 +6,7 @@ use App\Http\Middleware\RequireAuthenticatedUser;
 use App\Mail\AccountUpdateMail;
 use App\Mail\PasswordChangeCodeMail;
 use App\Models\User;
+use App\Services\AccountNotificationService;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -27,43 +28,73 @@ use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 class AuthController extends ApiController
 {
     // Create a resident account that requires administrator approval.
+    //
+    // Validation problems are reported specifically (so a resident knows what to fix).
+    // An email that already has an account gets the SAME response as a new registration,
+    // and the existing account owner is emailed instead, so this form cannot be used to
+    // find out which email addresses are registered.
     public function register(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'fullName' => ['required', 'string', 'max:100'],
-            'username' => ['required', 'string', 'min:3', 'max:50'],
+            'username' => ['required', 'string', 'min:3', 'max:50', 'regex:/\A[A-Za-z0-9._-]+\z/'],
             'email' => ['required', 'string', 'email', 'max:120'],
             'password' => ['required', 'string', Password::min(12)->mixedCase()->numbers()->symbols()],
             'privacyConsent' => ['required', 'accepted'],
+        ], [
+            'fullName.required' => 'Enter your full name.',
+            'username.required' => 'Choose a username.',
+            'username.min' => 'The username must be at least 3 characters.',
+            'username.regex' => 'The username may only contain letters, numbers, dots, dashes, and underscores.',
+            'email.required' => 'Enter your email address.',
+            'email.email' => 'Enter a valid email address.',
+            'password.required' => 'Choose a password.',
+            'privacyConsent.required' => 'Please agree to the privacy notice to continue.',
+            'privacyConsent.accepted' => 'Please agree to the privacy notice to continue.',
+        ], [
+            'fullName' => 'full name',
+            'username' => 'username',
+            'email' => 'email address',
+            'password' => 'password',
         ]);
         if ($validator->fails()) {
-            return $this->registrationError(
-                'Registration could not be completed with these details. Review them and try again.',
-                422,
-                'not_sent',
-            );
+            return $this->registrationError($validator->errors()->first(), 422, 'not_sent');
         }
 
         $data = $validator->validated();
+        $email = trim($data['email']);
+        $emailStatus = config('mail.default') === 'log' ? 'not_configured' : 'sent';
+        $received = [
+            'success' => true,
+            'pendingApproval' => true,
+            'message' => 'Registration received. An administrator must approve your account before you can sign in.',
+            'emailStatus' => $emailStatus,
+        ];
+
         try {
-            $user = DB::transaction(function () use ($data): User|JsonResponse {
+            $result = DB::transaction(function () use ($data, $email): User|string {
                 $capacityLock = DB::table('REGISTRATION_CAPACITY_LOCK')
                     ->where('id', 1)
                     ->lockForUpdate()
                     ->first();
-
                 if (! $capacityLock) {
                     throw new RuntimeException('The registration capacity lock is missing. Run the database migrations.');
                 }
 
+                if (User::query()->whereRaw('LOWER(email) = ?', [mb_strtolower($email)])->exists()) {
+                    return 'duplicate_email';
+                }
+                if (User::query()->whereRaw('LOWER(username) = ?', [mb_strtolower(trim($data['username']))])->exists()) {
+                    return 'duplicate_username';
+                }
                 if (User::count() >= config('security.max_registered_accounts')) {
-                    return $this->error('Registration is closed because the system has reached its configured account limit.', 403);
+                    return 'closed';
                 }
 
                 $resident = User::create([
                     'username' => trim($data['username']),
                     'full_name' => trim($data['fullName']),
-                    'email' => trim($data['email']),
+                    'email' => $email,
                     'password_hash' => Hash::make($data['password']),
                     'privacy_consent_at' => now(),
                     'privacy_notice_version' => config('security.registration_consent_version'),
@@ -79,31 +110,34 @@ class AuthController extends ApiController
             });
         } catch (QueryException $exception) {
             if (($exception->errorInfo[0] ?? null) === '23000') {
-                return $this->registrationError(
-                    'Registration could not be completed with these details. Review them and try again.',
-                    422,
-                    'not_sent',
-                );
+                // Two sign-ups raced for the same email or username: treat like a duplicate.
+                return response()->json($received, 202);
             }
 
             throw $exception;
         }
 
-        if ($user instanceof JsonResponse) {
-            $message = $user->getData()->message;
+        if ($result === 'duplicate_email') {
+            // Notify the address exactly as stored on the existing account.
+            $existing = User::query()->whereRaw('LOWER(email) = ?', [mb_strtolower($email)])->first();
+            app(AccountNotificationService::class)->send(
+                $existing?->email ?? $email,
+                'You already have an account',
+                'Someone tried to create a new Barangay Reporting System account with this email address, but an account already exists for it. If this was you, sign in with your existing username, or use "Forgot password" on the sign-in page. If this was not you, you can ignore this email.',
+            );
 
-            return $this->registrationError($message, $user->getStatusCode(), 'not_sent');
+            return response()->json($received, 202);
+        }
+        if ($result === 'duplicate_username') {
+            return $this->registrationError('That username is already taken. Please choose another.', 422, 'not_sent');
+        }
+        if ($result === 'closed') {
+            return $this->registrationError('Registration is closed because the system has reached its configured account limit.', 403, 'not_sent');
         }
 
-        $user->sendEmailVerificationNotification();
-        $emailStatus = config('mail.default') === 'log' ? 'not_configured' : 'sent';
+        $result->sendEmailVerificationNotification();
 
-        return response()->json([
-            'success' => true,
-            'pendingApproval' => true,
-            'message' => 'Registration received. An administrator must approve your account before you can sign in.',
-            'emailStatus' => $emailStatus,
-        ], 202);
+        return response()->json($received, 202);
     }
 
     private function registrationError(string $message, int $status, string $emailStatus): JsonResponse

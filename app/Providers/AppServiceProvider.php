@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Services\Triage\AnthropicTriageModel;
 use App\Services\Triage\TriageModel;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -24,5 +25,12 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Model::preventSilentlyDiscardingAttributes(! app()->isProduction());
+
+        // Behind a hosting proxy or load balancer, trust its forwarded headers so generated
+        // links (email verification, password reset) use https and the real host.
+        $trustedProxies = config('security.trusted_proxies', []);
+        if ($trustedProxies !== []) {
+            TrustProxies::at(count($trustedProxies) === 1 ? $trustedProxies[0] : array_values($trustedProxies));
+        }
     }
 }

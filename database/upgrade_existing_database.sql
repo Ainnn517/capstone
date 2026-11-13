@@ -1,7 +1,10 @@
 -- =============================================================================
 -- Upgrade an EXISTING Barangay Reporting database to schema v2 (see mysql_schema_v2.sql).
 -- Safe to run more than once. It works whether or not migrate_security_hardening.sql was
--- already applied. BACK UP THE DATABASE FIRST (mysqldump barangay_reporting > backup.sql).
+-- already applied. BACK UP THE DATABASE FIRST (mysqldump your_database > backup.sql).
+--
+-- Run it against the database the application uses (it does not select one itself):
+--   mysql -u your_user -p your_database < database/upgrade_existing_database.sql
 --
 -- What it does:
 --   * Adds missing columns, indexes, CHECK constraints and foreign keys (only if absent).
@@ -17,7 +20,6 @@
 -- and no DELIMITER, so it runs in the mysql client and in phpMyAdmin.
 -- =============================================================================
 
-USE barangay_reporting;
 SET NAMES utf8mb4;
 
 -- ---- Preflight: every count below should be 0. If not, fix those rows first. ----

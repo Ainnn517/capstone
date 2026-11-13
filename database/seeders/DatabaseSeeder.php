@@ -57,9 +57,14 @@ class DatabaseSeeder extends Seeder
         $this->seedPilotUser('resident');
     }
 
-    // Add a pilot account when its environment settings are provided.
+    // Add a pilot account when its environment settings are provided. Never in production
+    // (use `php artisan admin:create` there), and never changes an account that already exists.
     private function seedPilotUser(string $role): void
     {
+        if (app()->isProduction()) {
+            return;
+        }
+
         $username = config('pilot.'.$role.'.username');
         $email = config('pilot.'.$role.'.email');
         $password = config('pilot.'.$role.'.password');
@@ -70,6 +75,9 @@ class DatabaseSeeder extends Seeder
         }
 
         $user = User::firstOrNew(['username' => $username]);
+        if ($user->exists) {
+            return;
+        }
         $user->fill([
             'full_name' => config('pilot.'.$role.'.name'),
             'email' => $email,
