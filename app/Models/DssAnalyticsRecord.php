@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class DssAnalyticsRecord extends Model
 {
@@ -18,4 +19,10 @@ class DssAnalyticsRecord extends Model
         'recommendations' => 'array',
         'generated_at' => 'datetime',
     ];
+
+    // The administrator who saved the snapshot (null if that account was deleted).
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by', 'user_id');
+    }
 }

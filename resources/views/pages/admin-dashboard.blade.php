@@ -6,9 +6,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>Barangay Command Center - Operations Dashboard</title>
-  <link rel="stylesheet" href="/frontend/css/admin-dashboard.css">
-  <link rel="stylesheet" href="/frontend/css/notifications.css">
-  <link rel="stylesheet" href="/frontend/vendor/uicons-regular-rounded/css/uicons-regular-rounded.css">
+  <link rel="stylesheet" href="{{ \App\Support\Asset::url('/frontend/css/admin-dashboard.css') }}">
+  <link rel="stylesheet" href="{{ \App\Support\Asset::url('/frontend/css/notifications.css') }}">
+  <link rel="stylesheet" href="{{ \App\Support\Asset::url('/frontend/css/account.css') }}">
+  <link rel="stylesheet" href="{{ \App\Support\Asset::url('/frontend/vendor/uicons-regular-rounded/css/uicons-regular-rounded.css') }}">
 </head>
 <body>
 
@@ -16,8 +17,7 @@
   <nav class="navbar navbar-dark">
     <div class="container-fluid px-4">
       <div class="d-flex gap-2 align-items-center">
-        <span id="adminName" class="text-white-50 small">Welcome ! Admin</span>
-        <button class="btn btn-outline-light btn-sm" id="changePasswordButton" type="button">Change password</button>
+        <span id="adminName" class="text-white-50 small">Welcome</span>
         <button class="btn btn-light btn-sm" id="logoutBtn" type="button">Logout</button>
       </div>
     </div>
@@ -26,14 +26,21 @@
   <!-- Main Container -->
   <main class="container-fluid page-wrap px-3 px-lg-4 admin-layout">
     <aside class="admin-sidebar card" aria-label="Admin navigation">
-      <p class="sidebar-label">Workspace</p>
+      <p class="sidebar-label">Overview</p>
       <button class="sidebar-link active" type="button" data-admin-view="dashboard" aria-current="page">
         <i class="fi fi-rr-dashboard sidebar-icon" aria-hidden="true"></i>
         Dashboard
       </button>
+      <button class="sidebar-link" type="button" data-admin-view="analytics">
+        <i class="fi fi-rr-chart-histogram sidebar-icon" aria-hidden="true"></i>
+        Analytics
+      </button>
+
+      <p class="sidebar-label">Reports</p>
       <button class="sidebar-link" type="button" data-admin-view="incidents">
         <i class="fi fi-rr-flag sidebar-icon" aria-hidden="true"></i>
         Incident Management
+        <span class="priority-counts" id="incidentPriorityCounts" aria-label="Open incidents by priority"></span>
       </button>
       <button class="sidebar-link" type="button" data-admin-view="resolved">
         <i class="fi fi-rr-check-circle sidebar-icon" aria-hidden="true"></i>
@@ -45,6 +52,18 @@
         Archived Incidents
         <span class="sidebar-count" id="archivedNavCount">0</span>
       </button>
+
+      <p class="sidebar-label">Settings</p>
+      <button class="sidebar-link" type="button" data-admin-view="referenceData">
+        <i class="fi fi-rr-settings sidebar-icon" aria-hidden="true"></i>
+        Reference Data
+      </button>
+      <button class="sidebar-link" type="button" data-admin-view="account">
+        <i class="fi fi-rr-user sidebar-icon" aria-hidden="true"></i>
+        Account
+      </button>
+
+      <hr class="sidebar-divider">
       <button class="sidebar-link" type="button" data-admin-view="residents">
         <i class="fi fi-rr-users-alt sidebar-icon" aria-hidden="true"></i>
         Residents
@@ -54,14 +73,6 @@
         <i class="fi fi-rr-user-time sidebar-icon" aria-hidden="true"></i>
         Pending Approvals
         <span class="sidebar-count" id="pendingApprovalNavCount" aria-label="Pending approvals">0</span>
-      </button>
-      <button class="sidebar-link" type="button" data-admin-view="analytics">
-        <i class="fi fi-rr-chart-histogram sidebar-icon" aria-hidden="true"></i>
-        Analytics
-      </button>
-      <button class="sidebar-link" type="button" data-admin-view="referenceData">
-        <i class="fi fi-rr-settings sidebar-icon" aria-hidden="true"></i>
-        Reference Data
       </button>
     </aside>
 
@@ -165,12 +176,16 @@
       <div class="col-12">
         <div class="card p-4 h-100 admin-panel dss-card">
           <h4 class="section-title mb-1">DSS Recommendations</h4>
-          <p class="small text-secondary mb-3">Scores combine report count, average age, category severity, and critical reports. Save a snapshot to retain an analytics history.</p>
-          <button id="saveDssSnapshotBtn" class="btn btn-outline-primary btn-sm mb-3 align-self-start" type="button">Save DSS snapshot</button>
+          <p class="small text-secondary mb-3">A plain-language summary of what to prioritise, written from the DSS scores. Save a snapshot to keep a record of today's recommendations.</p>
+          <div class="dss-actions mb-3">
+            <button id="saveDssSnapshotBtn" class="btn btn-outline-primary btn-sm" type="button">Save DSS snapshot</button>
+            <button id="clearDssSnapshotsBtn" class="btn btn-outline-danger btn-sm" type="button" disabled>Clear snapshot history</button>
+          </div>
           <div id="dssPanel" class="dss-panel">
             <!-- Dynamic recommendation items -->
           </div>
-          <div id="dssHistory" class="mt-3" aria-label="Saved DSS analytics history"></div>
+          <h5 class="dss-history-title">Saved snapshots</h5>
+          <div id="dssHistory" aria-label="Saved DSS analytics history"></div>
         </div>
       </div>
 
@@ -243,7 +258,8 @@
       <div class="col-lg-5">
         <div class="card p-4 h-100">
           <h5 class="fw-bold mb-3">Category Breakdown</h5>
-          <canvas id="pieChart" height="240"></canvas>
+          <div class="chart-donut"><canvas id="pieChart" height="240"></canvas></div>
+          <ul id="pieLegend" class="chart-legend" aria-label="Reports by category"></ul>
         </div>
       </div>
 
@@ -336,6 +352,8 @@
           <div id="referenceLocations"></div>
         </div>
       </section>
+
+      @include('partials.account-view', ['viewClass' => 'admin-view'])
     </div>
   </main>
 
@@ -350,15 +368,24 @@
         <div class="modal-body">
           <form id="actionForm">
             <input type="hidden" id="editId">
-            
+            <div class="action-layout">
+            <!-- Left: report details. Right: the controls, kept in view on wide screens. -->
+            <div class="action-details">
             <div id="incidentSummary" class="alert alert-light border mb-3"></div>
             <section aria-labelledby="reportStatusHistoryTitle" class="mb-3">
               <h6 id="reportStatusHistoryTitle">Status history</h6>
               <div id="reportStatusHistory" aria-live="polite"></div>
             </section>
+            <section aria-labelledby="triagePanelTitle" class="triage-panel mb-3">
+              <h6 id="triagePanelTitle">Triage assistant <span id="triageSource" class="badge-soft soft-blue"></span></h6>
+              <div id="triageActions" class="triage-actions"></div>
+              <div id="triagePanel" aria-live="polite"></div>
+              <p class="triage-note">Suggestions only. Review them before acting; nothing is changed automatically.</p>
+            </section>
+            </div>
 
-            <div class="row g-3">
-              <div class="col-md-4">
+            <div class="action-controls row g-3">
+              <div class="col-6">
                 <label class="form-label fw-medium">Decision</label>
                 <select id="decision" class="form-select">
                   <option value="Advance">Continue Workflow</option>
@@ -366,13 +393,13 @@
                 </select>
               </div>
 
-              <div class="col-md-4">
+              <div class="col-6">
                 <label class="form-label fw-medium" for="editPriority">Automatic Priority</label>
                 <input id="editPriority" class="form-control" readonly aria-describedby="priorityHelp">
                 <div id="priorityHelp" class="form-text">Set automatically from the report category.</div>
               </div>
 
-              <div class="col-md-4">
+              <div class="col-6">
                 <label class="form-label fw-medium">Workflow Stage</label>
                 <select id="editStatus" class="form-select">
                   <option>Submitted</option>
@@ -383,7 +410,7 @@
                 </select>
               </div>
 
-              <div class="col-md-6">
+              <div class="col-6">
                 <label class="form-label fw-medium">Assign Field Personnel / Team</label>
                 <select id="assignee" class="form-select">
                   <option value="Unassigned">Unassigned</option>
@@ -395,10 +422,11 @@
                 </select>
               </div>
 
-              <div class="col-md-6">
+              <div class="col-12">
                 <label class="form-label fw-medium" for="dispatchNote">Message to resident</label>
-                <input id="dispatchNote" class="form-control" maxlength="255" required placeholder="Explain the current status and next steps">
+                <textarea id="dispatchNote" class="form-control" rows="3" maxlength="255" required placeholder="Explain the current status and next steps"></textarea>
               </div>
+            </div>
             </div>
           </form>
         </div>
@@ -410,27 +438,11 @@
     </div>
   </div>
 
-  <footer class="text-center text-secondary small py-3">
-    Icons by <a href="https://www.flaticon.com/uicons" rel="noopener">Flaticon Uicons</a>.
-  </footer>
-  <dialog id="accountSecurityDialog" aria-labelledby="accountSecurityTitle">
-    <h2 id="accountSecurityTitle">Change password</h2>
-    <form id="changePasswordForm">
-      <label for="currentPassword">Current password</label>
-      <input id="currentPassword" type="password" autocomplete="current-password" required>
-      <label for="newPassword">New password</label>
-      <input id="newPassword" type="password" minlength="12" autocomplete="new-password" required>
-      <label for="newPasswordConfirmation">Confirm new password</label>
-      <input id="newPasswordConfirmation" type="password" minlength="12" autocomplete="new-password" required>
-      <p id="changePasswordMessage" role="status" aria-live="polite"></p>
-      <button type="submit">Update password</button>
-      <button type="button" id="closeAccountSecurity">Close</button>
-    </form>
-  </dialog>
-  <script src="/frontend/js/notifications.js" nonce="{{ app('csp.nonce') }}"></script>
-  <script src="/frontend/js/session-handler.js" nonce="{{ app('csp.nonce') }}"></script>
-  <script src="/frontend/js/account-security.js" nonce="{{ app('csp.nonce') }}"></script>
-  <script src="/frontend/js/admin-dashboard.js" nonce="{{ app('csp.nonce') }}"></script>
+  <script src="{{ \App\Support\Asset::url('/frontend/js/notifications.js') }}" nonce="{{ app('csp.nonce') }}"></script>
+  <script src="{{ \App\Support\Asset::url('/frontend/js/session-handler.js') }}" nonce="{{ app('csp.nonce') }}"></script>
+  <script src="{{ \App\Support\Asset::url('/frontend/js/password-toggle.js') }}" nonce="{{ app('csp.nonce') }}"></script>
+  <script src="{{ \App\Support\Asset::url('/frontend/js/account-security.js') }}" nonce="{{ app('csp.nonce') }}"></script>
+  <script src="{{ \App\Support\Asset::url('/frontend/js/admin-dashboard.js') }}" nonce="{{ app('csp.nonce') }}"></script>
 
 </body>
 </html>

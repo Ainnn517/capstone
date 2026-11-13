@@ -171,6 +171,17 @@ class ReportController extends ApiController
                 'count' => (int) $row->report_count,
             ]);
         $hotspotThreshold = (int) config('dss.hotspot_report_threshold');
+        // Open incidents (not resolved, rejected, or archived) by priority, for the
+        // red/yellow/green counters on Incident Management. Same thresholds as priorityForWeight().
+        $openByPriority = DB::table('ISSUE_REPORT as report')
+            ->join('CATEGORY as category', 'category.category_id', '=', 'report.category_id')
+            ->whereNull('report.archived_at')
+            ->whereNotIn('report.status', ['Resolved', 'Rejected'])
+            ->selectRaw('SUM(category.severity_weight >= 5) as critical')
+            ->selectRaw('SUM(category.severity_weight BETWEEN 3 AND 4) as high')
+            ->selectRaw('SUM(category.severity_weight <= 2) as normal')
+            ->first();
+
         $hotspotCount = $hotspots->groupBy('location')
             ->map(fn ($groups): int => $groups->sum('count'))
             ->filter(fn (int $count): bool => $count >= $hotspotThreshold)
@@ -184,6 +195,11 @@ class ReportController extends ApiController
                 'dispatches' => $dispatches,
                 'resolutionRate' => $total === 0 ? 0 : (int) round(($resolved / $total) * 100),
                 'hotspotCount' => $hotspotCount,
+                'openByPriority' => [
+                    'critical' => (int) ($openByPriority->critical ?? 0),
+                    'high' => (int) ($openByPriority->high ?? 0),
+                    'normal' => (int) ($openByPriority->normal ?? 0),
+                ],
                 'categories' => $categories,
                 'monthly' => array_values($monthly),
                 'hotspots' => $hotspots,
@@ -196,7 +212,8 @@ class ReportController extends ApiController
         $user = $this->currentUser();
         $reportQuery = IssueReport::where('report_id', $id);
         if ($user->role !== 'admin') {
-            $reportQuery->where('user_id', $user->user_id);
+            // Same rule as report lists and attachments: residents do not see archived reports.
+            $reportQuery->where('user_id', $user->user_id)->whereNull('archived_at');
         }
         if (! $reportQuery->exists()) {
             return $this->error('Report not found.', 404);
@@ -284,7 +301,8 @@ class ReportController extends ApiController
     public function destroyArchived(int $id): JsonResponse
     {
         $user = $this->currentUser();
-        $result = DB::transaction(function () use ($id, $user): ?JsonResponse {
+        $storedFiles = [];
+        $result = DB::transaction(function () use ($id, $user, &$storedFiles): ?JsonResponse {
             $report = IssueReport::where('report_id', $id)
                 ->whereNotNull('archived_at')
                 ->lockForUpdate()
@@ -294,17 +312,38 @@ class ReportController extends ApiController
                 return $this->error('Archived report not found.', 404);
             }
 
+            // The database cascades attachment rows; collect their files to remove from disk.
+            $storedFiles = Attachment::query()
+                ->where('report_id', $report->report_id)
+                ->whereNotNull('file_path')
+                ->pluck('file_path')
+                ->all();
+
             AdminAuditLog::create([
                 'actor_user_id' => $user->user_id,
                 'action' => 'permanently_delete_archived_report',
-                'details' => ['report_id' => $report->report_id],
+                'details' => ['report_id' => $report->report_id, 'deleted_files' => count($storedFiles)],
             ]);
             $report->delete();
 
             return null;
         });
 
-        return $result ?? response()->json(['success' => true]);
+        if ($result !== null) {
+            return $result;
+        }
+
+        // Delete files only after the commit, so a rollback never loses a photo.
+        foreach ($storedFiles as $path) {
+            if (preg_match('#\Areport-attachments/[a-f0-9]{64}\.(?:jpg|png|gif|webp)\z#', $path)) {
+                Storage::disk('local')->delete($path);
+            } elseif (preg_match('#\Adatabase/uploads/[a-f0-9]{32}\.(?:jpg|png|gif|webp)\z#', $path)
+                && is_file(base_path($path))) {
+                @unlink(base_path($path));
+            }
+        }
+
+        return response()->json(['success' => true]);
     }
 
     /**
@@ -538,8 +577,8 @@ class ReportController extends ApiController
             if (! $report) {
                 return $this->error('Report not found.', 404);
             }
-            if ($report->status === 'Resolved') {
-                return $this->error('Resolved incidents are read-only and cannot be changed.', 409);
+            if (in_array($report->status, ['Resolved', 'Rejected'], true)) {
+                return $this->error("{$report->status} incidents are read-only and cannot be changed.", 409);
             }
 
             $oldStatus = $report->status;
@@ -552,6 +591,10 @@ class ReportController extends ApiController
             if ($data['status'] !== $oldStatus
                 && ! in_array($data['status'], $allowedTransitions[$oldStatus] ?? [], true)) {
                 return $this->error("A report cannot move from {$oldStatus} to {$data['status']}.", 422);
+            }
+            // A report cannot be dispatched or resolved without a responsible team.
+            if (in_array($data['status'], ['Dispatched', 'Resolved'], true) && $team === null) {
+                return $this->error("Assign a team before marking this report {$data['status']}.", 422);
             }
             $report->status = $data['status'];
             $report->team_id = $team?->team_id;

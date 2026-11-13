@@ -47,6 +47,13 @@ class User extends Authenticatable implements MustVerifyEmailContract
         return 'password_hash';
     }
 
+    // Fingerprint of the current password hash, stored in each session so a password
+    // change or reset ends every other session on its next request.
+    public function sessionPasswordFingerprint(): string
+    {
+        return hash_hmac('sha256', (string) $this->password_hash, (string) config('app.key'));
+    }
+
     // Get reports submitted by this user.
     public function reports(): HasMany
     {

@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Barangay Issue Reporting System</title>
-    <link rel="stylesheet" href="/frontend/css/style.css">
-    <link rel="stylesheet" href="/frontend/css/notifications.css">
+    <link rel="stylesheet" href="{{ \App\Support\Asset::url('/frontend/css/style.css') }}">
+    <link rel="stylesheet" href="{{ \App\Support\Asset::url('/frontend/css/notifications.css') }}">
 </head>
 <body>
 
@@ -55,46 +55,55 @@
             </form>
 
             <form id="registerForm" hidden>
-                <label for="registerName">Full name:</label>
-                <div class="input-wrap">
-                    <input type="text" id="registerName" autocomplete="name" required>
-                </div>
-
-                <label for="registerEmail">Email:</label>
-                <div class="input-wrap">
-                    <input type="email" id="registerEmail" autocomplete="email" required>
-                </div>
-
-                <label for="registerUsername">Username:</label>
-                <div class="input-wrap">
-                    <input type="text" id="registerUsername" autocomplete="username" required>
-                </div>
-
-                <label for="registerPassword">Password:</label>
-                <div class="input-wrap">
-                    <input type="password" id="registerPassword" autocomplete="new-password" minlength="12" required>
-                    <button type="button" class="toggle-password" id="toggleRegisterPassword" aria-label="Show password">
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M2.5 12s3.3-6 9.5-6 9.5 6 9.5 6-3.3 6-9.5 6-9.5-6-9.5-6z"></path>
-                            <circle cx="12" cy="12" r="2.7"></circle>
-                        </svg>
-                    </button>
-                </div>
-
-                <label for="confirmPassword">Confirm password:</label>
-                <div class="input-wrap">
-                    <input type="password" id="confirmPassword" autocomplete="new-password" minlength="12" required>
-                    <button type="button" class="toggle-password" id="toggleConfirmPassword" aria-label="Show password">
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M2.5 12s3.3-6 9.5-6 9.5 6 9.5 6-3.3 6-9.5 6-9.5-6-9.5-6z"></path>
-                            <circle cx="12" cy="12" r="2.7"></circle>
-                        </svg>
-                    </button>
+                <div class="register-fields">
+                    <div class="field">
+                        <label for="registerName">Full name:</label>
+                        <div class="input-wrap">
+                            <input type="text" id="registerName" autocomplete="name" required>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label for="registerEmail">Email:</label>
+                        <div class="input-wrap">
+                            <input type="email" id="registerEmail" autocomplete="email" required>
+                        </div>
+                    </div>
+                    <div class="field field-wide">
+                        <label for="registerUsername">Username:</label>
+                        <div class="input-wrap">
+                            <input type="text" id="registerUsername" autocomplete="username" required>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label for="registerPassword">Password:</label>
+                        <div class="input-wrap">
+                            <input type="password" id="registerPassword" autocomplete="new-password" minlength="12" required>
+                            <button type="button" class="toggle-password" id="toggleRegisterPassword" aria-label="Show password">
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M2.5 12s3.3-6 9.5-6 9.5 6 9.5 6-3.3 6-9.5 6-9.5-6-9.5-6z"></path>
+                                    <circle cx="12" cy="12" r="2.7"></circle>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label for="confirmPassword">Confirm password:</label>
+                        <div class="input-wrap">
+                            <input type="password" id="confirmPassword" autocomplete="new-password" minlength="12" required>
+                            <button type="button" class="toggle-password" id="toggleConfirmPassword" aria-label="Show password">
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M2.5 12s3.3-6 9.5-6 9.5 6 9.5 6-3.3 6-9.5 6-9.5-6-9.5-6z"></path>
+                                    <circle cx="12" cy="12" r="2.7"></circle>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <label class="privacy-consent">
-                    <input type="checkbox" id="privacyConsent" required>
-                    I have read and agree to the <a href="{{ route('privacy', [], false) }}" target="_blank" rel="noopener">Privacy Notice</a> and consent to the processing of my report and account information.
+                    <input type="checkbox" id="privacyConsent" class="check-input" required>
+                    <span class="check-box" aria-hidden="true"></span>
+                    <span class="check-text">I have read and agree to the privacy notice and consent to the processing of my report and account information.</span>
                 </label>
 
                 <button type="submit" class="login-button">Create account</button>
@@ -123,7 +132,8 @@
 
     </main>
 
-    <script src="/frontend/js/notifications.js" nonce="{{ app('csp.nonce') }}"></script>
-    <script src="/frontend/js/index.js" nonce="{{ app('csp.nonce') }}"></script>
+    <script src="{{ \App\Support\Asset::url('/frontend/js/notifications.js') }}" nonce="{{ app('csp.nonce') }}"></script>
+    <script src="{{ \App\Support\Asset::url('/frontend/js/password-toggle.js') }}" nonce="{{ app('csp.nonce') }}"></script>
+    <script src="{{ \App\Support\Asset::url('/frontend/js/index.js') }}" nonce="{{ app('csp.nonce') }}"></script>
 </body>
 </html>

@@ -49,6 +49,27 @@ class NotificationTest extends TestCase
         $this->getJson('/api/notifications')->assertJsonPath('unreadCount', 0);
     }
 
+    public function test_notifications_can_be_filtered_like_my_reports(): void
+    {
+        $resident = User::factory()->create();
+        $open = $this->createReport($resident);
+        $resolved = $this->createReport($resident);
+        $resolved->forceFill(['status' => 'Resolved', 'date_resolved' => now()])->save();
+        $archived = $this->createReport($resident);
+        $archived->forceFill(['archived_at' => now()])->save();
+        foreach ([[$open, 'Open update'], [$resolved, 'Resolved update'], [$archived, 'Archived update']] as [$report, $message]) {
+            Notification::create(['report_id' => $report->report_id, 'user_id' => $resident->user_id, 'message' => $message, 'type' => 'status_update']);
+        }
+        $messages = fn (string $view): array => collect($this->actingAs($resident)
+            ->getJson('/api/notifications?view='.$view)->assertOk()->json('notifications'))
+            ->pluck('message')->sort()->values()->all();
+
+        $this->assertSame(['Open update'], $messages('current'));
+        $this->assertSame(['Archived update', 'Resolved update'], $messages('past'));
+        $this->assertSame(['Archived update', 'Open update', 'Resolved update'], $messages('all'));
+        $this->getJson('/api/notifications?view=unknown')->assertUnprocessable();
+    }
+
     private function createReport(User $resident): IssueReport
     {
         $category = Category::firstOrCreate(

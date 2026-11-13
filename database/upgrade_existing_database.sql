@@ -41,7 +41,8 @@ PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 -- New accounts must wait for admin approval (fail-closed default).
-ALTER TABLE USERS MODIFY account_status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending';
+ALTER TABLE USERS MODIFY account_status ENUM('pending', 'approved', 'rejected', 'suspended') NOT NULL DEFAULT 'pending';
+ALTER TABLE USERS MODIFY contact_number VARCHAR(30) NULL;
 
 -- Existing approved accounts predate email verification, so treat them as verified.
 UPDATE USERS SET email_verified_at = NOW() WHERE account_status = 'approved' AND email_verified_at IS NULL;
@@ -67,6 +68,9 @@ CREATE TABLE IF NOT EXISTS PASSWORD_RESET_TOKENS (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ======================== TEAM and CATEGORY =====================
+-- Match the app's 100-character validation (older databases used VARCHAR(50)).
+ALTER TABLE TEAM MODIFY name VARCHAR(100) NOT NULL;
+
 INSERT IGNORE INTO TEAM (name) VALUES
   ('Field Team A'),
   ('Field Team B'),
@@ -112,6 +116,8 @@ PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 ALTER TABLE LOCATION MODIFY is_active TINYINT(1) NOT NULL DEFAULT 1;
+-- Match the app's 150-character validation (older databases used VARCHAR(100)).
+ALTER TABLE LOCATION MODIFY name VARCHAR(150) NOT NULL, MODIFY area_name VARCHAR(150) NOT NULL;
 
 -- Only re-activate when NO location is active (the state the old hardening script leaves behind).
 UPDATE LOCATION SET is_active = 1 WHERE (SELECT n FROM (SELECT COUNT(*) AS n FROM LOCATION WHERE is_active = 1) active_count) = 0;
@@ -182,6 +188,8 @@ WHERE tracking_code IS NULL;
 
 ALTER TABLE ISSUE_REPORT MODIFY tracking_code VARCHAR(23) NOT NULL;
 ALTER TABLE ISSUE_REPORT MODIFY description VARCHAR(500) NOT NULL;
+-- Match the app's 150-character landmark validation (older databases used VARCHAR(100)).
+ALTER TABLE ISSUE_REPORT MODIFY landmark VARCHAR(150) NULL;
 
 SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE ISSUE_REPORT ADD KEY idx_report_user_archived (user_id, archived_at)', 'DO 0') FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'ISSUE_REPORT' AND index_name = 'idx_report_user_archived');
 PREPARE stmt FROM @sql;
@@ -192,6 +200,11 @@ PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE ISSUE_REPORT ADD KEY idx_report_archived_by (archived_by)', 'DO 0') FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'ISSUE_REPORT' AND index_name = 'idx_report_archived_by');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+-- Drop the auto-created duplicate of idx_report_archived_by left by older schemas.
+SET @sql := (SELECT IF(COUNT(*) > 0, 'ALTER TABLE ISSUE_REPORT DROP INDEX fk_report_archived_by', 'DO 0') FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'ISSUE_REPORT' AND index_name = 'fk_report_archived_by');
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;

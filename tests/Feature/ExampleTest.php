@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 // use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Models\User;
 use Tests\TestCase;
 
 class ExampleTest extends TestCase
@@ -34,7 +35,8 @@ class ExampleTest extends TestCase
 
     public function test_admin_has_a_separate_pending_approvals_workspace(): void
     {
-        $response = $this->get('/frontend/pages/admin-dashboard.html');
+        // The admin page is only served to a signed-in administrator.
+        $response = $this->actingAs(User::factory()->admin()->create())->get('/frontend/pages/admin-dashboard.html');
 
         $response
             ->assertOk()

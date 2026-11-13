@@ -26,3 +26,7 @@ i[class*=" fi-rr-"]::before {
 .fi-rr-users-alt::before { content: "\f996"; }
 .fi-rr-user-time::before { content: "\f993"; }
 .fi-rr-chart-histogram::before { content: "\f2c8"; }
+.fi-rr-settings::before { content: "\f7e1"; }
+.fi-rr-megaphone::before { content: "\f65b"; }
+.fi-rr-clipboard-list::before { content: "\f33f"; }
+.fi-rr-user::before { content: "\f995"; }

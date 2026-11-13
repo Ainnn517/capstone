@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS USERS (
   email VARCHAR(120) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
   role ENUM('resident', 'admin') NOT NULL DEFAULT 'resident',
-  account_status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
+  account_status ENUM('pending', 'approved', 'rejected', 'suspended') NOT NULL DEFAULT 'pending',
   privacy_consent_at DATETIME NULL,
   privacy_notice_version VARCHAR(50) NULL,
   email_verified_at DATETIME NULL,

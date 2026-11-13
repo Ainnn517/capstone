@@ -19,15 +19,80 @@
 .app-toast-success { border-color: #198754; }
 .app-toast-error { border-color: #b42318; }
 
+/* Confirmation dialog in the system's look: dark green glass, white text, pill buttons. */
 .app-confirm-dialog {
   width: min(28rem, calc(100vw - 2rem));
-  border: 0;
-  border-radius: .75rem;
-  padding: 1.25rem;
-  box-shadow: 0 1rem 3rem #17203340;
+  margin: auto;
+  padding: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, .25);
+  border-radius: 14px;
+  background: rgba(48, 74, 57, .97);
+  color: #fff;
+  font-family: "Archivo", Arial, sans-serif;
+  box-shadow: 0 25px 60px rgba(2, 6, 23, .35);
 }
 
-.app-confirm-dialog::backdrop { background: #17203380; }
-.app-confirm-dialog > div { display: flex; justify-content: flex-end; gap: .5rem; }
-.app-confirm-dialog button { border: 1px solid #64748b; border-radius: .4rem; padding: .45rem .8rem; background: #fff; }
-.app-confirm-dialog .app-confirm-button { border-color: #0d6efd; background: #0d6efd; color: #fff; }
+.app-confirm-dialog::backdrop {
+  background: rgba(15, 28, 19, .62);
+  backdrop-filter: blur(3px);
+}
+
+.app-confirm-dialog p { margin: 0 0 1.25rem; font-size: 1rem; line-height: 1.5; }
+.app-confirm-dialog > div { display: flex; justify-content: flex-end; gap: .6rem; }
+
+.app-confirm-dialog button {
+  min-width: 6.5rem;
+  padding: .55rem 1.2rem;
+  border: 1px solid rgba(255, 255, 255, .7);
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font: 600 .92rem "Archivo", Arial, sans-serif;
+  cursor: pointer;
+  transition: background .15s, transform .15s, box-shadow .15s;
+}
+
+.app-confirm-dialog button:hover { background: rgba(255, 255, 255, .12); }
+
+.app-confirm-dialog .app-confirm-button {
+  border-color: transparent;
+  background: linear-gradient(#fff, #d9dedb);
+  color: #1f2d25;
+}
+
+.app-confirm-dialog .app-confirm-button:hover {
+  background: linear-gradient(#fff, #e6eae8);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .25);
+}
+
+.app-confirm-dialog button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+@media (max-width: 480px) {
+  .app-confirm-dialog > div { flex-direction: column-reverse; }
+  .app-confirm-dialog button { width: 100%; }
+}
+
+/* Text-input version of the dialog (replaces the browser's built-in prompt). */
+.app-prompt-dialog form { display: grid; gap: .75rem; }
+.app-prompt-label { display: grid; gap: .6rem; font-size: 1rem; line-height: 1.5; }
+.app-prompt-input {
+  width: 100%;
+  min-height: 4.5rem;
+  padding: .6rem .75rem;
+  border: 1px solid rgba(255, 255, 255, .45);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .08);
+  color: #fff;
+  font: inherit;
+  font-size: .95rem;
+  resize: vertical;
+}
+.app-prompt-input::placeholder { color: rgba(255, 255, 255, .55); }
+.app-prompt-input:focus { outline: none; border-color: #fff; background: rgba(255, 255, 255, .14); }
+.app-prompt-error { margin: 0; color: #ffb4b4; font-size: .88rem; }
+.app-prompt-error[hidden] { display: none; }
+.app-prompt-dialog > form > div { display: flex; justify-content: flex-end; gap: .6rem; }
+@media (max-width: 480px) {
+  .app-prompt-dialog > form > div { flex-direction: column-reverse; }
+}

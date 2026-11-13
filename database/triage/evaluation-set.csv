@@ -1,0 +1,41 @@
+description,expected_category
+"Garbage has not been collected on our street for two weeks and it smells terrible.",Sanitation
+"Ang daming basura sa tabi ng kalsada, hindi kinokolekta ng truck.",Sanitation
+"Daghan kaayo basura diri sa among dapit, nagbaho na.",Sanitation
+"May patay na aso sa may kanto, mabaho na at may langaw.",Sanitation
+"Someone keeps dumping construction waste beside the basketball court.",Sanitation
+"Nagkalat ang basura pagkatapos ng fiesta sa plaza.",Sanitation
+"Barado ang kanal sa harap ng bahay namin, umaapaw kapag umuulan.",Clogged Drainage
+"The drainage is clogged and the street floods every time it rains.",Clogged Drainage
+"Bumabaha sa kanto tuwing malakas ang ulan dahil sa baradong imburnal.",Clogged Drainage
+"Nalunop na pud ang among dalan kay barado ang kanal.",Clogged Drainage
+"Stagnant water in the canal, lots of mosquitoes now.",Clogged Drainage
+"Umaapaw yung estero sa likod ng chapel, amoy na rin.",Clogged Drainage
+"The streetlight in front of the chapel has been out for a week.",Streetlights
+"Walang ilaw sa poste sa dulo ng kalye, sobrang dilim sa gabi.",Streetlights
+"Patay ang suga sa poste duol sa eskwelahan, ngitngit kaayo.",Streetlights
+"Flickering street lights along the main road near the waiting shed.",Streetlights
+"Sira ang ilaw ng poste malapit sa basketball court.",Streetlights
+"Three lamp posts are not working on Mango Street.",Streetlights
+"Large pothole near the corner, motorcycles are swerving to avoid it.",Road Damage
+"Malaking lubak sa gitna ng kalsada, delikado sa mga nagmomotor.",Road Damage
+"Guba ang dalan duol sa merkado, daghan lungag.",Road Damage
+"The sidewalk is cracked and broken near the elementary school.",Road Damage
+"May bitak at butas sa kalsada papunta sa health center.",Road Damage
+"The asphalt is peeling off and there is a small sinkhole forming.",Road Damage
+"Open manhole without a cover beside the waiting shed.",Public Safety
+"May live wire na nakalaylay sa may puno, baka may makuryente.",Public Safety
+"Stray dogs are chasing children near the school gate.",Public Safety
+"May mga lasing na nag-aaway gabi-gabi sa may tindahan.",Public Safety
+"Gikawat ang motor sa akong silingan kagabii.",Public Safety
+"Suspicious men have been loitering around the parked cars at night.",Public Safety
+"Nakagat ng asong gala ang bata sa kabilang kalye.",Public Safety
+"Small fire started from burning leaves near the houses.",Public Safety
+"Loud karaoke past midnight every weekend.",Others
+"Our neighbor's rooster crows at 3 am every day.",Others
+"Request for a new basketball ring at the court.",Others
+"Kailan po ang susunod na libreng bakuna para sa mga bata?",Others
+"Ang ingay ng videoke ng kapitbahay hanggang madaling araw.",Others
+"Wala pa ang ayuda nga gisaad sa among purok.",Others
+"Mabagal ang internet sa buong barangay.",Others
+"Can the barangay hall extend office hours on Saturdays?",Others

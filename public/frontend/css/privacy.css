@@ -27,7 +27,9 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.65rem max(1.25rem, calc((100vw - 1000px) / 2));
+  /* Same width as the notice card below (820px, 1rem side gutters), so their edges line up.
+     Percentage padding is relative to the page width, matching the card's calc(100% - 2rem). */
+  padding: 0.65rem max(1rem, calc((100% - 820px) / 2));
   background: var(--glass-bar);
   border-bottom: 1px solid var(--line);
   backdrop-filter: blur(10px);
@@ -134,4 +136,42 @@ main a {
   .privacy-card {
     margin: 1rem auto;
   }
+}
+
+/* "I have read this notice" acknowledgement at the end of the notice. */
+.privacy-ack {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--line);
+}
+.privacy-ack-check { position: relative; display: flex; align-items: center; gap: 0.6rem; font-weight: 600; cursor: pointer; }
+/* Checkbox drawn as a plain <span> next to an invisible (but still working, focusable and
+   required) real checkbox. Unlike styling the checkbox itself with appearance:none, this
+   renders the same in every browser, including Firefox builds that drew nothing. */
+.check-input { position: absolute; width: 1px; height: 1px; margin: 0; opacity: 0; }
+.check-box {
+  flex: 0 0 auto; display: grid; place-content: center;
+  width: 22px; height: 22px; border: 2px solid #fff; border-radius: 4px;
+  background: rgba(255, 255, 255, .12); cursor: pointer;
+}
+.check-box::before {
+  content: ""; width: 11px; height: 6px; margin-top: -3px;
+  border: solid #fff; border-width: 0 0 3px 3px; transform: rotate(-45deg); visibility: hidden;
+}
+.check-input:checked + .check-box { background: #3f8f65; border-color: #3f8f65; }
+.check-input:checked + .check-box::before { visibility: visible; }
+.check-input:focus-visible + .check-box { outline: 2px solid #fff; outline-offset: 2px; }
+.privacy-continue {
+  padding: 0.7rem 1.4rem; border: 0; border-radius: 999px; cursor: pointer;
+  font: 600 0.95rem "Archivo", Arial, sans-serif; color: #1f2d25;
+  background: linear-gradient(#fff, #d9dedb);
+}
+.privacy-continue:disabled { opacity: 0.5; cursor: not-allowed; }
+@media (max-width: 520px) {
+  .privacy-continue { width: 100%; }
 }

@@ -28,6 +28,7 @@ abstract class ApiController extends Controller
             'id' => (int) $user->user_id,
             'username' => $user->username,
             'fullName' => $user->full_name,
+            'email' => $user->email,
             'role' => $user->role,
             'accountStatus' => $user->account_status,
         ];

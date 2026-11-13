@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\AddSecurityHeaders;
 use App\Http\Middleware\RequireAuthenticatedUser;
+use App\Http\Middleware\RequirePageRole;
 use App\Http\Middleware\RequireRole;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -26,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'api.auth' => RequireAuthenticatedUser::class,
             'role' => RequireRole::class,
+            'page.role' => RequirePageRole::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

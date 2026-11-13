@@ -7,9 +7,10 @@
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <meta name="google-maps-api-key" content="{{ config('services.google_maps.key') }}">
   <title>Barangay Issue Reporting System - Resident Portal</title>
-  <link rel="stylesheet" href="/frontend/css/resident-portal.css">
-  <link rel="stylesheet" href="/frontend/css/notifications.css">
-  <link rel="stylesheet" href="/frontend/vendor/uicons-regular-rounded/css/uicons-regular-rounded.css">
+  <link rel="stylesheet" href="{{ \App\Support\Asset::url('/frontend/css/resident-portal.css') }}">
+  <link rel="stylesheet" href="{{ \App\Support\Asset::url('/frontend/css/notifications.css') }}">
+  <link rel="stylesheet" href="{{ \App\Support\Asset::url('/frontend/css/account.css') }}">
+  <link rel="stylesheet" href="{{ \App\Support\Asset::url('/frontend/vendor/uicons-regular-rounded/css/uicons-regular-rounded.css') }}">
 </head>
 <body>
 
@@ -17,43 +18,54 @@
   <nav class="navbar navbar-dark sticky-top">
     <div class="container">
       <div class="d-flex align-items-center gap-3 navbar-actions">
-        <button class="btn btn-light position-relative notification-button" id="notifBtn" type="button" title="View notifications" aria-label="View notifications">
-          <i class="fi fi-rr-bell" aria-hidden="true"></i>
-          <span id="notifCount" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">0</span>
-        </button>
         <span id="residentName" class="small text-white-50 fw-semibold">Welcome,</span>
-        <button class="btn btn-outline-light btn-sm" id="changePasswordButton" type="button">Change password</button>
         <button class="btn btn-light btn-sm" id="logoutBtn" type="button">Logout</button>
       </div>
     </div>
   </nav>
 
   <!-- Main Content -->
-  <main class="container page-wrap">
+  <main class="container page-wrap resident-layout">
+    <aside class="resident-sidebar card" aria-label="Resident navigation">
+      <p class="sidebar-label">Menu</p>
+      <button class="sidebar-link active" type="button" data-resident-view="report" aria-current="page">
+        <i class="fi fi-rr-megaphone sidebar-icon" aria-hidden="true"></i>
+        Report an Issue
+      </button>
+      <button class="sidebar-link" type="button" data-resident-view="reports">
+        <i class="fi fi-rr-clipboard-list sidebar-icon" aria-hidden="true"></i>
+        My Reports
+      </button>
+      <button class="sidebar-link" type="button" data-resident-view="notifications">
+        <i class="fi fi-rr-bell sidebar-icon" aria-hidden="true"></i>
+        Notifications
+        <span class="sidebar-count" id="notifNavCount" aria-label="Unread notifications">0</span>
+      </button>
+      <button class="sidebar-link" type="button" data-resident-view="account">
+        <i class="fi fi-rr-user sidebar-icon" aria-hidden="true"></i>
+        Account
+      </button>
+    </aside>
 
-    <div class="card p-4 mb-4">
-      <h5 class="fw-bold mb-3">Reporting Workflow</h5>
-      <ol class="workflow-steps text-secondary mb-0">
-        <li><strong>Submit:</strong> Fill out the incident details.</li>
-        <li><strong>Validation:</strong> Officials review and confirm report accuracy.</li>
-        <li><strong>Dispatch:</strong> Field team/purok leader is deployed.</li>
-        <li><strong>Resolution:</strong> Issue resolved and closed with timestamp.</li>
-      </ol>
-    </div>
+    <div class="resident-content">
+      <!-- Report an issue -->
+      <section id="reportView" class="resident-view" aria-labelledby="reportTitle">
+        <div class="mb-4">
+          <h1 id="reportTitle" class="section-title mb-1">Report an Issue</h1>
+          <p class="text-secondary mb-0">Submit an incident and receive an automated tracking ID.</p>
+        </div>
 
-    <div class="row g-4">
+        <div class="card p-4 mb-4">
+          <h2 class="card-heading">How your report is handled</h2>
+          <ol class="workflow-steps text-secondary mb-0">
+            <li><strong>Submit:</strong> Fill out the incident details.</li>
+            <li><strong>Validation:</strong> Officials review and confirm report accuracy.</li>
+            <li><strong>Dispatch:</strong> Field team/purok leader is deployed.</li>
+            <li><strong>Resolution:</strong> Issue resolved and closed with timestamp.</li>
+          </ol>
+        </div>
 
-      <!-- Issue Reporting Form Column -->
-      <div class="col-lg-7">
         <div class="card p-4">
-          <div class="d-flex justify-content-between align-items-start mb-3">
-            <div>
-              <h2 class="section-title mb-1">Report a Barangay Issue</h2>
-              <p class="text-secondary mb-0">Submit an incident and receive an automated tracking ID.</p>
-            </div>
-            <span class="badge-soft soft-green">Citizen Portal</span>
-          </div>
-
           <form id="issueForm" novalidate>
             <div class="row g-3">
 
@@ -82,12 +94,13 @@
                 <label class="form-label fw-medium">Detailed Description</label>
                 <textarea id="description" class="form-control" rows="4" minlength="1" maxlength="500" required placeholder="Describe the incident in 1 to 500 characters."></textarea>
                 <small class="form-text text-secondary">Include enough detail for a response team to understand the issue (up to 500 characters).</small>
+                <div id="categorySuggestion" class="category-suggestion" aria-live="polite" hidden></div>
               </div>
 
               <div class="col-md-7">
                 <label class="form-label fw-medium">Specific Landmark / Marker</label>
                 <div class="input-group">
-                  <input id="location" class="form-control" placeholder="e.g. Near Barangay Hall">
+                  <input id="location" class="form-control" maxlength="150" placeholder="e.g. Near Barangay Hall">
                   <button type="button" id="geoBtn" class="btn btn-outline-primary">
                     <i class="fi fi-rr-map-marker" aria-hidden="true"></i>
                     Tag Location
@@ -125,29 +138,16 @@
             </div>
           </form>
         </div>
-      </div>
+      </section>
 
-      <!-- Notifications & Workflow Information -->
-      <div class="col-lg-5">
-
-        <div class="card p-4 mb-4">
-          <h5 class="fw-bold mb-3">Live Notification Updates</h5>
-          <div id="notifications">
-            <div class="text-secondary small">No new updates available yet.</div>
-          </div>
-        </div>
-
-      </div>
-
-    </div>
-
-    <!-- Submitted Reports Tracker -->
-    <section class="card p-4 mt-4 reports-panel" id="reportsPanel" aria-labelledby="reportsTitle">
-      <div class="reports-header">
-        <div>
-          <h3 id="reportsTitle" class="section-title mb-1">My Reports</h3>
+      <!-- Submitted reports tracker -->
+      <section id="reportsView" class="resident-view" aria-labelledby="reportsTitle" hidden>
+        <div class="mb-4">
+          <h1 id="reportsTitle" class="section-title mb-1">My Reports</h1>
           <p class="text-secondary mb-0">Follow open issues or review reports that have been closed.</p>
         </div>
+        <div class="card p-4 reports-panel" id="reportsPanel">
+          <div class="reports-header">
         <div class="report-controls">
           <div class="report-filters" role="group" aria-label="Filter my reports">
             <button class="report-filter active" type="button" data-report-filter="active" aria-pressed="true">Current</button>
@@ -162,31 +162,37 @@
         <!-- Dynamically rendered reports -->
       </div>
       <div id="reportPagination" class="d-flex justify-content-between align-items-center gap-3 mt-3" aria-label="Report pagination"></div>
-    </section>
+        </div>
+      </section>
 
+      <!-- Notifications -->
+      <section id="notificationsView" class="resident-view" aria-labelledby="notificationsTitle" hidden>
+        <div class="mb-4">
+          <h1 id="notificationsTitle" class="section-title mb-1">Notifications</h1>
+          <p class="text-secondary mb-0">Updates from the barangay about your reports.</p>
+        </div>
+        <div class="card p-4">
+          <div class="reports-header notifications-header mb-3">
+            <div class="report-filters" role="group" aria-label="Filter notifications">
+              <button class="report-filter" type="button" data-notif-filter="current" aria-pressed="false">Current</button>
+              <button class="report-filter" type="button" data-notif-filter="past" aria-pressed="false">Past</button>
+              <button class="report-filter active" type="button" data-notif-filter="all" aria-pressed="true">All</button>
+            </div>
+          </div>
+          <div id="notifications">
+            <div class="text-secondary small">No new updates available yet.</div>
+          </div>
+        </div>
+      </section>
+
+      @include('partials.account-view', ['viewClass' => 'resident-view'])
+    </div>
   </main>
-
-  <footer class="text-center text-secondary small py-3">
-    Icons by <a href="https://www.flaticon.com/uicons" rel="noopener">Flaticon Uicons</a>.
-  </footer>
-  <dialog id="accountSecurityDialog" aria-labelledby="accountSecurityTitle">
-    <h2 id="accountSecurityTitle">Change password</h2>
-    <form id="changePasswordForm">
-      <label for="currentPassword">Current password</label>
-      <input id="currentPassword" type="password" autocomplete="current-password" required>
-      <label for="newPassword">New password</label>
-      <input id="newPassword" type="password" minlength="12" autocomplete="new-password" required>
-      <label for="newPasswordConfirmation">Confirm new password</label>
-      <input id="newPasswordConfirmation" type="password" minlength="12" autocomplete="new-password" required>
-      <p id="changePasswordMessage" role="status" aria-live="polite"></p>
-      <button type="submit">Update password</button>
-      <button type="button" id="closeAccountSecurity">Close</button>
-    </form>
-  </dialog>
-  <script src="/frontend/js/notifications.js" nonce="{{ app('csp.nonce') }}"></script>
-  <script src="/frontend/js/session-handler.js" nonce="{{ app('csp.nonce') }}"></script>
-  <script src="/frontend/js/account-security.js" nonce="{{ app('csp.nonce') }}"></script>
-  <script src="/frontend/js/resident-portal.js" nonce="{{ app('csp.nonce') }}"></script>
+  <script src="{{ \App\Support\Asset::url('/frontend/js/notifications.js') }}" nonce="{{ app('csp.nonce') }}"></script>
+  <script src="{{ \App\Support\Asset::url('/frontend/js/session-handler.js') }}" nonce="{{ app('csp.nonce') }}"></script>
+  <script src="{{ \App\Support\Asset::url('/frontend/js/password-toggle.js') }}" nonce="{{ app('csp.nonce') }}"></script>
+  <script src="{{ \App\Support\Asset::url('/frontend/js/account-security.js') }}" nonce="{{ app('csp.nonce') }}"></script>
+  <script src="{{ \App\Support\Asset::url('/frontend/js/resident-portal.js') }}" nonce="{{ app('csp.nonce') }}"></script>
 
 </body>
 </html>

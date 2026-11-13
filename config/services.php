@@ -39,4 +39,9 @@ return [
         ],
     ],
 
+    // AI-assisted triage (optional). Leave ANTHROPIC_API_KEY empty to use keyword rules only.
+    'anthropic' => [
+        'key' => env('ANTHROPIC_API_KEY'),
+    ],
+
 ];

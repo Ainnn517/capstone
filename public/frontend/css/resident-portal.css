@@ -17,6 +17,11 @@
 
 * { box-sizing: border-box; }
 
+/* Browsers add a default top margin to headings (about 22px on h5). Bootstrap normally
+   removes it; this project does not load Bootstrap, so remove it here to keep card
+   spacing even. */
+h1, h2, h3, h4, h5, h6 { margin-top: 0; }
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -542,6 +547,8 @@ textarea.form-control {
   margin-bottom: 0.75rem;
 }
 
+.notification:last-child { margin-bottom: 0; }
+
 /* Report status progress steps. */
 .workflow {
   display: flex;
@@ -672,4 +679,113 @@ textarea.form-control {
     flex-direction: column;
     gap: 0.55rem;
   }
+}
+
+/* Category suggestion under the description (a hint the resident can accept). */
+.category-suggestion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--line);
+  border-left: 4px solid #8fd3b0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 0.9rem;
+}
+
+.category-suggestion[hidden] { display: none; }
+.category-suggestion small { flex-basis: 100%; opacity: 0.85; }
+
+/* ---- Sidebar layout (matches the admin dashboard sidebar) ---- */
+.resident-layout {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.resident-content,
+.resident-view { min-width: 0; }
+
+.resident-sidebar {
+  position: sticky;
+  top: 90px;
+  display: grid;
+  gap: 0.45rem;
+  padding: 1rem;
+}
+
+.sidebar-label {
+  margin: 0 0 0.45rem;
+  padding: 0 0.7rem;
+  color: rgba(255, 255, 255, .62);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 46px;
+  padding: 0.7rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: rgba(255, 255, 255, .82);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebar-link:hover,
+.sidebar-link.active {
+  border-color: rgba(255, 255, 255, .16);
+  background: rgba(255, 255, 255, .13);
+  color: #fff;
+}
+
+.sidebar-link.active { box-shadow: inset 3px 0 #69d39b; }
+
+.sidebar-icon {
+  width: 1.3rem;
+  color: #a7e7c2;
+  font-size: 1.1rem;
+  text-align: center;
+}
+
+.sidebar-count {
+  margin-left: auto;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .14);
+  font-size: 0.75rem;
+}
+
+.card-heading { margin: 0 0 1rem; font-size: 1.05rem; }
+
+/* My Reports: the page title is above the card now, so the filters sit on the right. */
+#reportsPanel .reports-header { justify-content: flex-end; }
+
+@media (max-width: 900px) {
+  .resident-layout { grid-template-columns: 1fr; gap: 1rem; }
+  .resident-sidebar {
+    position: static;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 0.65rem;
+  }
+  .sidebar-label { grid-column: 1 / -1; }
+}
+
+@media (max-width: 600px) {
+  .sidebar-link { padding: 0.65rem 0.45rem; font-size: 0.82rem; }
+  #reportsPanel .reports-header { justify-content: flex-start; }
 }

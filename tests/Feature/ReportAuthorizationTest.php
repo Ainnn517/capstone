@@ -8,6 +8,7 @@ use App\Models\Attachment;
 use App\Models\Category;
 use App\Models\IssueReport;
 use App\Models\Location;
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Database\Events\QueryExecuted;
@@ -235,11 +236,24 @@ class ReportAuthorizationTest extends TestCase
             ])
             ->assertOk();
 
+        // Dispatching requires a responsible team.
         $this->actingAs($administrator)
             ->postJson('/api/reports/update', [
                 'id' => $report->report_id,
                 'status' => 'Dispatched',
                 'assignee' => 'Unassigned',
+                'dispatchNote' => 'A response team has been notified.',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'Assign a team before marking this report Dispatched.');
+        $this->assertSame('Validated', $report->fresh()->status);
+
+        $team = Team::create(['name' => 'Field Team A']);
+        $this->actingAs($administrator)
+            ->postJson('/api/reports/update', [
+                'id' => $report->report_id,
+                'status' => 'Dispatched',
+                'assignee' => $team->name,
                 'dispatchNote' => 'A response team has been notified.',
             ])
             ->assertOk()
@@ -249,7 +263,7 @@ class ReportAuthorizationTest extends TestCase
         $this->assertDatabaseHas('NOTIFICATION', [
             'report_id' => $report->report_id,
             'user_id' => $resident->user_id,
-            'type' => 'status_update',
+            'type' => 'assigned',
             'message' => 'A response team has been notified.',
         ]);
         $this->assertDatabaseHas('STATUS_LOG', [
@@ -263,6 +277,15 @@ class ReportAuthorizationTest extends TestCase
                 'id' => $report->report_id,
                 'status' => 'Resolved',
                 'assignee' => 'Unassigned',
+                'dispatchNote' => 'The issue has been resolved.',
+            ])
+            ->assertUnprocessable();
+
+        $this->actingAs($administrator)
+            ->postJson('/api/reports/update', [
+                'id' => $report->report_id,
+                'status' => 'Resolved',
+                'assignee' => $team->name,
                 'dispatchNote' => 'The issue has been resolved.',
             ])
             ->assertOk()

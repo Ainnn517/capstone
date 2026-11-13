@@ -131,6 +131,18 @@ body {
 .mt-3 { margin-top: 1rem; }
 .mt-4 { margin-top: 1.5rem; }
 
+/* Bootstrap-style utilities used in the markup. This project does not load Bootstrap,
+   so `p-4` used to do nothing and cards had no inner padding. */
+.p-3 { padding: 1rem; }
+.p-4 { padding: 1.5rem; }
+.w-100 { width: 100%; }
+
+/* Remove the browser's default heading top margin so card spacing comes from padding. */
+h1, h2, h3, h4, h5, h6 { margin-top: 0; }
+
+/* Reference data rows: stretch Save/Delete so they line up with the Add buttons. */
+[data-reference-row] > :last-child .btn { flex: 1; }
+
 .brand-dot {
   display: inline-block;
   width: 10px;
@@ -148,8 +160,11 @@ body {
   backdrop-filter: blur(14px);
 }
 
+/* Only vertical padding here: the shorthand `padding: 28px 0 50px` used to reset the
+   .px-3/.px-lg-4 side gutters to 0, so content touched the window edges. */
 .page-wrap {
-  padding: 28px 0 50px;
+  padding-top: 28px;
+  padding-bottom: 50px;
 }
 
 /* Dashboard layout and navigation. */
@@ -238,9 +253,11 @@ body {
   margin-bottom: 0;
 }
 
+/* The negative side margins cancel the columns' 0.75rem gutters, so cards in a row
+   line up with the page title and with full-width cards (they used to sit 12px in). */
 .admin-view:not([hidden]) > .row {
-  margin-left: 0;
-  margin-right: 0;
+  margin-left: -0.75rem;
+  margin-right: -0.75rem;
   row-gap: 1.5rem;
 }
 
@@ -490,6 +507,32 @@ body {
 .g-3 > * { padding-top: 0.75rem; }
 .g-4 { margin-top: -1rem; }
 .g-4 > * { padding-top: 1rem; }
+.g-2 { margin-top: -0.5rem; }
+.g-2 > * { padding-top: 0.5rem; }
+
+/* Medium-breakpoint columns used by the action dialog and reference data forms:
+   stacked on phones, side by side from 768px. */
+.col-md-2,
+.col-md-3,
+.col-md-4,
+.col-md-5,
+.col-md-6,
+.col-md-10 {
+  position: relative;
+  flex: 0 0 100%;
+  max-width: 100%;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
+@media (min-width: 768px) {
+  .col-md-2 { flex: 0 0 16.6667%; max-width: 16.6667%; }
+  .col-md-3 { flex: 0 0 25%; max-width: 25%; }
+  .col-md-4 { flex: 0 0 33.3333%; max-width: 33.3333%; }
+  .col-md-5 { flex: 0 0 41.6667%; max-width: 41.6667%; }
+  .col-md-6 { flex: 0 0 50%; max-width: 50%; }
+  .col-md-10 { flex: 0 0 83.3333%; max-width: 83.3333%; }
+}
 
 .btn,
 .btn-light,
@@ -744,4 +787,214 @@ body {
     flex-direction: column;
     align-items: flex-end;
   }
+}
+
+/* Triage assistant panel in the report action dialog. */
+.triage-panel {
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--line);
+  border-left: 4px solid #8fd3b0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.triage-panel h6 { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.5rem; }
+.triage-duplicates { margin: 0; padding-left: 1.1rem; }
+.triage-duplicates li { margin-bottom: 0.4rem; }
+.triage-note { margin: 0.5rem 0 0; font-size: 0.8rem; opacity: 0.8; }
+
+/* Sidebar groups: extra space above each heading after the first, and a divider
+   before the resident accounts section. */
+.admin-sidebar .sidebar-link + .sidebar-label { margin-top: 0.6rem; }
+.sidebar-divider {
+  width: 100%;
+  margin: 0.4rem 0;
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, .18);
+}
+@media (max-width: 900px) {
+  .sidebar-divider { grid-column: 1 / -1; }
+  .admin-sidebar .sidebar-link + .sidebar-label { margin-top: 0.25rem; }
+}
+
+/* Category chart: centred donut with an HTML legend in an even grid. */
+.chart-donut { max-width: 280px; margin: 0 auto; }
+.chart-legend {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 1.25rem;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+}
+.chart-legend li { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.chart-legend-swatch { flex: 0 0 auto; width: 12px; height: 12px; border-radius: 3px; }
+.chart-legend-name { flex: 1; min-width: 0; line-height: 1.25; overflow-wrap: anywhere; }
+.chart-legend-value { flex: 0 0 auto; font-weight: 700; }
+.chart-legend-value small { font-weight: 400; opacity: 0.75; }
+.chart-legend-empty { grid-column: 1 / -1; justify-content: center; opacity: 0.8; }
+@media (max-width: 420px) {
+  .chart-legend { grid-template-columns: 1fr; }
+}
+
+/* DSS card: Save and Clear buttons side by side. */
+.dss-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.dss-actions .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* "Rejected applications" heading below the pending list. */
+.applications-subheading {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 1.5rem 0 0.25rem;
+  font-size: 1.1rem;
+}
+
+/* DSS Assistant: recommendations shown as a chat message. */
+.dss-chat { display: flex; align-items: flex-start; gap: 0.85rem; }
+.dss-avatar {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #69d39b, #2f7a52);
+  color: #fff;
+  font-size: 1.15rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .2);
+}
+.dss-bubble {
+  flex: 1;
+  min-width: 0;
+  padding: 1rem 1.15rem;
+  border: 1px solid rgba(255, 255, 255, .2);
+  border-radius: 4px 16px 16px 16px;
+  background: rgba(255, 255, 255, .1);
+  line-height: 1.6;
+  animation: dss-fade-in .35s ease-out;
+}
+.dss-name { margin-bottom: 0.35rem; color: #a7e7c2; font-size: 0.8rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.dss-bubble p { margin: 0 0 0.6rem; }
+.dss-items { margin: 0; padding-left: 1.25rem; display: grid; gap: 0.6rem; }
+.dss-urgency { padding: 0.05rem 0.45rem; border-radius: 999px; background: rgba(255, 255, 255, .15); font-size: 0.85em; font-weight: 700; white-space: nowrap; }
+.dss-urgency-high { background: #fde8ea; color: #b42318; }
+.dss-history-title { margin: 1.25rem 0 0.4rem; font-size: 0.95rem; opacity: 0.85; }
+@keyframes dss-fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .dss-bubble { animation: none; } }
+@media (max-width: 600px) { .dss-avatar { display: none; } }
+
+/* Saved snapshots: each row expands to show that moment's recommendations. */
+.snapshot-entry { border-top: 1px solid rgba(255, 255, 255, .15); padding: 0.5rem 0; }
+.snapshot-entry summary { cursor: pointer; list-style: none; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.35rem; }
+.snapshot-entry summary::-webkit-details-marker { display: none; }
+.snapshot-entry summary::before { content: "\25B8"; color: #a7e7c2; transition: transform .15s; }
+.snapshot-entry[open] summary::before { transform: rotate(90deg); }
+.snapshot-entry summary:hover strong { text-decoration: underline; }
+.snapshot-recs { display: grid; gap: 0.6rem; margin: 0.6rem 0 0.25rem; padding: 0; list-style: none; }
+.snapshot-recs li {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid rgba(255, 255, 255, .15);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .06);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.snapshot-rec-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; align-items: center; }
+
+/* Assistant "Next step" actions above the category/duplicate checks. */
+.triage-actions { padding-bottom: 0.5rem; margin-bottom: 0.5rem; border-bottom: 1px solid rgba(255, 255, 255, .15); }
+.triage-actions .btn { padding: 0.15rem 0.6rem; font-size: 0.8rem; }
+
+/* Message to resident: wraps so the whole drafted message is visible. */
+#dispatchNote { min-height: 3.2rem; resize: vertical; line-height: 1.4; }
+
+/* Incident Management menu item: red / yellow / green counters by priority. */
+.priority-counts { display: inline-flex; flex-shrink: 0; gap: 0.2rem; margin-left: auto; }
+.priority-pill {
+  min-width: 1.2rem;
+  padding: 0.1rem 0.3rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.3;
+  text-align: center;
+  color: #fff;
+}
+.priority-critical { background: #dc3545; box-shadow: 0 0 0 2px rgba(220, 53, 69, .25); }
+.priority-high { background: #f59e0b; color: #3b2a00; }
+.priority-normal { background: #22a06b; }
+
+/* Incident table: coloured strip on the left of each row, matching its priority. */
+tr.row-priority-critical > td:first-child { box-shadow: inset 4px 0 #dc3545; }
+tr.row-priority-high > td:first-child { box-shadow: inset 4px 0 #f59e0b; }
+tr.row-priority-normal > td:first-child { box-shadow: inset 4px 0 #22a06b; }
+
+/* Let the menu label wrap so the three counters always fit inside the sidebar. */
+.sidebar-link:has(.priority-counts) { gap: 0.55rem; }
+/* Priority badges in tables must not break mid-word ("Critica / l"). */
+td .badge-soft { white-space: nowrap; }
+@media (max-width: 600px) {
+  /* Phones: the two-column menu is narrow, so put the counters on their own line. */
+  .sidebar-link:has(.priority-counts) { flex-wrap: wrap; row-gap: 0.3rem; }
+  .sidebar-link .priority-counts { flex-basis: 100%; margin-left: 0; padding-left: 1.85rem; }
+}
+
+/* Report action dialog: never taller than the window. The title and the Save/Cancel buttons
+   stay visible and only the middle section scrolls. */
+#actionModal .modal-dialog {
+  display: flex;
+  max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
+}
+#actionModal .modal-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+}
+#actionModal .modal-header,
+#actionModal .modal-footer { flex: 0 0 auto; }
+#actionModal .modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* Status history grows with every update: keep it short and scroll inside it. */
+#reportStatusHistory {
+  max-height: 7.5rem;
+  overflow-y: auto;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+/* Report action dialog layout: details on the left, controls on the right (wide screens).
+   The controls column sticks to the top of the scrolling area so it is always reachable. */
+.action-controls { margin-top: 0; align-content: start; }
+.action-controls .form-select,
+.action-controls .form-control { width: 100%; }
+@media (min-width: 992px) {
+  #actionModal .modal-dialog { width: min(1080px, calc(100% - 2rem)); }
+  .action-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: 1.5rem;
+    align-items: start;
+  }
+  .action-controls {
+    position: sticky;
+    top: 0;
+    margin-left: 0;
+    margin-right: 0;
+    padding: 1rem 0.25rem 0.25rem;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, .05);
+  }
+  .action-details > :last-child { margin-bottom: 0; }
+}
+@media (max-width: 480px) {
+  .action-controls .col-6 { flex: 0 0 100%; max-width: 100%; }
 }

@@ -1,10 +1,7 @@
 
 const passwordInput = document.getElementById("password");
-const togglePassword = document.getElementById("togglePassword");
 const registerPasswordInput = document.getElementById("registerPassword");
-const toggleRegisterPassword = document.getElementById("toggleRegisterPassword");
 const confirmPasswordInput = document.getElementById("confirmPassword");
-const toggleConfirmPassword = document.getElementById("toggleConfirmPassword");
 const loginForm = document.getElementById("loginForm");
 const formMessage = document.getElementById("formMessage");
 const registerForm = document.getElementById("registerForm");
@@ -62,18 +59,6 @@ function enterPortal(user) {
     window.location.href = user.role === "admin" ? "admin-dashboard.html" : "resident-portal.html";
 }
 
-// Toggle password visibility and keep each control accessible.
-function bindPasswordToggle(input, button) {
-    button.addEventListener("click", () => {
-        const isPasswordHidden = input.type === "password";
-        input.type = isPasswordHidden ? "text" : "password";
-        button.setAttribute("aria-label", isPasswordHidden ? "Hide password" : "Show password");
-    });
-}
-
-bindPasswordToggle(passwordInput, togglePassword);
-bindPasswordToggle(registerPasswordInput, toggleRegisterPassword);
-bindPasswordToggle(confirmPasswordInput, toggleConfirmPassword);
 
 // Handle the login form
 loginForm.addEventListener("submit", async (event) => {
@@ -106,6 +91,7 @@ formSwitch.addEventListener("click", () => {
     registerForm.hidden = !showingRegistration;
     formTitle.textContent = showingRegistration ? "Create an account" : "Log in";
     formSwitch.textContent = showingRegistration ? "Back to log in" : "Create an account";
+    forgotPasswordButton.hidden = showingRegistration;
     formSwitch.setAttribute("aria-controls", showingRegistration ? "loginForm" : "registerForm");
     formMessage.textContent = "";
     registerMessage.textContent = "";
@@ -131,7 +117,7 @@ returnToLoginButton.addEventListener("click", () => {
 forgotPasswordForm.addEventListener("submit", async event => {
     event.preventDefault();
     const message = document.getElementById("forgotPasswordMessage");
-    message.textContent = "If an account matches that email, a reset link will be sent.";
+    message.textContent = "Sending…";
     try {
         const response = await fetch("/api/password/forgot", {
             method: "POST",
@@ -185,3 +171,15 @@ registerForm.addEventListener("submit", async (event) => {
         registerMessage.textContent = error.message + emailDeliveryNotice(error.emailStatus);
     }
 });
+
+// Arriving from the Privacy Notice's "Continue to create an account" button.
+if (new URLSearchParams(window.location.search).get("register") === "1" && registerForm.hidden) {
+    formSwitch.click();
+}
+try {
+    if (sessionStorage.getItem("privacyNoticeAccepted") === "1") {
+        document.getElementById("privacyConsent").checked = true;
+    }
+} catch {
+    // Storage unavailable: the resident ticks the consent box on the form instead.
+}

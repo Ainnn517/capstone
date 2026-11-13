@@ -8,6 +8,7 @@ const API_ENDPOINTS = {
   markNotificationRead: '/api/notifications/{id}/read',
   getReportHistory: '/api/reports/{id}/history',
   createReport: '/api/reports',
+  suggestCategory: '/api/triage/category',
   session: '/api/session',
   logout: '/api/logout'
 };
@@ -107,6 +108,8 @@ function initResidentPortalPage() {
   const STAGES = ['Submitted', 'Validated', 'Dispatched', 'Resolved'];
   let currentReports = [];
   let reportFilter = 'active';
+  // Notifications default to All so a "resolved" update (which counts as Past) is never hidden.
+  let notifFilter = 'all';
   let reportPage = 1;
   let reportPagination = { currentPage: 1, lastPage: 1, total: 0 };
 
@@ -157,6 +160,51 @@ function initResidentPortalPage() {
     updateStreets();
   }
 
+  // Category suggestion (AI, or keyword rules when AI is unavailable). It is only a hint:
+  // the resident decides whether to use it. Runs when the resident leaves the description
+  // field, so typing does not send a request on every keystroke.
+  const descriptionInput = document.getElementById('description');
+  const categoryInput = document.getElementById('category');
+  const suggestionBox = document.getElementById('categorySuggestion');
+  let lastSuggestedText = '';
+
+  function hideCategorySuggestion() {
+    suggestionBox.hidden = true;
+    suggestionBox.innerHTML = '';
+  }
+
+  async function suggestCategory() {
+    const text = descriptionInput.value.trim();
+    if (text.length < 10 || text === lastSuggestedText) return;
+    lastSuggestedText = text;
+    suggestionBox.textContent = 'Checking which category fits…';
+    suggestionBox.hidden = false;
+    try {
+      const { suggestion } = await apiRequest('suggestCategory', { description: text });
+      if (descriptionInput.value.trim() !== text) return; // The text changed while waiting.
+      if (!suggestion.category || suggestion.category === categoryInput.value) {
+        hideCategorySuggestion();
+        return;
+      }
+      const label = suggestion.source === 'ai' ? 'AI suggestion' : 'Suggested from keywords';
+      suggestionBox.innerHTML = `
+        <span><strong>${escapeHTML(label)}:</strong> ${escapeHTML(suggestion.category)}</span>
+        <button type="button" class="btn btn-sm btn-light" data-use-category="${escapeHTML(suggestion.category)}">Use this</button>
+        ${suggestion.reason ? `<small class="d-block">${escapeHTML(suggestion.reason)}</small>` : ''}
+      `;
+    } catch {
+      hideCategorySuggestion(); // Suggestions are optional; never block the form.
+    }
+  }
+
+  descriptionInput.addEventListener('blur', suggestCategory);
+  suggestionBox.addEventListener('click', event => {
+    const button = event.target.closest('[data-use-category]');
+    if (!button) return;
+    categoryInput.value = button.dataset.useCategory;
+    hideCategorySuggestion();
+  });
+
   // Load the resident's reports from the server.
   async function syncIssuesFromServer() {
     const view = reportFilter === 'active' ? 'current' : reportFilter;
@@ -179,11 +227,11 @@ function initResidentPortalPage() {
 
     renderReports();
     try {
-      updateNotifications(await apiRequest('getNotifications', {}, 'GET'));
+      updateNotifications(await apiRequest('getNotifications', { view: notifFilter }, 'GET'));
     } catch (error) {
       const notifContainer = document.getElementById('notifications');
       notifContainer.textContent = `Notifications unavailable: ${error.message}`;
-      document.getElementById('notifCount').textContent = '!';
+      document.getElementById('notifNavCount').textContent = '!';
     }
   }
 
@@ -267,10 +315,14 @@ function initResidentPortalPage() {
   // Show the latest report updates and notification count.
   function updateNotifications(result) {
     const notifContainer = document.getElementById('notifications');
-    const notifBadge = document.getElementById('notifCount');
     const notifications = result.notifications || [];
     if (notifications.length === 0) {
-      notifContainer.innerHTML = '<div class="text-secondary small">No new updates available yet.</div>';
+      const emptyMessage = {
+        current: 'No updates about reports that are still in progress.',
+        past: 'No updates about resolved or closed reports.',
+        all: 'No updates available yet.'
+      }[notifFilter];
+      notifContainer.innerHTML = `<div class="text-secondary small">${escapeHTML(emptyMessage)}</div>`;
     } else {
       notifContainer.innerHTML = notifications.map(notification => `
         <div class="notification mb-2 ${notification.isRead ? 'text-secondary' : ''}">
@@ -281,7 +333,7 @@ function initResidentPortalPage() {
         </div>
       `).join('');
     }
-    notifBadge.textContent = result.unreadCount;
+    document.getElementById('notifNavCount').textContent = result.unreadCount;
   }
 
   document.getElementById('notifications').addEventListener('click', async event => {
@@ -289,7 +341,7 @@ function initResidentPortalPage() {
     if (!button) return;
     try {
       await apiRequest('markNotificationRead', { id: button.dataset.markNotificationRead });
-      updateNotifications(await apiRequest('getNotifications', {}, 'GET'));
+      updateNotifications(await apiRequest('getNotifications', { view: notifFilter }, 'GET'));
     } catch (error) {
       window.showToast(error.message, 'error');
     }
@@ -464,6 +516,7 @@ function initResidentPortalPage() {
     const description = document.getElementById('description').value.trim();
     const landmark = locationInput.value.trim();
     const streets = LOCATIONS[phase] || [];
+    const street = streetSel.value;
 
     if (!categoryValue) {
       this.classList.add('was-validated');
@@ -518,6 +571,8 @@ function initResidentPortalPage() {
 
       this.reset();
       updateStreets();
+      hideCategorySuggestion();
+      lastSuggestedText = '';
       gpsCoordinates = null;
       if (locationMarker) {
         locationMarker.setMap(null);
@@ -529,7 +584,8 @@ function initResidentPortalPage() {
 
       document.getElementById('submitAlert').innerHTML = `
         <div class="alert alert-success alert-dismissible fade show" role="alert">
-          <strong>Report Submitted!</strong> Your tracking ID is <strong>${result.tracking}</strong>.
+          <strong>Report Submitted!</strong> Your tracking ID is <strong>${escapeHTML(result.tracking)}</strong>.
+          <button type="button" class="btn btn-sm btn-light ms-2" data-go-view="reports">View in My Reports</button>
           <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
       `;
@@ -550,6 +606,8 @@ function initResidentPortalPage() {
       }
       applyReferenceData(await apiRequest('getReferenceData', {}, 'GET'));
       document.getElementById('residentName').textContent = `Welcome, ${result.user.username}`;
+      window.fillAccountDetails(result.user);
+      showView(window.location.hash.slice(1));
       await render();
       setInterval(render, 15000);
     } catch (error) {
@@ -557,9 +615,47 @@ function initResidentPortalPage() {
     }
   }
 
-  // Scroll to notifications when the notification button is clicked.
-  document.getElementById('notifBtn').addEventListener('click', () => {
-    document.getElementById('notifications').scrollIntoView({ behavior: 'smooth' });
+  // Sidebar views. The current view is kept in the address (#reports) so a refresh stays on it.
+  const RESIDENT_VIEWS = ['report', 'reports', 'notifications', 'account'];
+  function showView(name) {
+    const view = RESIDENT_VIEWS.includes(name) ? name : 'report';
+    document.querySelectorAll('[data-resident-view]').forEach(button => {
+      const isActive = button.dataset.residentView === view;
+      button.classList.toggle('active', isActive);
+      if (isActive) {
+        button.setAttribute('aria-current', 'page');
+      } else {
+        button.removeAttribute('aria-current');
+      }
+    });
+    document.querySelectorAll('.resident-view').forEach(section => {
+      section.hidden = section.id !== `${view}View`;
+    });
+    if (window.location.hash !== `#${view}`) {
+      history.replaceState(null, '', `#${view}`);
+    }
+  }
+
+  document.querySelectorAll('[data-resident-view]').forEach(button => {
+    button.addEventListener('click', () => showView(button.dataset.residentView));
+  });
+  // Buttons elsewhere on the page (for example "View in My Reports") can open a view too.
+  document.addEventListener('click', event => {
+    const link = event.target.closest('[data-go-view]');
+    if (link) showView(link.dataset.goView);
+  });
+
+  // Change which notification group is shown.
+  document.querySelectorAll('[data-notif-filter]').forEach(button => {
+    button.addEventListener('click', () => {
+      notifFilter = button.dataset.notifFilter;
+      document.querySelectorAll('[data-notif-filter]').forEach(filterButton => {
+        const isSelected = filterButton === button;
+        filterButton.classList.toggle('active', isSelected);
+        filterButton.setAttribute('aria-pressed', String(isSelected));
+      });
+      render();
+    });
   });
 
   // Change which report group is shown.
