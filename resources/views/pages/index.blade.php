@@ -54,6 +54,17 @@
                 <p id="formMessage" class="form-message"></p>
             </form>
 
+            <form id="twoFactorForm" hidden>
+                <p class="two-factor-intro" id="twoFactorIntro"></p>
+                <label for="loginCode">Sign-in code:</label>
+                <div class="input-wrap">
+                    <input type="text" id="loginCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="000000" required>
+                </div>
+                <button type="submit" class="login-button">Verify and log in</button>
+                <p id="twoFactorMessage" class="form-message" role="status" aria-live="polite"></p>
+                <button type="button" class="form-switch" id="twoFactorBack">Back to log in</button>
+            </form>
+
             <form id="registerForm" hidden>
                 <div class="register-fields">
                     <div class="field">

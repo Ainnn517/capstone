@@ -14,7 +14,8 @@ const returnToLoginButton = document.getElementById("returnToLoginButton");
 // API routes used by the login and registration forms.
 const API_ENDPOINTS = {
     login: "/api/login",
-    register: "/api/register"
+    register: "/api/register",
+    verifyLogin: "/api/login/verify"
 };
 
 // Send an authentication request and return its response.
@@ -76,14 +77,64 @@ loginForm.addEventListener("submit", async (event) => {
     formMessage.textContent = "Signing in...";
     try {
         const result = await apiRequest("login", { username, password });
+        if (result.twoFactorRequired) {
+            showTwoFactorStep(result);
+            return;
+        }
         enterPortal(result.user);
     } catch (error) {
         formMessage.textContent = error.message;
     }
 });
 
+// Administrators confirm each sign-in with a code emailed to them.
+const twoFactorForm = document.getElementById("twoFactorForm");
+let twoFactorChallenge = null;
+
+function showTwoFactorStep(result) {
+    twoFactorChallenge = result.challenge;
+    loginForm.hidden = true;
+    forgotPasswordButton.hidden = true;
+    formSwitch.hidden = true;
+    twoFactorForm.hidden = false;
+    formTitle.textContent = "Check your email";
+    document.getElementById("twoFactorIntro").textContent = result.message;
+    document.getElementById("twoFactorMessage").textContent = "";
+    document.getElementById("loginCode").value = "";
+    document.getElementById("loginCode").focus();
+}
+
+function hideTwoFactorStep() {
+    twoFactorChallenge = null;
+    twoFactorForm.hidden = true;
+    loginForm.hidden = false;
+    forgotPasswordButton.hidden = false;
+    formSwitch.hidden = false;
+    formTitle.textContent = "Log in";
+    formMessage.textContent = "";
+}
+
+twoFactorForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const message = document.getElementById("twoFactorMessage");
+    message.textContent = "Checking the code...";
+    try {
+        const result = await apiRequest("verifyLogin", {
+            challenge: twoFactorChallenge,
+            code: document.getElementById("loginCode").value.trim()
+        });
+        enterPortal(result.user);
+    } catch (error) {
+        message.textContent = error.message;
+        if (/sign in again/i.test(error.message || "")) hideTwoFactorStep();
+    }
+});
+
+document.getElementById("twoFactorBack").addEventListener("click", hideTwoFactorStep);
+
 // Switch between the login and registration forms.
 formSwitch.addEventListener("click", () => {
+    twoFactorForm.hidden = true;
     forgotPasswordForm.hidden = true;
     forgotPasswordButton.hidden = false;
     const showingRegistration = registerForm.hidden;

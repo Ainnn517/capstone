@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Middleware\RequireAuthenticatedUser;
 use App\Mail\AccountUpdateMail;
+use App\Mail\LoginCodeMail;
 use App\Mail\PasswordChangeCodeMail;
 use App\Models\User;
 use App\Services\AccountNotificationService;
@@ -194,11 +195,106 @@ class AuthController extends ApiController
             return $this->error('Verify your email address before signing in. A verification link has been sent if email delivery is configured.', 403);
         }
 
+        if ($user->role === 'admin' && config('security.admin_two_factor')) {
+            return $this->startTwoFactor($user);
+        }
+
+        return $this->signIn($request, $user);
+    }
+
+    // Step 2 of an administrator sign-in: the emailed code confirms it is really them.
+    public function verifyLogin(Request $request): JsonResponse
+    {
+        $challenge = (string) $request->input('challenge');
+        $code = trim((string) $request->input('code'));
+        if (! preg_match('/\A[a-f0-9]{64}\z/', $challenge) || ! preg_match('/\A\d{6}\z/', $code)) {
+            return $this->error('Enter the 6-digit code from the email.', 422);
+        }
+
+        $key = 'login-2fa:'.$challenge;
+        $pending = Cache::get($key);
+        if (! is_array($pending)) {
+            return $this->error('This code has expired. Please sign in again.', 422);
+        }
+
+        if (! hash_equals($pending['code'], $this->hashPasswordCode($code))) {
+            $pending['attempts']++;
+            if ($pending['attempts'] >= self::PASSWORD_CODE_MAX_ATTEMPTS) {
+                Cache::forget($key);
+                Cache::forget('login-2fa-current:'.$pending['user_id']);
+
+                return $this->error('Too many incorrect codes. Please sign in again.', 422);
+            }
+            Cache::put($key, $pending, Carbon::createFromTimestamp($pending['expires_at']));
+            $remaining = self::PASSWORD_CODE_MAX_ATTEMPTS - $pending['attempts'];
+
+            return $this->error("That code is incorrect. {$remaining} ".($remaining === 1 ? 'try' : 'tries').' left.', 422);
+        }
+
+        Cache::forget($key);
+        Cache::forget('login-2fa-current:'.$pending['user_id']);
+        $user = User::find($pending['user_id']);
+        if (! $user || $user->account_status !== 'approved') {
+            return $this->error('This account can no longer sign in. Contact the barangay office.', 403);
+        }
+
+        return $this->signIn($request, $user);
+    }
+
+    private function signIn(Request $request, User $user): JsonResponse
+    {
         Auth::login($user);
         $request->session()->regenerate();
         $request->session()->put(RequireAuthenticatedUser::PASSWORD_FINGERPRINT_KEY, $user->sessionPasswordFingerprint());
 
         return response()->json(['success' => true, 'user' => $this->userPayload($user)]);
+    }
+
+    // Email a one-time sign-in code and return a challenge token for step 2. A repeated
+    // sign-in within the cooldown reuses the pending code instead of emailing again.
+    private function startTwoFactor(User $user): JsonResponse
+    {
+        $currentKey = 'login-2fa-current:'.$user->user_id;
+        $cooldownKey = 'login-2fa-mail:'.$user->user_id;
+        $existing = Cache::get($currentKey);
+        if (is_string($existing) && RateLimiter::tooManyAttempts($cooldownKey, 1) && Cache::has('login-2fa:'.$existing)) {
+            return response()->json([
+                'success' => true,
+                'twoFactorRequired' => true,
+                'challenge' => $existing,
+                'message' => 'We already sent a code to '.$this->maskEmail($user->email).' in the last 5 minutes. Enter it below to finish signing in.',
+            ]);
+        }
+
+        $challenge = bin2hex(random_bytes(32));
+        $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $expiresAt = now()->addMinutes(self::PASSWORD_CODE_MINUTES);
+        Cache::put('login-2fa:'.$challenge, [
+            'user_id' => (int) $user->user_id,
+            'code' => $this->hashPasswordCode($code),
+            'attempts' => 0,
+            'expires_at' => $expiresAt->getTimestamp(),
+        ], $expiresAt);
+        Cache::put($currentKey, $challenge, $expiresAt);
+        RateLimiter::hit($cooldownKey, self::EMAIL_COOLDOWN_SECONDS);
+
+        try {
+            Mail::to($user->email)->send(new LoginCodeMail($code, $user->full_name, self::PASSWORD_CODE_MINUTES));
+        } catch (TransportExceptionInterface $exception) {
+            Cache::forget('login-2fa:'.$challenge);
+            Cache::forget($currentKey);
+            RateLimiter::clear($cooldownKey);
+            Log::error('Administrator sign-in code email could not be sent.', ['exception' => $exception::class]);
+
+            return $this->error('We could not send the sign-in code email. Please try again later or contact the system maintainer.', 503);
+        }
+
+        return response()->json([
+            'success' => true,
+            'twoFactorRequired' => true,
+            'challenge' => $challenge,
+            'message' => 'We sent a 6-digit sign-in code to '.$this->maskEmail($user->email).'. Enter it below to finish signing in.',
+        ]);
     }
 
     // Return the current signed-in user's details.

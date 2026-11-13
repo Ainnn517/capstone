@@ -38,6 +38,24 @@ The example `.env` uses Laravel's `log` mailer and does not send inbox email. Em
 
 The location picker requires the Google Maps JavaScript API, billing, and an API key restricted to the required API and allowed referrers. This map integration still requires network access. The charts and Uicons used by the operations/resident pages are hosted locally.
 
+## Administrator sign-in codes
+
+Administrators confirm every sign-in with a 6-digit code emailed to them (`ADMIN_TWO_FACTOR=true`, the default). Email delivery must therefore work before the first administrator signs in on a server. For local development without email, set `ADMIN_TWO_FACTOR=false`, or keep `MAIL_MAILER=log` and read the code from `storage/logs/laravel.log`.
+
+## Scheduled clean-up and backups
+
+`php artisan data:purge` deletes rejected applications after 30 days, archived reports (with their photos and history) after one year, administrator audit entries after two years, and expired password-reset links. The periods are `RETENTION_*` settings in `.env`; `0` disables a rule. It runs daily at 02:00 through Laravel's scheduler, which needs one cron entry on the server:
+
+```
+* * * * * cd /path/to/CAPSTONE && php artisan schedule:run >> /dev/null 2>&1
+```
+
+Run `php artisan data:purge --dry-run` to see what would be removed. Take a database backup before the first real run, and keep nightly backups thereafter (see the checklist below).
+
+## Continuous integration
+
+Every push to GitHub runs code style checks and the full test suite against MySQL 8 (`.github/workflows/tests.yml`). Dependabot opens pull requests for security and dependency updates weekly (`.github/dependabot.yml`); merge them after the tests pass.
+
 ## Production checklist
 
 - Set `APP_ENV=production`, `APP_DEBUG=false`, the real HTTPS `APP_URL`, and `SESSION_SECURE_COOKIE=true`.

@@ -11,6 +11,7 @@ use App\Models\Notification;
 use App\Models\StatusLog;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\AttachmentFileRemover;
 use App\Services\UploadedImageSanitizer;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -334,14 +335,7 @@ class ReportController extends ApiController
         }
 
         // Delete files only after the commit, so a rollback never loses a photo.
-        foreach ($storedFiles as $path) {
-            if (preg_match('#\Areport-attachments/[a-f0-9]{64}\.(?:jpg|png|gif|webp)\z#', $path)) {
-                Storage::disk('local')->delete($path);
-            } elseif (preg_match('#\Adatabase/uploads/[a-f0-9]{32}\.(?:jpg|png|gif|webp)\z#', $path)
-                && is_file(base_path($path))) {
-                @unlink(base_path($path));
-            }
-        }
+        app(AttachmentFileRemover::class)->remove($storedFiles);
 
         return response()->json(['success' => true]);
     }

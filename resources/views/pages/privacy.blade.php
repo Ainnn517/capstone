@@ -37,7 +37,7 @@
     <p>When this feature is enabled, the text of report descriptions is sent to an artificial intelligence service provided by Anthropic to produce these suggestions. Your name, username, email address, GPS coordinates, and photos are not sent, and email addresses and phone numbers written inside a description are masked before sending. When the feature is turned off or unavailable, suggestions are produced on the barangay's own server using keyword rules, and no report text leaves the system.</p>
 
     <h2>Retention and deletion</h2>
-    <p>Reports and attachments are retained until an administrator permanently deletes an archived report. Archiving does not delete the report. Permanent deletion also removes associated attachments and report history from the live database. Separate backups may retain deleted information until those backups expire under the barangay's backup schedule.</p>
+    <p>Reports and attachments are kept while they are active. Archived reports, with their attachments and history, are deleted automatically one year after archiving, or earlier when an administrator deletes them. Registration requests that were not approved are deleted 30 days after rejection. Administrator activity records are kept for two years. Separate backups may retain deleted information until those backups expire under the barangay's backup schedule.</p>
 
     <h2>Account and privacy questions</h2>
     <p>Contact the barangay office for questions about your information or to request assistance. The barangay should provide its approved contact details here before launch.</p>

@@ -23,7 +23,7 @@ class ExampleTest extends TestCase
         $this->get('/privacy')
             ->assertOk()
             ->assertSee('href="/"', false)
-            ->assertSee('Reports and attachments are retained until an administrator permanently deletes an archived report.');
+            ->assertSee('Archived reports, with their attachments and history, are deleted automatically one year after archiving');
     }
 
     public function test_login_page_uses_a_relative_privacy_notice_link(): void

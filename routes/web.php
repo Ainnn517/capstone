@@ -19,6 +19,7 @@ Route::view('/privacy', 'pages.privacy')->name('privacy');
 
 // Handle login, registration, and session requests.
 Route::post('/api/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+Route::post('/api/login/verify', [AuthController::class, 'verifyLogin'])->middleware('throttle:10,1');
 Route::post('/api/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
 Route::post('/api/password/forgot', [AuthController::class, 'forgotPassword'])->middleware('throttle:5,1');
 Route::post('/api/password/reset', [AuthController::class, 'resetPassword'])->middleware('throttle:5,1');

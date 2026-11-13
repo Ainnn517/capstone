@@ -121,6 +121,8 @@ body { font-family: "Archivo", Arial, sans-serif; color: #fff; }
   display: block; margin: 14px auto 0; padding: 4px; color: #fff; font: inherit;
   background: none; border: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
 }
+.two-factor-intro { margin-bottom: 14px; font-size: .9rem; line-height: 1.45; }
+#loginCode { font-size: 1.3rem; letter-spacing: .35em; text-align: center; }
 .card-footer { margin-top: 6px; text-align: center; font-size: .72rem; opacity: .8; line-height: 1.5; }
 
 /* Create account: pair the fields in two columns on wider screens so the form fits a
