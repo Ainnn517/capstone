@@ -25,6 +25,9 @@ def test_admin_labels_reports_and_sees_results(app, new_page, mail):
     log_in(admin, app, "e2eadmin", mail=mail)
     admin.click("[data-admin-view=evaluation]")
     expect(admin.locator("#evaluationProgress")).to_contain_text("0 of 2 reports labelled")
+    # Nothing to export yet.
+    expect(admin.locator("#evaluationResults")).to_contain_text("No results yet")
+    expect(admin.locator("#evaluationExport")).to_be_hidden()
     # Blind: only the description is shown.
     expect(admin.locator(".evaluation-description")).to_contain_text("Barado ang kanal")
     admin.locator("[data-eval-category]", has_text="Clogged Drainage").click()

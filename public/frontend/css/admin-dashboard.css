@@ -1033,3 +1033,4 @@ td .badge-soft { white-space: nowrap; }
 .overdue-badge { margin-top: 0.25rem; display: inline-block; }
 .dss-reason { display: block; font-size: 0.85em; opacity: 0.85; font-style: italic; }
 .dss-overdue { color: #ffb4a8; }
+#evaluationExport[hidden] { display: none !important; }

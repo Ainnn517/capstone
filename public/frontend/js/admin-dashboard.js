@@ -915,8 +915,11 @@ function initAdminDashboardPage() {
     const container = document.getElementById('evaluationResults');
     try {
       const result = await apiRequest('evaluationSummary', {}, 'GET');
+      // Nothing to export until at least one report is labelled.
+      const exportLink = document.getElementById('evaluationExport');
+      exportLink.hidden = result.labelled === 0;
       if (result.labelled === 0) {
-        container.innerHTML = '<p class="text-secondary mb-0">No reports labelled yet. Results appear here after the first labels.</p>';
+        container.innerHTML = '<p class="text-secondary mb-0">No results yet. Label a few reports above and the accuracy will appear here.</p>';
         return;
       }
       const tile = (title, data, note) => `

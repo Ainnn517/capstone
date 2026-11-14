@@ -392,10 +392,10 @@
         <div class="card p-4">
           <div class="evaluation-head">
             <h2 class="card-heading mb-0">Results</h2>
-            <a id="evaluationExport" class="btn btn-sm btn-light" href="/api/evaluation/export">Export CSV</a>
+            <a id="evaluationExport" class="btn btn-sm btn-light" href="/api/evaluation/export" hidden>Export CSV</a>
           </div>
           <div id="evaluationResults"></div>
-          <p class="small text-secondary mt-3 mb-0">AI accuracy appears after running <code>php artisan triage:evaluate --from-db --ai</code> on the server (needs <code>ANTHROPIC_API_KEY</code>; it asks before spending money). The CSV has no names, and contact details in descriptions are masked.</p>
+          <p class="small text-secondary mt-3 mb-0">The exported CSV has no names, and contact details in descriptions are masked. AI accuracy is added when the system's technical administrator runs the AI check on the server.</p>
         </div>
       </section>
 
