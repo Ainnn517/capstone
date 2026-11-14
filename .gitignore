@@ -11,4 +11,6 @@
 /storage/framework/cache/data/*
 /storage/framework/sessions/*
 /storage/framework/views/*
-/storage/logs/*
+/storage/logs/*/.venv-e2e/
+__pycache__/
+.pytest_cache/

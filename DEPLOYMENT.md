@@ -73,6 +73,9 @@ Every push to GitHub runs code style checks and the full test suite against MySQ
 
 ## Tests
 
+Browser end-to-end tests (Firefox and Chromium, full user journeys) live in `tests/e2e`; see [tests/e2e/README.md](./tests/e2e/README.md). They use the same `barangay_reporting_test` database.
+
+
 Run `php artisan test` or `composer test`. Tests use the separate `barangay_reporting_test` MySQL database configured in `phpunit.xml`; the test harness drops and recreates its application tables. Never point it at the live database. Create the test database and grant the configured application account access:
 
 ```sql
