@@ -28,6 +28,8 @@ use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 class AuthController extends ApiController
 {
+    private const VERIFICATION_EMAIL_COOLDOWN_SECONDS = 300;
+
     // Create a resident account that requires administrator approval.
     //
     // Validation problems are reported specifically (so a resident knows what to fix).
@@ -136,7 +138,7 @@ class AuthController extends ApiController
             return $this->registrationError('Registration is closed because the system has reached its configured account limit.', 403, 'not_sent');
         }
 
-        $result->sendEmailVerificationNotification();
+        $this->sendVerificationEmail($result);
 
         return response()->json($received, 202);
     }
@@ -190,9 +192,12 @@ class AuthController extends ApiController
             return $this->error($message, 403);
         }
         if (config('auth.require_email_verification') && ! $user->hasVerifiedEmail()) {
-            $user->sendEmailVerificationNotification();
+            $wait = $this->sendVerificationEmail($user);
+            $message = $wait === 0
+                ? 'Verify your email address before signing in. We sent a new verification link to '.$this->maskEmail($user->email).'. Check your inbox and spam folder.'
+                : 'Verify your email address before signing in. We already sent a verification link to '.$this->maskEmail($user->email).'. Check your inbox and spam folder, or try again in '.max(1, (int) ceil($wait / 60)).' minute(s) for a new link.';
 
-            return $this->error('Verify your email address before signing in. A verification link has been sent if email delivery is configured.', 403);
+            return $this->error($message, 403);
         }
 
         if ($user->role === 'admin' && config('security.admin_two_factor')) {
@@ -303,6 +308,27 @@ class AuthController extends ApiController
     {
         return response()->json(['token' => $request->session()->token()])
             ->header('Cache-Control', 'no-store, private');
+    }
+
+    // At most one verification email per account every 5 minutes, so repeated sign-in
+    // attempts cannot flood an inbox or get the sending address flagged as spam.
+    // Returns 0 when an email was sent now, otherwise the seconds until the next one.
+    private function sendVerificationEmail(User $user): int
+    {
+        $key = 'verification-email:'.$user->user_id;
+        if (RateLimiter::tooManyAttempts($key, 1)) {
+            return RateLimiter::availableIn($key);
+        }
+        RateLimiter::hit($key, self::VERIFICATION_EMAIL_COOLDOWN_SECONDS);
+
+        try {
+            $user->sendEmailVerificationNotification();
+        } catch (TransportExceptionInterface $exception) {
+            RateLimiter::clear($key); // Nothing was delivered, so allow a retry right away.
+            Log::error('Verification email could not be sent.', ['exception' => $exception::class]);
+        }
+
+        return 0;
     }
 
     public function session(): JsonResponse
