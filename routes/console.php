@@ -13,3 +13,6 @@ Artisan::command('inspire', function () {
 // expired reset links (periods in config/security.php). Needs the scheduler running on the
 // server: a cron entry `* * * * * php /path/to/artisan schedule:run`.
 Schedule::command('data:purge')->dailyAt('02:00');
+
+// Nightly backup of the database and photos, before the clean-up runs (config/backup.php).
+Schedule::command('backup:run')->dailyAt('01:30');

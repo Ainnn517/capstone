@@ -97,3 +97,9 @@ jobs:
 
       - name: Run browser tests
         run: python -m pytest tests/e2e -q
+
+      - name: Rehearse production mode (APP_ENV=production, cached config and routes)
+        run: python -m pytest tests/e2e -q
+        env:
+          E2E_PRODUCTION: '1'
+          E2E_BROWSERS: chromium

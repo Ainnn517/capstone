@@ -53,6 +53,24 @@ ENV = {
     "PILOT_RESIDENT_USERNAME": "",
 }
 
+# E2E_PRODUCTION=1 rehearses a production deployment: APP_ENV=production with config, routes,
+# and views cached. The caches go to a temporary directory, never bootstrap/cache, so the
+# development app is untouched even if the run is interrupted.
+PRODUCTION = os.environ.get("E2E_PRODUCTION") == "1"
+if PRODUCTION:
+    import tempfile
+
+    _cache = Path(tempfile.mkdtemp(prefix="barangay-e2e-cache-"))
+    ENV.update({
+        "APP_ENV": "production",
+        "SESSION_SECURE_COOKIE": "false",  # The rehearsal server is plain HTTP on 127.0.0.1.
+        "APP_CONFIG_CACHE": str(_cache / "config.php"),
+        "APP_ROUTES_CACHE": str(_cache / "routes.php"),
+        "APP_EVENTS_CACHE": str(_cache / "events.php"),
+        "VIEW_COMPILED_PATH": str(_cache / "views"),
+    })
+    (_cache / "views").mkdir()
+
 
 def _artisan(*args: str) -> None:
     subprocess.run(["php", "artisan", *args], cwd=PROJECT, env=ENV, check=True, capture_output=True)
@@ -70,6 +88,9 @@ def reset_database() -> None:
 def server():
     LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
     LOG_FILE.touch()
+    if PRODUCTION:
+        for command in ("config:cache", "route:cache", "view:cache", "event:cache"):
+            _artisan(command)
     process = subprocess.Popen(
         ["php", "-S", f"127.0.0.1:{PORT}", "../vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php"],
         cwd=PROJECT / "public", env=ENV, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -86,6 +107,10 @@ def server():
     yield BASE_URL
     process.terminate()
     process.wait(timeout=10)
+    if PRODUCTION:
+        import shutil
+
+        shutil.rmtree(_cache, ignore_errors=True)
 
 
 @pytest.fixture(scope="session")

@@ -53,11 +53,36 @@ Administrators confirm every sign-in with a 6-digit code emailed to them (`ADMIN
 * * * * * cd /path/to/CAPSTONE && php artisan schedule:run >> /dev/null 2>&1
 ```
 
-Run `php artisan data:purge --dry-run` to see what would be removed. Take a database backup before the first real run, and keep nightly backups thereafter (see the checklist below).
+Run `php artisan data:purge --dry-run` to see what would be removed. Take a database backup before the first real run.
+
+### Backups and restores
+
+`php artisan backup:run` writes a compressed database dump and an archive of uploaded photos to `BACKUP_PATH` (default `storage/app/backups`, files readable only by the app's system user), then deletes backups older than `BACKUP_KEEP_DAYS` (default 14). The scheduler runs it nightly at 01:30, before the clean-up. It needs the `mysqldump` and `mysql` client tools on the server.
+
+To restore:
+
+```
+php artisan backup:run                                   # keep the current state first
+php artisan backup:restore storage/app/backups/barangay_reporting-YYYYMMDD-HHMMSS.sql.gz
+tar -xzf storage/app/backups/attachments-YYYYMMDD-HHMMSS.tar.gz -C storage/app   # photos
+```
+
+The restore asks you to type the database name before replacing any data. The test suite backs up, damages and restores a database on every run (`tests/Feature/BackupRestoreTest.php`), but still rehearse a restore on the real server once after deployment. Backups on the same server do not survive losing that server: copy them regularly to separate, access-controlled storage (for example the host's backup service or an encrypted drive), because they contain resident data.
+
+### Least-privilege database accounts
+
+`database/least_privilege_users.sql` creates two MySQL accounts. The web app's account (`DB_USERNAME`) can only read and change rows; it cannot create, alter or drop tables. A separate owner account (`DB_ADMIN_USERNAME` / `DB_ADMIN_PASSWORD`) is used only from the command line for migrations and backups:
+
+```
+php artisan migrate --database=mysql_admin --force
+php artisan backup:run
+```
+
+If `DB_ADMIN_USERNAME` is not set, both use the app account (fine for local development).
 
 ## Continuous integration
 
-Every push to GitHub runs code style checks and the full test suite against MySQL 8 (`.github/workflows/tests.yml`). Dependabot opens pull requests for security and dependency updates weekly (`.github/dependabot.yml`); merge them after the tests pass.
+Every push to GitHub runs code style checks, the full test suite against MySQL 8, and the browser tests in Firefox and Chromium, then repeats the browser tests in production mode (`APP_ENV=production` with config, routes and views cached) to catch problems that only appear after deployment (`.github/workflows/tests.yml`). Run the same rehearsal locally with `E2E_PRODUCTION=1 python -m pytest tests/e2e`. Dependabot opens pull requests for security and dependency updates weekly (`.github/dependabot.yml`); merge them after the tests pass.
 
 ## Production checklist
 
@@ -65,9 +90,9 @@ Every push to GitHub runs code style checks and the full test suite against MySQ
 - If the app is behind a reverse proxy, set `TRUSTED_PROXIES` to its exact IP address(es) or CIDR ranges. Do not trust arbitrary forwarded headers.
 - Keep `.env`, keys, database passwords, and pilot credentials out of GitHub.
 - Use a supported PHP runtime and install production dependencies with `composer install --no-dev --optimize-autoloader`.
-- Expose only `public/`; use HTTPS and keep MySQL private with a least-privilege application account.
+- Expose only `public/`; use HTTPS and keep MySQL private. Create the least-privilege accounts with `database/least_privilege_users.sql` and run migrations with `--database=mysql_admin`.
 - Ensure `storage/` and `bootstrap/cache/` are writable; run `php artisan config:cache`, `php artisan route:cache`, and `php artisan view:cache`.
-- Keep encrypted database backups outside the web root, restrict access, test restores, and apply an approved retention schedule. Reports, account details, GPS data, and attachments are sensitive.
+- Confirm the nightly `backup:run` produces files, rehearse one `backup:restore`, and copy backups off the server to encrypted, access-controlled storage under an approved retention schedule. Reports, account details, GPS data, and attachments are sensitive.
 - Review the `/privacy` notice with the barangay privacy officer before accepting real data.
 - Verify registration, login, report submission, notification read state, attachments, admin actions, and logout on the deployed host.
 
