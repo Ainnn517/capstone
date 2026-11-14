@@ -12,6 +12,7 @@ use App\Models\StatusLog;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\AttachmentFileRemover;
+use App\Services\InsightService;
 use App\Services\UploadedImageSanitizer;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -196,6 +197,7 @@ class ReportController extends ApiController
                 'dispatches' => $dispatches,
                 'resolutionRate' => $total === 0 ? 0 : (int) round(($resolved / $total) * 100),
                 'hotspotCount' => $hotspotCount,
+                'resolution' => app(InsightService::class)->resolutionStats(),
                 'openByPriority' => [
                     'critical' => (int) ($openByPriority->critical ?? 0),
                     'high' => (int) ($openByPriority->high ?? 0),
@@ -364,7 +366,8 @@ class ReportController extends ApiController
                 'location' => $landmark,
                 'latitude' => $report->latitude,
                 'longitude' => $report->longitude,
-                'priority' => $this->priorityForWeight((int) $report->category->severity_weight),
+                'priority' => $priority = $this->priorityForWeight((int) $report->category->severity_weight),
+                'overdue' => app(InsightService::class)->isOverdue($report->status, $report->date_submitted, $priority),
                 'stage' => $report->status,
                 'created' => $this->clientTimestamp($report->date_submitted),
                 'resolved' => $this->clientTimestamp($report->date_resolved),

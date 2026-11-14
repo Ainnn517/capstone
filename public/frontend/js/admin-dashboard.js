@@ -229,7 +229,7 @@ function initAdminDashboardPage() {
             <small class="text-secondary">${escapeHTML(item.location || '')}</small>
           </td>
           <td><span class="badge text-bg-light border">${item.stage}</span></td>
-          <td>${getPriorityBadge(item.priority)}</td>
+          <td>${getPriorityBadge(item.priority)}${item.overdue ? '<div><span class="badge-soft soft-red overdue-badge" title="Open longer than the target time for its priority">Overdue</span></div>' : ''}</td>
           <td>
             ${item.attachmentId
               ? `<a href="/api/attachments/${encodeURIComponent(item.attachmentId)}" aria-label="View attachment for ${escapeHTML(item.tracking)}"><img class="img-fluid rounded" src="/api/attachments/${encodeURIComponent(item.attachmentId)}" alt="Resident upload for ${escapeHTML(item.tracking)}" loading="lazy" style="width: 88px; height: 64px; object-fit: cover;"></a>`
@@ -273,6 +273,33 @@ function initAdminDashboardPage() {
   function renderAnalytics(summary) {
     renderCharts(summary);
     renderHotspotGrid(summary.hotspots || []);
+    renderResolution(summary.resolution);
+  }
+
+  // Resolution times per category, against the target for that category's priority.
+  function renderResolution(resolution) {
+    const body = document.getElementById('resolutionBody');
+    const overdueBadge = document.getElementById('resolutionOverdue');
+    if (!body || !resolution) return;
+    const total = Number(resolution.overdueTotal || 0);
+    overdueBadge.textContent = total ? `${total} overdue` : 'None overdue';
+    overdueBadge.className = `badge-soft ${total ? 'soft-red' : 'soft-green'}`;
+    const days = value => value < 1 ? `${Math.max(1, Math.round(value * 24))} h` : `${value} d`;
+    body.innerHTML = (resolution.categories || []).map(row => {
+      const verdict = row.averageDays === null
+        ? '<span class="text-secondary">No resolved reports yet</span>'
+        : row.averageDays <= row.targetDays
+          ? '<span class="badge-soft soft-green">Within target</span>'
+          : '<span class="badge-soft soft-yellow">Slower than target</span>';
+      return `<tr>
+          <td><strong>${escapeHTML(row.category)}</strong></td>
+          <td>${row.resolved}</td>
+          <td>${row.averageDays === null ? '—' : days(row.averageDays)}</td>
+          <td>${row.targetDays} d</td>
+          <td>${row.overdue ? `<span class="badge-soft soft-red">${row.overdue}</span>` : '0'}</td>
+          <td>${verdict}</td>
+        </tr>`;
+    }).join('') || '<tr><td colspan="6" class="text-secondary">No categories yet.</td></tr>';
   }
 
   // Draw report totals by category and month using server-side aggregates.
@@ -392,6 +419,7 @@ function initAdminDashboardPage() {
     } else {
       const high = recommendations.filter(rec => rec.urgency === 'High').length;
       const intro = `<p>${greeting} I went through ${plural(Number(dss.sourceReportCount || 0), 'open report')}. `
+        + (Number(dss.overdueTotal) > 0 ? `${Number(dss.overdueTotal) === 1 ? 'One report is' : `${dss.overdueTotal} reports are`} past the target time for its priority. ` : '')
         + (high > 0 ? `${high === 1 ? 'One area is' : `${high} areas are`} urgent. Here's what I'd prioritise, most important first:` : `Nothing is urgent right now, but here's what I'd schedule next:`)
         + '</p>';
       const items = recommendations.map((rec, index) => {
@@ -404,11 +432,15 @@ function initAdminDashboardPage() {
             : '<span class="dss-urgency dss-urgency-high">is also urgent</span>';
         const team = rec.recommendedTeam
           ? `I suggest sending the <strong>${escapeHTML(rec.recommendedTeam)}</strong> to ${escapeHTML(lowerFirst(rec.recommendedAction))}.`
+            + (rec.teamSource === 'history' ? ` <span class="dss-reason">${escapeHTML(rec.teamReason)}</span>` : '')
           : `No team is set for this category yet. Next step: ${escapeHTML(lowerFirst(rec.recommendedAction))}.`;
+        const overdue = Number(rec.overdueCount) > 0
+          ? ` <strong class="dss-overdue">${Number(rec.overdueCount) === 1 ? 'One is' : `${rec.overdueCount} are`} past the target time.</strong>`
+          : '';
         return `
           <li>
             <strong>${escapeHTML(rec.category)}</strong> ${place(rec.location)} ${urgency}.
-            There ${Number(rec.reportCount) === 1 ? 'is' : 'are'} ${reports}, ${age(Number(rec.averageAgeDays), Number(rec.reportCount))}${critical}.
+            There ${Number(rec.reportCount) === 1 ? 'is' : 'are'} ${reports}, ${age(Number(rec.averageAgeDays), Number(rec.reportCount))}${critical}.${overdue}
             ${team}
           </li>`;
       }).join('');
@@ -942,17 +974,22 @@ function initAdminDashboardPage() {
   // Show the triage assistant's category check and possible duplicates for a report.
   // Assistant "Next step": suggest the category's team and draft the message to the resident.
   // Works instantly from Reference Data and the selected action; nothing is saved until "Save".
+  const triageTeams = {};
   function renderTriageActions(issue) {
     const container = document.getElementById('triageActions');
     const category = (referenceData.categories || []).find(item => item.name === issue.category);
-    const team = (referenceData.teams || []).find(item => String(item.team_id) === String(category?.recommended_team_id ?? ''));
+    const configured = (referenceData.teams || []).find(item => String(item.team_id) === String(category?.recommended_team_id ?? ''));
+    // Prefer the team learned from resolved reports (sent with the triage check), else Reference Data.
+    const learned = triageTeams[issue.id];
+    const teamName = learned ? learned.team : configured?.name;
+    const reason = learned?.reason ? `<span class="d-block small">${escapeHTML(learned.reason)}</span>` : '';
     const assignee = document.getElementById('assignee');
 
-    const teamHTML = team
-      ? (assignee.value === team.name
-        ? `<p class="mb-2"><strong>Suggested team:</strong> ${escapeHTML(team.name)} <span class="small">(already assigned)</span></p>`
-        : `<p class="mb-2"><strong>Suggested team:</strong> ${escapeHTML(team.name)}
-             <button class="btn btn-sm btn-light ms-1" type="button" data-assistant-assign="${escapeHTML(team.name)}">Assign</button></p>`)
+    const teamHTML = teamName
+      ? (assignee.value === teamName
+        ? `<p class="mb-2"><strong>Suggested team:</strong> ${escapeHTML(teamName)} <span class="small">(already assigned)</span>${reason}</p>`
+        : `<p class="mb-2"><strong>Suggested team:</strong> ${escapeHTML(teamName)}
+             <button class="btn btn-sm btn-light ms-1" type="button" data-assistant-assign="${escapeHTML(teamName)}">Assign</button>${reason}</p>`)
       : '<p class="mb-2"><strong>Suggested team:</strong> none set for this category (Reference Data).</p>';
 
     container.innerHTML = `${teamHTML}
@@ -997,6 +1034,10 @@ function initAdminDashboardPage() {
       const result = await apiRequest('getReportTriage', {}, 'GET', issue.id);
       if (document.getElementById('editId').value !== issue.id) return; // Another report was opened.
       sourceBadge.textContent = result.source === 'ai' ? 'AI' : 'Keyword rules';
+      if (result.team) {
+        triageTeams[issue.id] = result.team;
+        renderTriageActions(issue);
+      }
 
       const suggestion = result.category || {};
       let categoryHTML;

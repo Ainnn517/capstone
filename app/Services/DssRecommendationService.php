@@ -10,6 +10,8 @@ use JsonException;
 
 class DssRecommendationService
 {
+    public function __construct(private readonly InsightService $insights) {}
+
     /**
      * @return array{recommendations: list<array<string, mixed>>, sourceReportCount: int}
      */
@@ -50,6 +52,7 @@ class DssRecommendationService
                 'ages' => [],
                 'severityTotal' => 0,
                 'criticalCount' => 0,
+                'overdueCount' => 0,
             ];
             $groups[$key]['ages'][] = max(
                 0,
@@ -59,6 +62,9 @@ class DssRecommendationService
             $groups[$key]['severityTotal'] += $severityWeight;
             if ($severityWeight >= 5) {
                 $groups[$key]['criticalCount']++;
+            }
+            if ($this->insights->isOverdue('Submitted', $report->date_submitted, $this->insights->priority($severityWeight))) {
+                $groups[$key]['overdueCount']++;
             }
         }
 
@@ -83,7 +89,10 @@ class DssRecommendationService
                     'averageAgeDays' => round($ageScore, 2),
                     'severity' => $severityScore,
                 ],
-                'recommendedTeam' => $group['recommendedTeam'],
+                'recommendedTeam' => ($team = $this->insights->recommendTeam($group['category'], $group['recommendedTeam']))['team'],
+                'teamReason' => $team['reason'],
+                'teamSource' => $team['source'],
+                'overdueCount' => $group['overdueCount'],
                 'recommendedAction' => config('dss.action_by_category')[$group['category']]
                     ?? 'Review the reports and identify the appropriate response.',
             ];
@@ -92,6 +101,7 @@ class DssRecommendationService
         return [
             'recommendations' => $recommendations->all(),
             'sourceReportCount' => $reports->count(),
+            'overdueTotal' => $this->insights->resolutionStats()['overdueTotal'],
         ];
     }
 }

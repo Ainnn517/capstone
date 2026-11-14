@@ -4,6 +4,8 @@ namespace App\Services\Triage;
 
 use App\Models\Category;
 use App\Models\IssueReport;
+use App\Models\Team;
+use App\Services\InsightService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -50,7 +52,13 @@ class TriageService
         $candidates = $this->duplicateCandidates($report);
         $cacheKey = 'triage:report:'.$report->report_id.':'.hash('sha256', $report->description.'|'.$candidates->pluck('report_id')->implode(','));
 
-        return Cache::remember($cacheKey, now()->addMinutes((int) config('triage.cache_minutes')), function () use ($report, $categories, $candidates): array {
+        $configuredTeam = $report->category?->recommended_team_id
+            ? Team::query()->whereKey($report->category->recommended_team_id)->value('name')
+            : null;
+        // Computed fresh each time: it learns from resolved reports, not from this description.
+        $team = app(InsightService::class)->recommendTeam((string) $report->category?->name, $configuredTeam);
+
+        return ['team' => $team] + Cache::remember($cacheKey, now()->addMinutes((int) config('triage.cache_minutes')), function () use ($report, $categories, $candidates): array {
             $ai = $this->model->classify(
                 $report->description,
                 $categories,

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\InsightService;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -37,7 +38,7 @@ abstract class ApiController extends Controller
     // Turn a category severity into a priority label.
     protected function priorityForWeight(int $severityWeight): string
     {
-        return $severityWeight >= 5 ? 'Critical' : ($severityWeight >= 3 ? 'High' : 'Normal');
+        return app(InsightService::class)->priority($severityWeight);
     }
 
     // Return a consistent API error response.

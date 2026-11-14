@@ -25,7 +25,7 @@ The schema is managed with Laravel migrations (`database/migrations`); `database
 - Session-based authentication, role checks, CSRF protection, login rate limiting, and admin approval for resident accounts.
 - Resident report submission and status tracking, with ownership-checked attachments and notifications.
 - Admin report processing, team assignment, archive/restore workflows, and paginated lists.
-- Backend DSS scoring with visible score breakdowns, category team suggestions, and saved snapshot history.
+- Backend DSS scoring with visible score breakdowns, team suggestions learned from past resolution times, overdue detection against per-priority targets, and saved snapshot history.
 - Authorization, report validation, notification, DSS, and account workflow tests.
 
 The DSS is a configurable heuristic, not a prediction model. Its exact formula, configuration, and limitations are in [`docs/DSS-METHODOLOGY.md`](./docs/DSS-METHODOLOGY.md).

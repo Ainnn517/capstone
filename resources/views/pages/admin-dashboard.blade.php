@@ -290,6 +290,23 @@
       </div>
     </div>
 
+    <!-- Resolution times learned from resolved reports -->
+    <div class="card p-4 mt-4">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h4 class="section-title mb-1">Resolution Times</h4>
+          <p class="small text-secondary mb-0">Average time from report to resolution, against the target for each category's priority.</p>
+        </div>
+        <span id="resolutionOverdue" class="badge-soft soft-green">None overdue</span>
+      </div>
+      <div class="table-responsive mt-3">
+        <table class="table align-middle" aria-label="Resolution times by category">
+          <thead><tr><th>Category</th><th>Resolved</th><th>Average time</th><th>Target</th><th>Open &amp; overdue</th><th>Status</th></tr></thead>
+          <tbody id="resolutionBody"></tbody>
+        </table>
+      </div>
+    </div>
+
       </section>
 
       <section id="residentsView" class="admin-view" hidden>

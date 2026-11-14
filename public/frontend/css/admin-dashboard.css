@@ -1028,3 +1028,8 @@ td .badge-soft { white-space: nowrap; }
 .evaluation-misses { margin-top: 1rem; }
 .evaluation-misses summary { cursor: pointer; font-weight: 700; color: #a7e7c2; }
 .evaluation-misses ul { margin: 0.5rem 0 0; padding-left: 1.1rem; display: grid; gap: 0.5rem; }
+
+/* Overdue reports and learned-team reasons. */
+.overdue-badge { margin-top: 0.25rem; display: inline-block; }
+.dss-reason { display: block; font-size: 0.85em; opacity: 0.85; font-style: italic; }
+.dss-overdue { color: #ffb4a8; }
