@@ -860,7 +860,11 @@ class ReportAuthorizationTest extends TestCase
             ])
             ->assertMethodNotAllowed();
 
-        $this->getJson('/api/reports/'.$report->report_id)->assertNotFound();
+        // Only PUT (resident edit) exists at this address: a GET must not return the report.
+        $this->getJson('/api/reports/'.$report->report_id)
+            ->assertMethodNotAllowed()
+            ->assertJsonMissingPath('reports')
+            ->assertJsonMissingPath('description');
         $this->assertSame('Submitted', $report->fresh()->status);
     }
 

@@ -8,6 +8,8 @@ const API_ENDPOINTS = {
   markNotificationRead: '/api/notifications/{id}/read',
   getReportHistory: '/api/reports/{id}/history',
   createReport: '/api/reports',
+  updateReport: '/api/reports/{id}',
+  withdrawReport: '/api/reports/{id}/withdraw',
   suggestCategory: '/api/triage/category',
   session: '/api/session',
   logout: '/api/logout'
@@ -274,7 +276,9 @@ function initResidentPortalPage() {
 
     const workflowHTML = item.stage === 'Rejected'
       ? '<span class="badge-soft soft-red">Report Rejected</span>'
-      : `<div class="workflow">${STAGES.map((stageName, index) => {
+      : item.stage === 'Withdrawn'
+        ? '<span class="badge-soft">Withdrawn by you</span>'
+        : `<div class="workflow">${STAGES.map((stageName, index) => {
       const isDone = index < currentStageIndex;
       const isActive = index === currentStageIndex;
       return `
@@ -306,7 +310,11 @@ function initResidentPortalPage() {
         <div class="issue-status-note">
           <strong>Latest Status:</strong> ${escapeHTML(item.updatedMessage || 'Report received and queued for administrative validation.')}
         </div>
-        <button class="btn btn-sm btn-outline-secondary mt-2" type="button" data-report-history="${escapeHTML(item.id)}">Status history</button>
+        <div class="issue-actions mt-2">
+          <button class="btn btn-sm btn-outline-secondary" type="button" data-report-history="${escapeHTML(item.id)}">Status history</button>
+          ${item.stage === 'Submitted' ? `<button class="btn btn-sm btn-outline-secondary" type="button" data-report-edit="${escapeHTML(item.id)}">Edit</button>` : ''}
+          ${['Submitted', 'Validated'].includes(item.stage) ? `<button class="btn btn-sm btn-outline-danger" type="button" data-report-withdraw="${escapeHTML(item.id)}">Withdraw</button>` : ''}
+        </div>
         <ol class="report-history mt-2" data-history-for="${escapeHTML(item.id)}" hidden></ol>
       </article>
     `;
@@ -347,7 +355,45 @@ function initResidentPortalPage() {
     }
   });
 
+  // Edit (before review) and withdraw (before dispatch) a resident's own report.
+  const editDialog = document.getElementById('editReportDialog');
+  let editingReportId = null;
+
   document.getElementById('issuesList').addEventListener('click', async event => {
+    const editButton = event.target.closest('[data-report-edit]');
+    if (editButton) {
+      const report = currentReports.find(item => item.id === editButton.dataset.reportEdit);
+      if (!report) return;
+      editingReportId = report.id;
+      const categorySelect = document.getElementById('editReportCategory');
+      categorySelect.innerHTML = [...document.getElementById('category').options]
+        .filter(option => option.value)
+        .map(option => `<option${option.value === report.category ? ' selected' : ''}>${escapeHTML(option.value)}</option>`)
+        .join('');
+      document.getElementById('editReportDescription').value = report.description;
+      document.getElementById('editReportLandmark').value = report.landmark || '';
+      document.getElementById('editReportMessage').textContent = '';
+      editDialog.showModal();
+      return;
+    }
+
+    const withdrawButton = event.target.closest('[data-report-withdraw]');
+    if (withdrawButton) {
+      const reason = await window.promptAction(
+        'Withdraw this report? The barangay will stop working on it. You can tell them why (optional).',
+        { required: false, maxLength: 200, placeholder: 'For example: the problem was fixed', confirmLabel: 'Withdraw report' }
+      );
+      if (reason === null) return;
+      try {
+        await apiRequest('withdrawReport', { id: withdrawButton.dataset.reportWithdraw, reason });
+        window.showToast('Your report has been withdrawn.', 'success');
+        await render();
+      } catch (error) {
+        window.showToast(error.message, 'error');
+      }
+      return;
+    }
+
     const button = event.target.closest('[data-report-history]');
     if (!button) return;
     const historyList = document.querySelector(`[data-history-for="${CSS.escape(button.dataset.reportHistory)}"]`);
@@ -643,6 +689,30 @@ function initResidentPortalPage() {
   document.addEventListener('click', event => {
     const link = event.target.closest('[data-go-view]');
     if (link) showView(link.dataset.goView);
+  });
+
+  document.getElementById('editReportCancel').addEventListener('click', () => editDialog.close());
+  document.getElementById('editReportForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const message = document.getElementById('editReportMessage');
+    const description = document.getElementById('editReportDescription').value.trim();
+    if (!description) {
+      message.textContent = 'Please describe the issue.';
+      return;
+    }
+    try {
+      await apiRequest('updateReport', {
+        id: editingReportId,
+        category: document.getElementById('editReportCategory').value,
+        description,
+        location: document.getElementById('editReportLandmark').value.trim()
+      }, 'PUT');
+      editDialog.close();
+      window.showToast('Your report has been updated.', 'success');
+      await render();
+    } catch (error) {
+      message.textContent = error.message;
+    }
   });
 
   // Change which notification group is shown.

@@ -28,7 +28,7 @@ use Throwable;
 
 class ReportController extends ApiController
 {
-    private const STATUSES = ['Submitted', 'Validated', 'Dispatched', 'Resolved', 'Rejected'];
+    private const STATUSES = IssueReport::STATUSES;
 
     public function __construct(private readonly UploadedImageSanitizer $imageSanitizer) {}
 
@@ -55,9 +55,9 @@ class ReportController extends ApiController
             $reportsQuery->where('user_id', $user->user_id);
             $view = $request->query('view', 'all');
             if ($view === 'current') {
-                $reportsQuery->whereNotIn('status', ['Resolved', 'Rejected']);
+                $reportsQuery->whereNotIn('status', IssueReport::CLOSED_STATUSES);
             } elseif ($view === 'past') {
-                $reportsQuery->whereIn('status', ['Resolved', 'Rejected']);
+                $reportsQuery->whereIn('status', IssueReport::CLOSED_STATUSES);
             } elseif ($view !== 'all') {
                 return $this->error('Select a valid report view.', 422);
             }
@@ -160,7 +160,7 @@ class ReportController extends ApiController
             ->join('CATEGORY as category', 'category.category_id', '=', 'report.category_id')
             ->join('LOCATION as location', 'location.location_id', '=', 'report.location_id')
             ->whereNull('report.archived_at')
-            ->whereNotIn('report.status', ['Resolved', 'Rejected'])
+            ->whereNotIn('report.status', IssueReport::CLOSED_STATUSES)
             ->groupBy('location.name', 'location.area_name', 'category.name')
             ->selectRaw(
                 "CONCAT(location.name, ', ', location.area_name) as location, category.name as category, COUNT(*) as report_count",
@@ -177,7 +177,7 @@ class ReportController extends ApiController
         $openByPriority = DB::table('ISSUE_REPORT as report')
             ->join('CATEGORY as category', 'category.category_id', '=', 'report.category_id')
             ->whereNull('report.archived_at')
-            ->whereNotIn('report.status', ['Resolved', 'Rejected'])
+            ->whereNotIn('report.status', IssueReport::CLOSED_STATUSES)
             ->selectRaw('SUM(category.severity_weight >= 5) as critical')
             ->selectRaw('SUM(category.severity_weight BETWEEN 3 AND 4) as high')
             ->selectRaw('SUM(category.severity_weight <= 2) as normal')
@@ -360,6 +360,7 @@ class ReportController extends ApiController
                 'category' => $report->category->name,
                 'purok' => $location,
                 'description' => $report->description,
+                'landmark' => $report->landmark,
                 'location' => $landmark,
                 'latitude' => $report->latitude,
                 'longitude' => $report->longitude,
@@ -536,6 +537,98 @@ class ReportController extends ApiController
         ], 201);
     }
 
+    // Resident: change a report that nobody has reviewed yet (status Submitted).
+    public function residentUpdate(Request $request, int $id): JsonResponse
+    {
+        $user = $this->currentUser();
+        $validator = Validator::make($request->all(), [
+            'category' => ['required', 'string', 'max:100'],
+            'description' => ['required', 'string', 'max:500'],
+            'location' => ['nullable', 'string', 'max:150'],
+        ]);
+        if ($validator->fails()) {
+            return $this->error($validator->errors()->first(), 422);
+        }
+        $data = $validator->validated();
+        $description = trim($data['description']);
+        if ($description === '') {
+            return $this->error('The incident description must be between 1 and 500 characters.', 422);
+        }
+        $category = Category::query()->where('name', trim($data['category']))->first();
+        if (! $category) {
+            return $this->error('Select a valid issue category.', 422);
+        }
+
+        return DB::transaction(function () use ($user, $id, $category, $description, $data): JsonResponse {
+            $report = IssueReport::query()
+                ->where('report_id', $id)
+                ->where('user_id', $user->user_id)
+                ->whereNull('archived_at')
+                ->lockForUpdate()
+                ->first();
+            if (! $report) {
+                return $this->error('Report not found.', 404);
+            }
+            if ($report->status !== 'Submitted') {
+                return $this->error('This report is already being handled and can no longer be edited.', 409);
+            }
+
+            $report->update([
+                'category_id' => $category->category_id,
+                'description' => $description,
+                'landmark' => trim((string) ($data['location'] ?? '')) ?: null,
+            ]);
+            StatusLog::create([
+                'report_id' => $report->report_id,
+                'changed_by' => $user->user_id,
+                'old_status' => 'Submitted',
+                'new_status' => 'Submitted',
+                'remarks' => 'Report edited by the resident.',
+            ]);
+
+            return response()->json(['success' => true]);
+        });
+    }
+
+    // Resident: cancel a report before a team has been dispatched.
+    public function withdraw(Request $request, int $id): JsonResponse
+    {
+        $user = $this->currentUser();
+        $reason = trim((string) $request->input('reason', ''));
+        if (mb_strlen($reason) > 200) {
+            return $this->error('Keep the reason under 200 characters.', 422);
+        }
+
+        return DB::transaction(function () use ($user, $id, $reason): JsonResponse {
+            $report = IssueReport::query()
+                ->where('report_id', $id)
+                ->where('user_id', $user->user_id)
+                ->whereNull('archived_at')
+                ->lockForUpdate()
+                ->first();
+            if (! $report) {
+                return $this->error('Report not found.', 404);
+            }
+            if (! in_array($report->status, ['Submitted', 'Validated'], true)) {
+                return $this->error($report->status === 'Dispatched'
+                    ? 'A team has already been sent, so this report can no longer be withdrawn. Contact the barangay office if it is no longer needed.'
+                    : 'This report is already closed.', 409);
+            }
+
+            $oldStatus = $report->status;
+            $report->update(['status' => 'Withdrawn', 'date_resolved' => null]);
+            StatusLog::create([
+                'report_id' => $report->report_id,
+                'changed_by' => $user->user_id,
+                'old_status' => $oldStatus,
+                'new_status' => 'Withdrawn',
+                'remarks' => $reason !== '' ? "Withdrawn by the resident: {$reason}" : 'Withdrawn by the resident.',
+            ]);
+
+            return response()->json(['success' => true]);
+        });
+    }
+
     // Update a report's status, assignment, history, and notification.
     public function update(Request $request): JsonResponse
     {
@@ -571,7 +664,7 @@ class ReportController extends ApiController
             if (! $report) {
                 return $this->error('Report not found.', 404);
             }
-            if (in_array($report->status, ['Resolved', 'Rejected'], true)) {
+            if (in_array($report->status, IssueReport::CLOSED_STATUSES, true)) {
                 return $this->error("{$report->status} incidents are read-only and cannot be changed.", 409);
             }
 
@@ -581,6 +674,7 @@ class ReportController extends ApiController
                 'Validated' => ['Dispatched', 'Rejected'],
                 'Dispatched' => ['Resolved', 'Rejected'],
                 'Rejected' => [],
+                'Withdrawn' => [],
             ];
             if ($data['status'] !== $oldStatus
                 && ! in_array($data['status'], $allowedTransitions[$oldStatus] ?? [], true)) {

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\IssueReport;
 use App\Models\Notification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,7 +19,7 @@ class NotificationController extends ApiController
         if (! in_array($view, ['current', 'past', 'all'], true)) {
             return $this->error('Select a valid notification view.', 422);
         }
-        $closed = ['Resolved', 'Rejected'];
+        $closed = IssueReport::CLOSED_STATUSES;
 
         $notifications = Notification::query()
             ->with(['report:report_id,tracking_code'])

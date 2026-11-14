@@ -190,6 +190,10 @@ WHERE tracking_code IS NULL;
 
 ALTER TABLE ISSUE_REPORT MODIFY tracking_code VARCHAR(23) NOT NULL;
 ALTER TABLE ISSUE_REPORT MODIFY description VARCHAR(500) NOT NULL;
+-- 'Withdrawn': a resident cancelled the report before a team was sent.
+ALTER TABLE ISSUE_REPORT MODIFY status ENUM('Submitted', 'Validated', 'Dispatched', 'Resolved', 'Rejected', 'Withdrawn') NOT NULL DEFAULT 'Submitted';
+ALTER TABLE STATUS_LOG MODIFY old_status ENUM('Submitted', 'Validated', 'Dispatched', 'Resolved', 'Rejected', 'Withdrawn') NULL,
+  MODIFY new_status ENUM('Submitted', 'Validated', 'Dispatched', 'Resolved', 'Rejected', 'Withdrawn') NOT NULL;
 -- Match the app's 150-character landmark validation (older databases used VARCHAR(100)).
 ALTER TABLE ISSUE_REPORT MODIFY landmark VARCHAR(150) NULL;
 

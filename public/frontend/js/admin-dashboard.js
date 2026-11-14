@@ -244,7 +244,7 @@ function initAdminDashboardPage() {
               : readOnly
                 ? '<span class="badge-soft soft-green">Read-only</span>'
                 : `<div class="report-actions">
-                    ${item.stage === 'Rejected' ? '' : `<button class="btn btn-sm btn-outline-primary" data-report-id="${escapeHTML(item.id)}">Manage</button>`}
+                    ${['Rejected', 'Withdrawn'].includes(item.stage) ? '' : `<button class="btn btn-sm btn-outline-primary" data-report-id="${escapeHTML(item.id)}">Manage</button>`}
                     <button class="btn btn-sm btn-outline-secondary" data-archive-report-id="${escapeHTML(item.id)}">Archive</button>
                   </div>`}
           </td>
@@ -754,7 +754,7 @@ function initAdminDashboardPage() {
           <article class="resident-complaint">
             <div class="complaint-heading">
               <strong>${escapeHTML(report.category)}</strong>
-              <span class="badge-soft ${report.stage === 'Resolved' ? 'soft-green' : report.stage === 'Rejected' ? 'soft-red' : 'soft-yellow'}">${escapeHTML(report.stage)}</span>
+              <span class="badge-soft ${report.stage === 'Resolved' ? 'soft-green' : report.stage === 'Rejected' ? 'soft-red' : report.stage === 'Withdrawn' ? '' : 'soft-yellow'}">${escapeHTML(report.stage)}</span>
             </div>
             <div class="small text-secondary">${escapeHTML(report.tracking)} · ${escapeHTML(report.purok)} · ${new Date(report.created).toLocaleString()}</div>
             <p>${escapeHTML(report.description)}</p>
@@ -809,7 +809,8 @@ function initAdminDashboardPage() {
       Submitted: ['Validated'],
       Validated: ['Dispatched'],
       Dispatched: ['Resolved'],
-      Rejected: []
+      Rejected: [],
+      Withdrawn: []
     }[issue.stage] || [];
     const editStatus = document.getElementById('editStatus');
     editStatus.innerHTML = nextStatuses.map(status => `<option>${status}</option>`).join('');

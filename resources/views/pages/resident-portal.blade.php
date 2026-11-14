@@ -188,6 +188,23 @@
       @include('partials.account-view', ['viewClass' => 'resident-view'])
     </div>
   </main>
+  <dialog id="editReportDialog" class="edit-report-dialog" aria-labelledby="editReportTitle">
+    <form id="editReportForm" method="dialog">
+      <h2 id="editReportTitle">Edit report</h2>
+      <p class="small edit-report-note">You can edit a report until the barangay starts reviewing it.</p>
+      <label class="form-label" for="editReportCategory">Issue category</label>
+      <select id="editReportCategory" class="form-select" required></select>
+      <label class="form-label" for="editReportDescription">Description</label>
+      <textarea id="editReportDescription" class="form-control" rows="4" maxlength="500" required></textarea>
+      <label class="form-label" for="editReportLandmark">Landmark (optional)</label>
+      <input id="editReportLandmark" class="form-control" maxlength="150">
+      <p id="editReportMessage" class="edit-report-message" role="alert"></p>
+      <div class="edit-report-actions">
+        <button class="btn btn-light" type="button" id="editReportCancel">Cancel</button>
+        <button class="btn btn-primary" type="submit">Save changes</button>
+      </div>
+    </form>
+  </dialog>
   <script src="{{ \App\Support\Asset::url('/frontend/js/notifications.js') }}" nonce="{{ app('csp.nonce') }}"></script>
   <script src="{{ \App\Support\Asset::url('/frontend/js/session-handler.js') }}" nonce="{{ app('csp.nonce') }}"></script>
   <script src="{{ \App\Support\Asset::url('/frontend/js/password-toggle.js') }}" nonce="{{ app('csp.nonce') }}"></script>

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\IssueReport;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -18,7 +19,7 @@ class DssRecommendationService
             ->join('CATEGORY as category', 'category.category_id', '=', 'report.category_id')
             ->join('LOCATION as location', 'location.location_id', '=', 'report.location_id')
             ->whereNull('report.archived_at')
-            ->whereNotIn('report.status', ['Resolved', 'Rejected'])
+            ->whereNotIn('report.status', IssueReport::CLOSED_STATUSES)
             ->select([
                 'report.date_submitted',
                 'category.name as category',

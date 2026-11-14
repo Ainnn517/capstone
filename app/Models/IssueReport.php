@@ -11,6 +11,11 @@ class IssueReport extends Model
 {
     protected $table = 'ISSUE_REPORT';
 
+    public const STATUSES = ['Submitted', 'Validated', 'Dispatched', 'Resolved', 'Rejected', 'Withdrawn'];
+
+    // Finished reports: read-only for administrators and "past" for residents.
+    public const CLOSED_STATUSES = ['Resolved', 'Rejected', 'Withdrawn'];
+
     protected $primaryKey = 'report_id';
 
     public $timestamps = false;

@@ -98,7 +98,7 @@ class TriageService
             ->where('location_id', $report->location_id)
             ->where('report_id', '<>', $report->report_id)
             ->whereNull('archived_at')
-            ->whereNotIn('status', ['Resolved', 'Rejected'])
+            ->whereNotIn('status', IssueReport::CLOSED_STATUSES)
             ->where('date_submitted', '>=', now()->subDays((int) config('triage.duplicate_window_days')))
             ->orderByDesc('date_submitted')
             ->limit((int) config('triage.max_duplicate_candidates'))

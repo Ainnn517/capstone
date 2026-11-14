@@ -142,6 +142,7 @@
                 <option>Validated</option>
                 <option>Dispatched</option>
                 <option>Rejected</option>
+                <option>Withdrawn</option>
               </select>
               <select id="filterPriority" class="form-select form-select-sm" aria-label="Filter by priority">
                 <option>All Priority</option>
