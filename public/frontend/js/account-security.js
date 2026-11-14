@@ -23,7 +23,7 @@ function showPasswordMessage(text, kind = '') {
 }
 
 async function postJson(url, body) {
-  const response = await fetch(url, {
+  const response = await window.csrfFetch(url, {
     method: 'POST',
     credentials: 'same-origin',
     headers: {

@@ -24,6 +24,7 @@
             <a href="/frontend/pages/index.html">Return to sign in</a>
         </section>
     </main>
+    <script src="{{ \App\Support\Asset::url('/frontend/js/csrf.js') }}" nonce="{{ app('csp.nonce') }}"></script>
     <script src="{{ \App\Support\Asset::url('/frontend/js/password-toggle.js') }}" nonce="{{ app('csp.nonce') }}"></script>
     <script src="{{ \App\Support\Asset::url('/frontend/js/password-reset.js') }}" nonce="{{ app('csp.nonce') }}"></script>
 </body>

@@ -20,7 +20,7 @@ const API_ENDPOINTS = {
 
 // Send an authentication request and return its response.
 async function apiRequest(action, payload) {
-    const response = await fetch(API_ENDPOINTS[action], {
+    const response = await window.csrfFetch(API_ENDPOINTS[action], {
         method: "POST",
         credentials: "same-origin",
         headers: {
@@ -170,7 +170,7 @@ forgotPasswordForm.addEventListener("submit", async event => {
     const message = document.getElementById("forgotPasswordMessage");
     message.textContent = "Sending…";
     try {
-        const response = await fetch("/api/password/forgot", {
+        const response = await window.csrfFetch("/api/password/forgot", {
             method: "POST",
             credentials: "same-origin",
             headers: {

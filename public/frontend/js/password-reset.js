@@ -6,7 +6,7 @@ resetForm.addEventListener('submit', async event => {
   resetMessage.textContent = 'Saving your new password…';
 
   try {
-    const response = await fetch('/api/password/reset', {
+    const response = await window.csrfFetch('/api/password/reset', {
       method: 'POST',
       credentials: 'same-origin',
       headers: {

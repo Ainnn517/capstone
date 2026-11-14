@@ -78,7 +78,7 @@ async function apiRequest(action, payload = {}, method = 'POST') {
     const query = new URLSearchParams(payload);
     endpoint += `?${query.toString()}`;
   }
-  const response = await fetch(endpoint, options);
+  const response = await window.csrfFetch(endpoint, options);
   window.handleExpiredSession(response);
   if (!(response.headers.get('content-type') || '').includes('application/json')) {
     throw new Error('The server could not complete that request. Please try again in a moment.');

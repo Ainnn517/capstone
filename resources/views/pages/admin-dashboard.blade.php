@@ -457,6 +457,7 @@
     </div>
   </div>
 
+  <script src="{{ \App\Support\Asset::url('/frontend/js/csrf.js') }}" nonce="{{ app('csp.nonce') }}"></script>
   <script src="{{ \App\Support\Asset::url('/frontend/js/notifications.js') }}" nonce="{{ app('csp.nonce') }}"></script>
   <script src="{{ \App\Support\Asset::url('/frontend/js/session-handler.js') }}" nonce="{{ app('csp.nonce') }}"></script>
   <script src="{{ \App\Support\Asset::url('/frontend/js/password-toggle.js') }}" nonce="{{ app('csp.nonce') }}"></script>

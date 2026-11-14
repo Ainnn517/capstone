@@ -143,6 +143,7 @@
 
     </main>
 
+    <script src="{{ \App\Support\Asset::url('/frontend/js/csrf.js') }}" nonce="{{ app('csp.nonce') }}"></script>
     <script src="{{ \App\Support\Asset::url('/frontend/js/notifications.js') }}" nonce="{{ app('csp.nonce') }}"></script>
     <script src="{{ \App\Support\Asset::url('/frontend/js/password-toggle.js') }}" nonce="{{ app('csp.nonce') }}"></script>
     <script src="{{ \App\Support\Asset::url('/frontend/js/index.js') }}" nonce="{{ app('csp.nonce') }}"></script>

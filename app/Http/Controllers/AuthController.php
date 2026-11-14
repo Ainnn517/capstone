@@ -298,6 +298,13 @@ class AuthController extends ApiController
     }
 
     // Return the current signed-in user's details.
+    // A fresh CSRF token for the current session, used by pages whose token went stale.
+    public function csrfToken(Request $request): JsonResponse
+    {
+        return response()->json(['token' => $request->session()->token()])
+            ->header('Cache-Control', 'no-store, private');
+    }
+
     public function session(): JsonResponse
     {
         $user = $this->currentUser();
