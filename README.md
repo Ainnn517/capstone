@@ -5,19 +5,20 @@ A Laravel 12, PHP 8.2+, and MySQL application for residents to submit and track 
 ## Local setup
 
 1. Install PHP 8.2+ with `pdo_mysql`, `fileinfo`, `mbstring`, and XML/DOM, plus Composer and MySQL.
-2. Create a MySQL database (`CREATE DATABASE barangay_reporting CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`) and import [`database/mysql_schema.sql`](./database/mysql_schema.sql) into it. For an existing installation, back up the database first, then run [`database/upgrade_existing_database.sql`](./database/upgrade_existing_database.sql) against it.
+2. Create an empty MySQL database (`CREATE DATABASE barangay_reporting CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`). After configuring `.env` (step 3), build the tables with `php artisan migrate`. Existing databases can run `php artisan migrate` too (back up first); very old ones need [`database/upgrade_existing_database.sql`](./database/upgrade_existing_database.sql) first. See [DEPLOYMENT.md](./DEPLOYMENT.md).
 3. Copy `.env.example` to `.env` and set your private database credentials. Configure `GOOGLE_MAPS_API_KEY` if you want to enable map selection.
 4. Install dependencies, generate the app key, and seed the reference data (plus pilot accounts outside production; use `php artisan admin:create` for a production administrator):
 
    ```sh
    composer install
    php artisan key:generate
+   php artisan migrate
    php artisan db:seed
    ```
 
 5. Start the local application with `php artisan serve`.
 
-The schema is managed with SQL rather than automatic Laravel migrations. Seeding after schema setup adds the configured categories, teams, and active approved locations; for existing data, it also reactivates configured locations while keeping unrecognized legacy locations inactive.
+The schema is managed with Laravel migrations (`database/migrations`); `database/mysql_schema.sql` is kept identical for manual imports. Seeding after schema setup adds the configured categories, teams, and active approved locations; for existing data, it also reactivates configured locations while keeping unrecognized legacy locations inactive.
 
 ## Main capabilities
 

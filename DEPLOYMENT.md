@@ -4,7 +4,10 @@
 
 The application requires PHP 8.2+ with `pdo_mysql`, `fileinfo`, `mbstring`, and XML/DOM, Composer, and MySQL. The browser screens and Laravel API are served by Laravel; point the web server document root to `public/`.
 
-1. For a new installation, create a MySQL database (`CREATE DATABASE your_database CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`) and import `database/mysql_schema.sql` into it. For an existing installation, back up the database first, then run `mysql -u user -p your_database < database/upgrade_existing_database.sql`. Neither file selects a database itself, so they work with any database name.
+1. Create an empty MySQL database (`CREATE DATABASE your_database CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`), set its details in `.env` (step 2), then build the tables with `php artisan migrate`. The migrations in `database/migrations` are the source of truth for the schema; `database/mysql_schema.sql` describes the same schema for manual imports (for example through phpMyAdmin), and a test keeps the two identical.
+   - **Existing database already on the current schema:** back it up, then run `php artisan migrate`. It recognises the existing tables and only records them as done.
+   - **Older database from before these changes:** back it up, run `mysql -u user -p your_database < database/upgrade_existing_database.sql`, then `php artisan migrate`.
+   - **Changing the schema later:** add a new migration (`php artisan make:migration ...`) and update `database/mysql_schema.sql` to match; the test suite fails until both agree.
 2. Copy `.env.example` to `.env`. Configure `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, and `DB_PASSWORD`. Set a Google Maps JavaScript API key if the map picker is needed.
 3. Install dependencies, generate an application key, and seed the reference data (categories, teams, locations). Outside production the seeder also creates the pilot accounts from `.env`; it never changes an account that already exists:
 
@@ -18,7 +21,7 @@ The application requires PHP 8.2+ with `pdo_mysql`, `fileinfo`, `mbstring`, and 
 
 Start the hosted system with a clean database rather than copying development data:
 
-1. Create the database on the host and import `database/mysql_schema.sql`.
+1. Create the database on the host and run `php artisan migrate --force`.
 2. Run `php artisan db:seed` to add the categories, teams, recommended teams, and the street catalog. In production the seeder creates **no accounts**.
 3. Create the first administrator interactively (the password is never stored in `.env`):
 
@@ -30,7 +33,7 @@ Start the hosted system with a clean database rather than copying development da
 
 4. Start locally with `php artisan serve`.
 
-The database schema is managed manually. After schema setup or upgrade, run `php artisan db:seed` to add or refresh default categories, teams, recommended team assignments, and approved locations. Existing location rows not present in the configuration remain inactive. Verify the resulting schema before deploying the matching code. The old security-hardening SQL migration is retained under `database/legacy/` and is superseded by `database/upgrade_existing_database.sql`.
+After schema setup or upgrade, run `php artisan db:seed` to add or refresh default categories, teams, recommended team assignments, and approved locations. Existing location rows not present in the configuration remain inactive. Verify the resulting schema before deploying the matching code. The old security-hardening SQL migration is retained under `database/legacy/` and is superseded by `database/upgrade_existing_database.sql`.
 
 ## Mail and maps
 
