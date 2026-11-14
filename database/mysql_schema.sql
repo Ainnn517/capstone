@@ -222,29 +222,6 @@ CREATE TABLE IF NOT EXISTS ADMIN_AUDIT_LOG (
     ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Evaluation set: an independent person's "correct category" for real reports, used to
--- measure how often residents, the keyword rules, and the AI pick the right category.
-CREATE TABLE IF NOT EXISTS EVALUATION_LABEL (
-  report_id INT UNSIGNED NOT NULL,
-  category_id INT UNSIGNED NOT NULL,
-  labelled_by INT UNSIGNED NULL,
-  labelled_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  ai_category_id INT UNSIGNED NULL,
-  ai_evaluated_at DATETIME NULL,
-  PRIMARY KEY (report_id),
-  KEY idx_eval_category (category_id),
-  KEY idx_eval_labelled_by (labelled_by),
-  KEY idx_eval_ai_category (ai_category_id),
-  CONSTRAINT fk_eval_report FOREIGN KEY (report_id) REFERENCES ISSUE_REPORT (report_id)
-    ON UPDATE CASCADE ON DELETE CASCADE,
-  CONSTRAINT fk_eval_category FOREIGN KEY (category_id) REFERENCES CATEGORY (category_id)
-    ON UPDATE CASCADE ON DELETE RESTRICT,
-  CONSTRAINT fk_eval_labelled_by FOREIGN KEY (labelled_by) REFERENCES USERS (user_id)
-    ON UPDATE CASCADE ON DELETE SET NULL,
-  CONSTRAINT fk_eval_ai_category FOREIGN KEY (ai_category_id) REFERENCES CATEGORY (category_id)
-    ON UPDATE CASCADE ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 -- ===== SEED DATA (safe to re-run; the Laravel seeder also maintains these rows) =====
 
 INSERT IGNORE INTO REGISTRATION_CAPACITY_LOCK (id) VALUES (1);

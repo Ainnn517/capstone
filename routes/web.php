@@ -3,7 +3,6 @@
 use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DssController;
-use App\Http\Controllers\EvaluationController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ReferenceDataController;
 use App\Http\Controllers\ReportController;
@@ -78,13 +77,6 @@ Route::middleware('api.auth')->group(function (): void {
     Route::get('/api/reports/{id}/triage', [TriageController::class, 'review'])
         ->whereNumber('id')
         ->middleware(['role:admin', 'throttle:60,1']);
-    Route::get('/api/evaluation/next', [EvaluationController::class, 'next'])->middleware('role:admin');
-    Route::post('/api/evaluation/labels', [EvaluationController::class, 'store'])->middleware('role:admin');
-    Route::delete('/api/evaluation/labels/{id}', [EvaluationController::class, 'destroy'])
-        ->whereNumber('id')
-        ->middleware('role:admin');
-    Route::get('/api/evaluation/summary', [EvaluationController::class, 'summary'])->middleware('role:admin');
-    Route::get('/api/evaluation/export', [EvaluationController::class, 'export'])->middleware('role:admin');
     Route::get('/api/residents', [ResidentController::class, 'index'])->middleware('role:admin');
     Route::post('/api/residents/{id}/approval', [ResidentController::class, 'updateApproval'])
         ->whereNumber('id')

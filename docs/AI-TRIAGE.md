@@ -42,20 +42,6 @@ The command reads `database/triage/evaluation-set.csv` (`description,expected_ca
 
 **Important:** the bundled 40 examples were written by the developer who also wrote the keywords, so the rules' score on them (39/40) is inflated and should not be reported as real accuracy. Before reporting results, replace or extend the set with real, anonymised resident reports labelled by someone other than the keyword author (100 or more if possible), then run both evaluations and report the two numbers side by side.
 
-## Collecting real evaluation data (admin Evaluation page)
-
-The bundled CSV is only a starter set. For results you can report, build the evaluation set from real reports:
-
-1. Sign in as an administrator and open **Settings → Evaluation**. Ideally the labeller is someone who did not write the keyword rules.
-2. Each report is shown **blind**: only its description (contact details masked), without the resident's chosen category or any system suggestion. Pick the category it really belongs to, or **Skip** unclear ones. Labels can be changed later; each change is recorded in the audit log.
-3. The **Results** card compares three things against the labels, per category and overall:
-   - **Residents' own choice**: how often residents pick the right category themselves (the baseline the suggestions should improve on);
-   - **Keyword rules**: the built-in English/Tagalog/Bisaya rules;
-   - **AI**: shown after running `php artisan triage:evaluate --from-db --ai` on the server (needs `ANTHROPIC_API_KEY`; asks before spending money; saves each AI answer so the page can show it).
-4. **Export CSV** downloads the set (no names, contact details masked) with every prediction, for the paper's tables. The file also works with `php artisan triage:evaluate --file=...`.
-
-Aim for **at least 100 labelled reports**, spread across categories, before quoting numbers. Report the three accuracies side by side, with the number of reports and labellers.
-
 ## Configuration
 
 | Variable | Default | Purpose |

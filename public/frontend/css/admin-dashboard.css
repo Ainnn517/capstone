@@ -999,38 +999,7 @@ td .badge-soft { white-space: nowrap; }
   .action-controls .col-6 { flex: 0 0 100%; max-width: 100%; }
 }
 
-/* Evaluation page. */
-.evaluation-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
-.evaluation-description {
-  margin: 0 0 1rem;
-  padding: 0.9rem 1rem;
-  border-left: 4px solid #8fd3b0;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, .08);
-  font-size: 1rem;
-  line-height: 1.5;
-}
-.evaluation-choices, .evaluation-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.evaluation-actions { margin-top: 0.75rem; }
-.evaluation-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.75rem; margin-bottom: 0.75rem; }
-.evaluation-stat {
-  display: grid;
-  gap: 0.15rem;
-  padding: 0.9rem 1rem;
-  border: 1px solid rgba(255, 255, 255, .18);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, .06);
-}
-.evaluation-stat-title { font-size: 0.85rem; opacity: 0.85; }
-.evaluation-stat strong { font-size: 1.6rem; }
-.evaluation-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-.evaluation-table th, .evaluation-table td { padding: 0.45rem 0.6rem; border-bottom: 1px solid rgba(255, 255, 255, .12); text-align: left; }
-.evaluation-misses { margin-top: 1rem; }
-.evaluation-misses summary { cursor: pointer; font-weight: 700; color: #a7e7c2; }
-.evaluation-misses ul { margin: 0.5rem 0 0; padding-left: 1.1rem; display: grid; gap: 0.5rem; }
-
 /* Overdue reports and learned-team reasons. */
 .overdue-badge { margin-top: 0.25rem; display: inline-block; }
 .dss-reason { display: block; font-size: 0.85em; opacity: 0.85; font-style: italic; }
 .dss-overdue { color: #ffb4a8; }
-#evaluationExport[hidden] { display: none !important; }
