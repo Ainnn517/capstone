@@ -3,6 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Models\Category;
+use App\Models\EvaluationLabel;
+use App\Services\Triage\EvaluationService;
 use App\Services\Triage\KeywordCategorizer;
 use App\Services\Triage\TriageModel;
 use Illuminate\Console\Command;
@@ -14,20 +16,34 @@ class EvaluateTriage extends Command
 {
     protected $signature = 'triage:evaluate
         {--file=database/triage/evaluation-set.csv : CSV with description,expected_category columns}
+        {--from-db : Use the reports labelled on the admin Evaluation page instead of the CSV file}
         {--ai : Also evaluate the AI model (sends each description to the AI service; costs money)}';
 
     protected $description = 'Measure category-suggestion accuracy for the keyword rules and, optionally, the AI';
 
     public function handle(KeywordCategorizer $keywords, TriageModel $model): int
     {
-        $path = base_path((string) $this->option('file'));
-        if (! is_file($path)) {
-            $this->error("Evaluation file not found: {$path}");
+        $fromDatabase = (bool) $this->option('from-db');
+        if ($fromDatabase) {
+            $rows = array_map(fn (array $row): array => [
+                'description' => $row['description'],
+                'expected' => $row['label'],
+                'report_id' => $row['report_id'],
+            ], app(EvaluationService::class)->rows());
+            if ($rows === []) {
+                $this->error('No labelled reports yet. Label some on the admin Evaluation page first.');
 
-            return self::FAILURE;
+                return self::FAILURE;
+            }
+        } else {
+            $path = base_path((string) $this->option('file'));
+            if (! is_file($path)) {
+                $this->error("Evaluation file not found: {$path}");
+
+                return self::FAILURE;
+            }
+            $rows = $this->readRows($path);
         }
-
-        $rows = $this->readRows($path);
         $categories = Category::query()->orderBy('name')->get(['name', 'description'])
             ->map(fn (Category $category): array => ['name' => $category->name, 'description' => $category->description])
             ->all();
@@ -59,15 +75,27 @@ class EvaluateTriage extends Command
             if (! $this->confirm(sprintf('This sends %d descriptions to the AI service and costs money. Continue?', count($rows)))) {
                 return self::SUCCESS;
             }
-            $this->report('AI ('.config('triage.model').')', $rows, fn (string $text): ?string => $model->classify($text, $categories, [])['category'] ?? null);
+            $categoryIds = Category::query()->pluck('category_id', 'name');
+            $this->report('AI ('.config('triage.model').')', $rows, function (string $text, array $row) use ($model, $categories, $fromDatabase, $categoryIds): ?string {
+                $predicted = $model->classify($text, $categories, [])['category'] ?? null;
+                if ($fromDatabase && isset($row['report_id'])) {
+                    // Saved so the admin Evaluation page can show the AI's accuracy.
+                    EvaluationLabel::query()->whereKey($row['report_id'])->update([
+                        'ai_category_id' => $predicted !== null ? ($categoryIds[$predicted] ?? null) : null,
+                        'ai_evaluated_at' => now(),
+                    ]);
+                }
+
+                return $predicted;
+            });
         }
 
         return self::SUCCESS;
     }
 
     /**
-     * @param  list<array{description: string, expected: string}>  $rows
-     * @param  callable(string): ?string  $predict
+     * @param  list<array<string, mixed>>  $rows
+     * @param  callable(string, array<string, mixed>): ?string  $predict
      */
     private function report(string $label, array $rows, callable $predict): void
     {
@@ -76,7 +104,7 @@ class EvaluateTriage extends Command
         $misses = [];
         $started = microtime(true);
         foreach ($rows as $row) {
-            $predicted = $predict($row['description']);
+            $predicted = $predict($row['description'], $row);
             if ($predicted === null) {
                 $failed++;
             }

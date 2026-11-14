@@ -58,6 +58,10 @@
         <i class="fi fi-rr-settings sidebar-icon" aria-hidden="true"></i>
         Reference Data
       </button>
+      <button class="sidebar-link" type="button" data-admin-view="evaluation">
+        <i class="fi fi-rr-clipboard-list sidebar-icon" aria-hidden="true"></i>
+        Evaluation
+      </button>
       <button class="sidebar-link" type="button" data-admin-view="account">
         <i class="fi fi-rr-user sidebar-icon" aria-hidden="true"></i>
         Account
@@ -350,6 +354,30 @@
             <div class="col-md-2"><button class="btn btn-primary w-100" type="submit">Add</button></div>
           </form>
           <div id="referenceLocations"></div>
+        </div>
+      </section>
+
+      <section id="evaluationView" class="admin-view" aria-labelledby="evaluationTitle" hidden>
+        <div class="mb-4">
+          <h1 id="evaluationTitle" class="section-title mb-1">Evaluation</h1>
+          <p class="text-secondary mb-0">Measure how often category suggestions are right, using real reports. Label each report yourself without seeing what the resident or the system chose. Ideally, ask someone who did not set up the keyword rules to do the labelling.</p>
+        </div>
+
+        <div class="card p-4 mb-4">
+          <div class="evaluation-head">
+            <h2 class="card-heading mb-0">Label reports</h2>
+            <span id="evaluationProgress" class="badge-soft soft-blue">0 labelled</span>
+          </div>
+          <div id="evaluationTask" aria-live="polite"></div>
+        </div>
+
+        <div class="card p-4">
+          <div class="evaluation-head">
+            <h2 class="card-heading mb-0">Results</h2>
+            <a id="evaluationExport" class="btn btn-sm btn-light" href="/api/evaluation/export">Export CSV</a>
+          </div>
+          <div id="evaluationResults"></div>
+          <p class="small text-secondary mt-3 mb-0">AI accuracy appears after running <code>php artisan triage:evaluate --from-db --ai</code> on the server (needs <code>ANTHROPIC_API_KEY</code>; it asks before spending money). The CSV has no names, and contact details in descriptions are masked.</p>
         </div>
       </section>
 

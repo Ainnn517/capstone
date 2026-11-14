@@ -15,6 +15,9 @@ const API_ENDPOINTS = {
   deleteReference: '/api/reference-data/{resource}/{id}',
   getReportHistory: '/api/reports/{id}/history',
   getReportTriage: '/api/reports/{id}/triage',
+  evaluationNext: '/api/evaluation/next',
+  evaluationLabel: '/api/evaluation/labels',
+  evaluationSummary: '/api/evaluation/summary',
   updateResidentApproval: '/api/residents/{id}/approval',
   deleteResident: '/api/residents/{id}',
   session: '/api/session',
@@ -840,6 +843,101 @@ function initAdminDashboardPage() {
     document.body.classList.add('modal-open');
   }
 
+  // ---- Evaluation: label real reports blind, then compare residents, rules, and AI ----
+  let evaluationSkip = [];
+  let evaluationReportId = null;
+
+  async function loadEvaluation() {
+    await Promise.all([loadEvaluationTask(), loadEvaluationResults()]);
+  }
+
+  async function loadEvaluationTask() {
+    const task = document.getElementById('evaluationTask');
+    try {
+      const result = await apiRequest('evaluationNext', evaluationSkip.length ? { skip: evaluationSkip.join(',') } : {}, 'GET');
+      document.getElementById('evaluationProgress').textContent = `${result.labelled} of ${result.total} reports labelled`;
+      if (!result.report) {
+        evaluationReportId = null;
+        task.innerHTML = evaluationSkip.length
+          ? '<p class="mb-0">No more reports to label. <button class="btn btn-sm btn-light" type="button" data-eval-reset-skip>Show skipped reports again</button></p>'
+          : '<p class="mb-0">Every report has been labelled. New reports will appear here as residents submit them.</p>';
+        return;
+      }
+      evaluationReportId = result.report.id;
+      const categories = (referenceData.categories || []).map(category => `
+        <button class="btn btn-sm btn-light" type="button" data-eval-category="${escapeHTML(category.category_id)}">${escapeHTML(category.name)}</button>`).join('');
+      task.innerHTML = `
+        <p class="small text-secondary mb-2">Which category does this report really belong to?</p>
+        <blockquote class="evaluation-description">${escapeHTML(result.report.description)}</blockquote>
+        <div class="evaluation-choices">${categories}</div>
+        <div class="evaluation-actions">
+          <button class="btn btn-sm btn-outline-secondary" type="button" data-eval-skip>Skip (unclear)</button>
+        </div>`;
+    } catch (error) {
+      task.textContent = error.message || 'The next report could not be loaded.';
+    }
+  }
+
+  async function loadEvaluationResults() {
+    const container = document.getElementById('evaluationResults');
+    try {
+      const result = await apiRequest('evaluationSummary', {}, 'GET');
+      if (result.labelled === 0) {
+        container.innerHTML = '<p class="text-secondary mb-0">No reports labelled yet. Results appear here after the first labels.</p>';
+        return;
+      }
+      const tile = (title, data, note) => `
+        <div class="evaluation-stat">
+          <span class="evaluation-stat-title">${title}</span>
+          <strong>${data ? `${data.percent}%` : '—'}</strong>
+          <span class="small text-secondary">${data ? `${data.correct} of ${data.total} correct` : note}</span>
+        </div>`;
+      const rows = result.perCategory.map(row => `
+        <tr><td>${escapeHTML(row.category)}</td><td>${row.labelled}</td><td>${row.resident}</td><td>${row.rules}</td></tr>`).join('');
+      const misses = result.misses.map(miss => `
+        <li><span class="small">${escapeHTML(miss.description)}</span>
+          <div class="small text-secondary">Correct: <strong>${escapeHTML(miss.label)}</strong> · rules said ${escapeHTML(miss.rules || '(nothing)')} · resident chose ${escapeHTML(miss.resident || '—')}</div></li>`).join('');
+      container.innerHTML = `
+        <div class="evaluation-stats">
+          ${tile('Residents\' own choice', result.accuracy.resident, '')}
+          ${tile('Keyword rules', result.accuracy.rules, '')}
+          ${tile('AI', result.accuracy.ai, 'Not run yet')}
+        </div>
+        <p class="small text-secondary">${result.labelled} labelled report${result.labelled === 1 ? '' : 's'} · ${result.labellers} labeller${result.labellers === 1 ? '' : 's'}${result.labelled < 100 ? ' · aim for at least 100 for results you can report' : ''}</p>
+        <div class="table-responsive">
+          <table class="evaluation-table">
+            <thead><tr><th>Correct category</th><th>Labelled</th><th>Residents right</th><th>Rules right</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        ${misses ? `<details class="evaluation-misses"><summary>Where the keyword rules were wrong (${result.misses.length})</summary><ul>${misses}</ul></details>` : ''}`;
+    } catch (error) {
+      container.textContent = error.message || 'Results could not be loaded.';
+    }
+  }
+
+  document.getElementById('evaluationTask').addEventListener('click', async event => {
+    const choice = event.target.closest('[data-eval-category]');
+    if (choice && evaluationReportId) {
+      try {
+        await apiRequest('evaluationLabel', { report_id: Number(evaluationReportId), category_id: Number(choice.dataset.evalCategory) });
+        await loadEvaluation();
+      } catch (error) {
+        window.showToast(error.message, 'error');
+      }
+      return;
+    }
+    if (event.target.closest('[data-eval-skip]') && evaluationReportId) {
+      evaluationSkip.push(Number(evaluationReportId));
+      await loadEvaluationTask();
+      return;
+    }
+    if (event.target.closest('[data-eval-reset-skip]')) {
+      evaluationSkip = [];
+      await loadEvaluationTask();
+    }
+  });
+
   // Show the triage assistant's category check and possible duplicates for a report.
   // Assistant "Next step": suggest the category's team and draft the message to the resident.
   // Works instantly from Reference Data and the selected action; nothing is saved until "Save".
@@ -1159,6 +1257,8 @@ function initAdminDashboardPage() {
         renderArchivedReports();
       } else if (selectedView === 'referenceData') {
         loadReferenceData();
+      } else if (selectedView === 'evaluation') {
+        loadEvaluation();
       } else if (['dashboard', 'incidents', 'resolved', 'analytics'].includes(selectedView)) {
         render();
       }
