@@ -23,7 +23,13 @@ class ExampleTest extends TestCase
         $this->get('/privacy')
             ->assertOk()
             ->assertSee('href="/"', false)
-            ->assertSee('Archived reports, with their attachments and history, are deleted automatically one year after archiving');
+            ->assertSee('Archived reports, with their attachments and history, are deleted automatically one year after archiving')
+            ->assertSee('mailto:appbarangay@gmail.com', false)
+            // Consent is given once, on the sign-up form; the notice itself is read-only.
+            ->assertDontSee('Continue to create an account')
+            ->assertDontSee('id="privacyAck"', false)
+            // The logo is plain text; the "Back" link is the one way back.
+            ->assertDontSee('class="navbar-brand" href', false);
     }
 
     public function test_login_page_uses_a_relative_privacy_notice_link(): void

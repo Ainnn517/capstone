@@ -223,14 +223,8 @@ registerForm.addEventListener("submit", async (event) => {
     }
 });
 
-// Arriving from the Privacy Notice's "Continue to create an account" button.
+// A link to index.html?register=1 opens the Create account form directly.
 if (new URLSearchParams(window.location.search).get("register") === "1" && registerForm.hidden) {
     formSwitch.click();
 }
-try {
-    if (sessionStorage.getItem("privacyNoticeAccepted") === "1") {
-        document.getElementById("privacyConsent").checked = true;
-    }
-} catch {
-    // Storage unavailable: the resident ticks the consent box on the form instead.
-}
+
