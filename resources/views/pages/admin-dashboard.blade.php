@@ -18,7 +18,6 @@
     <div class="container-fluid px-4">
       <div class="d-flex gap-2 align-items-center">
         <span id="adminName" class="text-white-50 small">Welcome</span>
-        <button class="btn btn-light btn-sm" id="logoutBtn" type="button">Logout</button>
       </div>
     </div>
   </nav>

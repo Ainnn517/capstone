@@ -17,6 +17,7 @@ def test_sign_up_after_logging_out_in_another_tab(app, new_page):
     # Same browser, second tab: log in and out, which gives the session a new token.
     other = signup.context.new_page()
     log_in(other, app, "e2eresident")
+    other.click("[data-resident-view=account]")
     other.click("#logoutBtn")
     confirm_dialog(other)
     other.wait_for_url(re.compile(r"/index\.html"))

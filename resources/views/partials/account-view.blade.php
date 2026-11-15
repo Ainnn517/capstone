@@ -41,4 +41,12 @@
     </form>
     <p id="changePasswordMessage" class="account-message" role="status" aria-live="polite"></p>
   </div>
+
+  <div class="card p-4 mt-4 account-signout">
+    <div>
+      <h2 class="account-heading mb-1">Sign out</h2>
+      <p class="text-secondary small mb-0">End your session on this device. You will need your password to sign in again.</p>
+    </div>
+    <button class="btn btn-light account-logout" id="logoutBtn" type="button">Log out</button>
+  </div>
 </section>

@@ -58,3 +58,9 @@
   .code-input { max-width: none; }
   .account-code-actions .btn { flex: 1 1 100%; }
 }
+
+/* Sign out card at the bottom of the Account section. */
+.account-signout { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; }
+.account-logout, .account-signout .btn.account-logout { background: #fff; border: 1px solid #fff; color: #b42318; font-weight: 700; padding: 0.45rem 1.1rem; border-radius: 999px; }
+.account-signout .btn.account-logout:hover, .account-signout .btn.account-logout:focus-visible { background: #fde8e7; color: #8f1d14; }
+@media (max-width: 600px) { .account-logout { flex: 1 1 100%; } }

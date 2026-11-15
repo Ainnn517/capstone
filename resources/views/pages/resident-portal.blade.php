@@ -19,7 +19,6 @@
     <div class="container">
       <div class="d-flex align-items-center gap-3 navbar-actions">
         <span id="residentName" class="small text-white-50 fw-semibold">Welcome,</span>
-        <button class="btn btn-light btn-sm" id="logoutBtn" type="button">Logout</button>
       </div>
     </div>
   </nav>
