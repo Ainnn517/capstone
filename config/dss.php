@@ -16,9 +16,12 @@ return [
     'history_window_days' => 180,
     'history_min_resolved' => 2,
     'hotspot_report_threshold' => 3,
-    // Days a resident has to confirm a resolved report or reopen it. With no answer by
-    // then, the fix counts as accepted. A report can be reopened at most max_reopens times.
+    // Days a resident has to answer "Is the problem fixed?". With no answer by then, the
+    // fix counts as accepted. A report can be reopened at most max_reopens times.
     'resident_confirmation_days' => 7,
+    // Even after that (or after confirming), the resident can reopen the report for this many
+    // days after the fix, for problems that only show later (a drain at the next heavy rain).
+    'reopen_window_days' => 30,
     'max_reopens' => 2,
     // On the hotspot map, open reports pinned within this distance of each other count as one hotspot.
     'hotspot_radius_meters' => 150,

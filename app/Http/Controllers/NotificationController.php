@@ -24,11 +24,14 @@ class NotificationController extends ApiController
         $notifications = Notification::query()
             ->with(['report:report_id,tracking_code'])
             ->where('user_id', $user->user_id)
+            // A resolved report still waiting for the resident's answer counts as current.
             ->when($view === 'current', fn ($query) => $query->whereHas('report', fn ($reports) => $reports
-                ->whereNotIn('status', $closed)
-                ->whereNull('archived_at')))
+                ->whereNull('archived_at')
+                ->where(fn ($open) => $open->whereNotIn('status', $closed)->orWhere(fn ($awaiting) => $awaiting->awaitingConfirmation()))))
             ->when($view === 'past', fn ($query) => $query->whereHas('report', fn ($reports) => $reports
-                ->where(fn ($closedReports) => $closedReports->whereIn('status', $closed)->orWhereNotNull('archived_at'))))
+                ->where(fn ($closedReports) => $closedReports
+                    ->where(fn ($done) => $done->whereIn('status', $closed)->whereNot(fn ($awaiting) => $awaiting->awaitingConfirmation()))
+                    ->orWhereNotNull('archived_at'))))
             ->latest('timestamp')
             ->paginate((int) config('security.notification_page_size'), ['notif_id', 'report_id', 'message', 'type', 'timestamp', 'is_read'])
             ->withQueryString();

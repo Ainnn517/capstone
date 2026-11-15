@@ -54,6 +54,10 @@ def test_resident_reopens_then_confirms_the_fix(app, new_page, mail):
     card.locator("[data-report-confirm]").click()
     confirm_dialog(resident)
     expect(resident.locator("#toastContainer")).to_contain_text("Thank you for confirming")
+    # Closed reports are under Past Reports, with a way to reopen if the problem comes back.
+    resident.click("[data-report-filter=past]")
+    past_card = resident.locator(".issue-card", has_text="You confirmed this is fixed")
+    expect(past_card.locator("[data-report-reopen]")).to_have_text("Problem came back?")
 
     admin.click("[data-admin-view=resolved]")
     expect(admin.locator("#resolvedBody tr", has_text="Streetlights")).to_contain_text("Resident confirmed")

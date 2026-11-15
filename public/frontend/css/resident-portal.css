@@ -337,6 +337,16 @@ body {
 }
 
 .resolution-done { color: #8ee6b8; }
+
+.resolution-came-back {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
+
+.resolution-came-back .resolution-check-hint { margin: 0; }
 .resolution-done-auto { color: rgba(255, 255, 255, .7); font-weight: 500; }
 .resolution-reopened { color: #ffd27a; }
 

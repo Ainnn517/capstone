@@ -110,6 +110,24 @@ class IssueReport extends Model
         return $this->confirmationDeadline()?->isFuture() ? 'awaiting' : 'accepted';
     }
 
+    // Last moment the resident can reopen a resolved report; null unless it is Resolved.
+    public function reopenDeadline(): ?CarbonImmutable
+    {
+        if ($this->status !== 'Resolved' || $this->date_resolved === null) {
+            return null;
+        }
+
+        return CarbonImmutable::parse($this->date_resolved, config('app.timezone'))
+            ->addDays((int) config('dss.reopen_window_days'));
+    }
+
+    // The resident can still say the problem is back: inside the window and under the limit.
+    public function canReopen(): bool
+    {
+        return (bool) $this->reopenDeadline()?->isFuture()
+            && $this->reopen_count < (int) config('dss.max_reopens');
+    }
+
     // Resolved reports the resident has not answered yet and can still answer.
     public function scopeAwaitingConfirmation(Builder $query): Builder
     {

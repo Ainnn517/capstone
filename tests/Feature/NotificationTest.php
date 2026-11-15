@@ -54,7 +54,8 @@ class NotificationTest extends TestCase
         $resident = User::factory()->create();
         $open = $this->createReport($resident);
         $resolved = $this->createReport($resident);
-        $resolved->forceFill(['status' => 'Resolved', 'date_resolved' => now()])->save();
+        // Confirmed by the resident, so it is finished ("past"), not waiting for an answer.
+        $resolved->forceFill(['status' => 'Resolved', 'date_resolved' => now(), 'resident_confirmed_at' => now()])->save();
         $archived = $this->createReport($resident);
         $archived->forceFill(['archived_at' => now()])->save();
         foreach ([[$open, 'Open update'], [$resolved, 'Resolved update'], [$archived, 'Archived update']] as [$report, $message]) {

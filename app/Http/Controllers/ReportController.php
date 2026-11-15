@@ -440,7 +440,9 @@ class ReportController extends ApiController
                 'confirmedAt' => $this->clientTimestamp($report->resident_confirmed_at),
                 'respondBy' => $report->confirmationDeadline()?->toIso8601String(),
                 'reopenCount' => (int) $report->reopen_count,
-                'canReopen' => $report->reopen_count < (int) config('dss.max_reopens'),
+                'reopenLimitReached' => $report->reopen_count >= (int) config('dss.max_reopens'),
+                'canReopen' => $report->canReopen(),
+                'reopenUntil' => $report->reopenDeadline()?->toIso8601String(),
             ];
         });
 
@@ -730,17 +732,26 @@ class ReportController extends ApiController
         }
 
         return DB::transaction(function () use ($user, $id, $reason): JsonResponse {
-            $report = $this->residentReportForAnswer($user, $id);
-            if ($report instanceof JsonResponse) {
-                return $report;
+            $report = $this->ownReport($user, $id);
+            if (! $report) {
+                return $this->error('Report not found.', 404);
+            }
+            if ($report->status !== 'Resolved') {
+                return $this->error('Only resolved reports can be reopened.', 409);
             }
             if ($report->reopen_count >= (int) config('dss.max_reopens')) {
                 return $this->error('This report has already been reopened the most times allowed. Please contact the barangay office directly.', 409);
+            }
+            if (! $report->canReopen()) {
+                $days = (int) config('dss.reopen_window_days');
+
+                return $this->error("Reports can be reopened up to {$days} days after the fix. If the problem is back, please submit a new report.", 409);
             }
 
             $report->update([
                 'status' => 'Validated',
                 'date_resolved' => null,
+                'resident_confirmed_at' => null,
                 'reopen_count' => $report->reopen_count + 1,
             ]);
             StatusLog::create([
@@ -755,15 +766,21 @@ class ReportController extends ApiController
         });
     }
 
-    // A resident's own resolved report that is still waiting for their answer, locked for update.
-    private function residentReportForAnswer(User $user, int $id): IssueReport|JsonResponse
+    // The resident's own, non-archived report, locked for update.
+    private function ownReport(User $user, int $id): ?IssueReport
     {
-        $report = IssueReport::query()
+        return IssueReport::query()
             ->where('report_id', $id)
             ->where('user_id', $user->user_id)
             ->whereNull('archived_at')
             ->lockForUpdate()
             ->first();
+    }
+
+    // A resident's own resolved report that is still waiting for their answer, locked for update.
+    private function residentReportForAnswer(User $user, int $id): IssueReport|JsonResponse
+    {
+        $report = $this->ownReport($user, $id);
         if (! $report) {
             return $this->error('Report not found.', 404);
         }
@@ -771,7 +788,7 @@ class ReportController extends ApiController
         return match ($report->confirmationState()) {
             'awaiting' => $report,
             'confirmed' => $this->error('You already confirmed that this issue is fixed.', 409),
-            'accepted' => $this->error('The time to answer has passed. If the problem is back, please submit a new report.', 409),
+            'accepted' => $this->error('The time to answer has passed, so this report is already closed as fixed.', 409),
             default => $this->error('Only resolved reports can be confirmed or reopened.', 409),
         };
     }

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Category;
 use App\Models\IssueReport;
 use App\Models\Location;
+use App\Models\Notification;
 use App\Models\StatusLog;
 use App\Models\Team;
 use App\Models\User;
@@ -49,9 +50,25 @@ class ResidentConfirmationTest extends TestCase
             ->assertJsonPath('reports.0.confirmation', 'confirmed');
         $this->actingAs($this->resident)->getJson('/api/reports?view=current')->assertOk()->assertJsonCount(0, 'reports');
 
-        // Answering twice is refused.
+        // Confirming twice is refused.
         $this->actingAs($this->resident)->postJson("/api/reports/{$report->report_id}/confirm")->assertStatus(409);
-        $this->actingAs($this->resident)->postJson("/api/reports/{$report->report_id}/reopen", ['reason' => 'Still broken.'])->assertStatus(409);
+    }
+
+    public function test_a_confirmed_fix_can_still_be_reopened_if_the_problem_comes_back(): void
+    {
+        $report = $this->resolvedReport();
+        $this->actingAs($this->resident)->postJson("/api/reports/{$report->report_id}/confirm")->assertOk();
+        $this->actingAs($this->resident)->getJson('/api/reports?view=past')->assertOk()
+            ->assertJsonPath('reports.0.canReopen', true);
+
+        $this->actingAs($this->resident)
+            ->postJson("/api/reports/{$report->report_id}/reopen", ['reason' => 'The drain flooded again at the first heavy rain.'])
+            ->assertOk();
+
+        $report->refresh();
+        $this->assertSame('Validated', $report->status);
+        $this->assertNull($report->resident_confirmed_at);
+        $this->assertSame(1, (int) $report->reopen_count);
     }
 
     public function test_reopening_sends_the_report_back_to_the_barangay(): void
@@ -100,11 +117,44 @@ class ResidentConfirmationTest extends TestCase
         $report = $this->resolvedReport(resolvedDaysAgo: 8);
 
         $this->actingAs($this->resident)->getJson('/api/reports?view=past')->assertOk()
-            ->assertJsonPath('reports.0.confirmation', 'accepted');
+            ->assertJsonPath('reports.0.confirmation', 'accepted')
+            ->assertJsonPath('reports.0.canReopen', true);
         $this->actingAs($this->resident)->getJson('/api/reports?view=current')->assertOk()->assertJsonCount(0, 'reports');
+        $this->actingAs($this->resident)->postJson("/api/reports/{$report->report_id}/confirm")->assertStatus(409);
+
+        // Still inside the 30-day reopen window.
         $this->actingAs($this->resident)
             ->postJson("/api/reports/{$report->report_id}/reopen", ['reason' => 'It is broken again.'])
-            ->assertStatus(409);
+            ->assertOk();
+    }
+
+    public function test_reports_cannot_be_reopened_after_30_days(): void
+    {
+        $report = $this->resolvedReport(resolvedDaysAgo: 31);
+
+        $this->actingAs($this->resident)->getJson('/api/reports?view=past')->assertOk()
+            ->assertJsonPath('reports.0.canReopen', false);
+        $this->actingAs($this->resident)
+            ->postJson("/api/reports/{$report->report_id}/reopen", ['reason' => 'It is broken again.'])
+            ->assertStatus(409)
+            ->assertJsonPath('message', 'Reports can be reopened up to 30 days after the fix. If the problem is back, please submit a new report.');
+    }
+
+    public function test_notifications_for_a_report_awaiting_an_answer_are_current(): void
+    {
+        $report = $this->resolvedReport();
+        Notification::create([
+            'report_id' => $report->report_id,
+            'user_id' => $this->resident->user_id,
+            'message' => 'The streetlight was replaced.',
+            'type' => 'resolved',
+        ]);
+
+        $this->actingAs($this->resident)->getJson('/api/notifications?view=current')->assertOk()->assertJsonCount(1, 'notifications');
+        $this->actingAs($this->resident)->getJson('/api/notifications?view=past')->assertOk()->assertJsonCount(0, 'notifications');
+
+        $this->actingAs($this->resident)->postJson("/api/reports/{$report->report_id}/confirm")->assertOk();
+        $this->actingAs($this->resident)->getJson('/api/notifications?view=past')->assertOk()->assertJsonCount(1, 'notifications');
     }
 
     public function test_only_the_owner_can_answer_and_only_for_resolved_reports(): void

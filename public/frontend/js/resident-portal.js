@@ -263,15 +263,24 @@ function initResidentPortalPage() {
             <button class="btn btn-sm btn-success" type="button" data-report-confirm="${id}">Yes, it's fixed</button>
             ${item.canReopen
               ? `<button class="btn btn-sm btn-outline-danger" type="button" data-report-reopen="${id}">No, still a problem</button>`
-              : '<span class="resolution-check-hint">Still a problem? This report was already reopened twice, so please contact the barangay office.</span>'}
+              : item.reopenLimitReached
+                ? '<span class="resolution-check-hint">Still a problem? This report was already reopened twice, so please contact the barangay office.</span>'
+                : ''}
           </div>
         </div>`;
     }
-    if (item.confirmation === 'confirmed') {
-      return `<div class="resolution-done"><i class="fi fi-rr-check" aria-hidden="true"></i> You confirmed this is fixed on ${escapeHTML(new Date(item.confirmedAt).toLocaleDateString())}.</div>`;
-    }
-    if (item.confirmation === 'accepted') {
-      return '<div class="resolution-done resolution-done-auto">Closed as fixed (no reply within 7 days).</div>';
+    if (item.confirmation === 'confirmed' || item.confirmation === 'accepted') {
+      const closedText = item.confirmation === 'confirmed'
+        ? `<i class="fi fi-rr-check" aria-hidden="true"></i> You confirmed this is fixed on ${escapeHTML(new Date(item.confirmedAt).toLocaleDateString())}.`
+        : 'Closed as fixed (no reply within 7 days).';
+      // Problems like a drain that floods at the next heavy rain can show up later.
+      const cameBack = item.canReopen
+        ? `<div class="resolution-came-back">
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-report-reopen="${id}">Problem came back?</button>
+            <span class="resolution-check-hint">You can reopen this report until ${escapeHTML(new Date(item.reopenUntil).toLocaleDateString([], { month: 'long', day: 'numeric' }))}.</span>
+          </div>`
+        : '';
+      return `<div class="resolution-done ${item.confirmation === 'accepted' ? 'resolution-done-auto' : ''}">${closedText}</div>${cameBack}`;
     }
     if (item.reopenCount > 0 && !['Rejected', 'Withdrawn'].includes(item.stage)) {
       return '<div class="resolution-reopened">You reopened this report. The barangay will send the team again.</div>';
@@ -408,7 +417,7 @@ function initResidentPortalPage() {
     const reopenButton = event.target.closest('[data-report-reopen]');
     if (reopenButton) {
       const reason = await window.promptAction(
-        'What is still wrong? The report goes back to the barangay so they can send the team again.',
+        'What is wrong? The report goes back to the barangay so they can send the team again.',
         {
           maxLength: 300,
           placeholder: 'For example: the pothole was only partly filled',
