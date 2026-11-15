@@ -85,6 +85,7 @@ class DatabaseSeeder extends Seeder
         ]);
         $user->forceFill([
             'role' => $role,
+            'admin_level' => $role === 'admin' ? 'super' : null,
             'account_status' => 'approved',
             'email_verified_at' => now(),
         ])->save();

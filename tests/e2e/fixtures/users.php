@@ -19,11 +19,12 @@ if (DB::connection()->getDatabaseName() !== 'barangay_reporting_test') {
 }
 
 foreach ([
-    ['e2eadmin', 'E2E Administrator', 'e2e-admin@example.test', 'admin'],
-    ['e2eresident', 'E2E Resident', 'e2e-resident@example.test', 'resident'],
-] as [$username, $name, $email, $role]) {
+    ['e2eadmin', 'E2E Administrator', 'e2e-admin@example.test', 'admin', 'super'],
+    ['e2eviewer', 'E2E Captain', 'e2e-viewer@example.test', 'admin', 'viewer'],
+    ['e2eresident', 'E2E Resident', 'e2e-resident@example.test', 'resident', null],
+] as [$username, $name, $email, $role, $level]) {
     $user = new User(['username' => $username, 'full_name' => $name, 'email' => $email, 'password_hash' => Hash::make('E2e-password123!')]);
-    $user->forceFill(['role' => $role, 'account_status' => 'approved', 'email_verified_at' => now()])->save();
+    $user->forceFill(['role' => $role, 'admin_level' => $level, 'account_status' => 'approved', 'email_verified_at' => now()])->save();
 }
 
 echo "ok\n";

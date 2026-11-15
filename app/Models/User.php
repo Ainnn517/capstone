@@ -49,6 +49,37 @@ class User extends Authenticatable implements MustVerifyEmailContract
         ];
     }
 
+    public const ADMIN_LEVELS = ['super', 'staff', 'viewer'];
+
+    // Does this account pass a route's role list? "resident" and "admin" are the account
+    // roles; "staff" means an administrator who can make changes (super or staff level);
+    // "super" means a super administrator only.
+    public function hasAnyRole(array $roles): bool
+    {
+        foreach ($roles as $role) {
+            $passes = match ($role) {
+                'super' => $this->role === 'admin' && $this->admin_level === 'super',
+                'staff' => $this->role === 'admin' && in_array($this->admin_level, ['super', 'staff'], true),
+                default => $this->role === $role,
+            };
+            if ($passes) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function adminLevelLabel(): ?string
+    {
+        return match ($this->admin_level) {
+            'super' => 'Super admin',
+            'staff' => 'Staff',
+            'viewer' => 'Viewer',
+            default => null,
+        };
+    }
+
     // The street and area of the resident's home address.
     public function addressLocation(): BelongsTo
     {

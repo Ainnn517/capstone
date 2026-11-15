@@ -66,6 +66,7 @@ class CreateAdmin extends Command
         ]);
         $admin->forceFill([
             'role' => 'admin',
+            'admin_level' => 'super',
             'account_status' => 'approved',
             'email_verified_at' => now(),
         ])->save();

@@ -19,6 +19,7 @@
       <div class="d-flex gap-2 align-items-center">
         <span id="adminName" class="text-white-50 small">Welcome</span>
       </div>
+      <span id="viewOnlyBadge" class="view-only-badge small" hidden>View only</span>
       <span id="liveStatus" class="live-status small" title="The dashboard checks for new reports every 30 seconds">
         <span class="live-dot" aria-hidden="true"></span><span id="liveStatusText">Live</span>
       </span>
@@ -59,6 +60,10 @@
       <button class="sidebar-link" type="button" data-admin-view="referenceData">
         <i class="fi fi-rr-settings sidebar-icon" aria-hidden="true"></i>
         Reference Data
+      </button>
+      <button class="sidebar-link" type="button" data-admin-view="adminAccounts">
+        <i class="fi fi-rr-users-alt sidebar-icon" aria-hidden="true"></i>
+        Admin Accounts
       </button>
       <button class="sidebar-link" type="button" data-admin-view="account">
         <i class="fi fi-rr-user sidebar-icon" aria-hidden="true"></i>
@@ -388,6 +393,44 @@
         </div>
         <div id="pendingApprovalList" class="resident-list" aria-live="polite">
           <div class="card p-4 text-secondary">Loading pending registrations…</div>
+        </div>
+      </section>
+
+      <section id="adminAccountsView" class="admin-view" hidden>
+        <div class="card p-4 admin-panel">
+          <div class="admin-panel-header">
+            <div>
+              <h1 class="section-title mb-1">Admin Accounts</h1>
+              <small class="text-secondary">Super admins manage everything, including these accounts. Staff handle reports and sign-ups. Viewers (for example the barangay captain) can look at everything but change nothing.</small>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="table align-middle" aria-label="Administrator accounts">
+              <thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Level</th><th>Status</th></tr></thead>
+              <tbody id="adminAccountsBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card p-4 admin-panel mt-4">
+          <h2 class="section-title mb-1" style="font-size: 1.15rem;">Add an administrator</h2>
+          <p class="small text-secondary">Give the new administrator the temporary password in person; they change it in Account after signing in. Each sign-in also asks for a code sent to their email.</p>
+          <form id="addAdminForm" class="add-admin-form" novalidate>
+            <div><label class="form-label" for="newAdminName">Full name</label><input id="newAdminName" class="form-control" maxlength="100" required></div>
+            <div><label class="form-label" for="newAdminUsername">Username</label><input id="newAdminUsername" class="form-control" maxlength="50" autocomplete="off" required></div>
+            <div><label class="form-label" for="newAdminEmail">Email</label><input id="newAdminEmail" class="form-control" type="email" maxlength="120" autocomplete="off" required></div>
+            <div><label class="form-label" for="newAdminLevel">Level</label>
+              <select id="newAdminLevel" class="form-select">
+                <option value="staff">Staff</option>
+                <option value="viewer">Viewer</option>
+                <option value="super">Super admin</option>
+              </select>
+            </div>
+            <div><label class="form-label" for="newAdminPassword">Temporary password</label><input id="newAdminPassword" class="form-control" type="password" minlength="12" autocomplete="new-password" required aria-describedby="newAdminPasswordRules"></div>
+            <div><label class="form-label" for="newAdminPasswordConfirm">Confirm password</label><input id="newAdminPasswordConfirm" class="form-control" type="password" minlength="12" autocomplete="new-password" required></div>
+            <small id="newAdminPasswordRules" class="text-secondary add-admin-wide">At least 12 characters, with uppercase and lowercase letters, a number, and a symbol.</small>
+            <div class="add-admin-wide"><button class="btn btn-primary" type="submit">Add administrator</button> <span id="addAdminMessage" class="small" role="status" aria-live="polite"></span></div>
+          </form>
         </div>
       </section>
 

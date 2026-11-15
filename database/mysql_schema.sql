@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS USERS (
   email VARCHAR(120) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
   role ENUM('resident', 'admin') NOT NULL DEFAULT 'resident',
+  admin_level ENUM('super', 'staff', 'viewer') NULL,
   account_status ENUM('pending', 'approved', 'rejected', 'suspended') NOT NULL DEFAULT 'pending',
   privacy_consent_at DATETIME NULL,
   privacy_notice_version VARCHAR(50) NULL,
@@ -48,7 +49,8 @@ CREATE TABLE IF NOT EXISTS USERS (
   KEY idx_users_address_location (address_location_id),
   CONSTRAINT chk_users_username_length CHECK (CHAR_LENGTH(username) >= 3),
   CONSTRAINT chk_users_consent_pair CHECK ((privacy_consent_at IS NULL) = (privacy_notice_version IS NULL)),
-  CONSTRAINT chk_users_email_notifications CHECK (email_notifications IN (0, 1))
+  CONSTRAINT chk_users_email_notifications CHECK (email_notifications IN (0, 1)),
+  CONSTRAINT chk_users_admin_level CHECK ((role = 'admin') = (admin_level IS NOT NULL))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Password reset tokens (config/auth.php uses PASSWORD_RESET_TOKENS).

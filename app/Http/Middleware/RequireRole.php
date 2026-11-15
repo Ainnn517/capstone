@@ -19,7 +19,7 @@ class RequireRole
             ], 401);
         }
 
-        if (! in_array($user->role, $roles, true)) {
+        if (! $user->hasAnyRole($roles)) {
             return response()->json([
                 'success' => false,
                 'message' => 'You do not have permission to perform this action.',

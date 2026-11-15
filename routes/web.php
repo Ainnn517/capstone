@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminAccountController;
 use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DssController;
@@ -50,13 +51,13 @@ Route::view('/reset-password/{token}', 'pages.password-reset')->name('password.r
 Route::middleware('api.auth')->group(function (): void {
     Route::get('/api/session', [AuthController::class, 'session']);
     Route::get('/api/reference-data', [ReferenceDataController::class, 'index'])->middleware('role:resident,admin');
-    Route::post('/api/reference-data/{resource}', [ReferenceDataController::class, 'store'])->middleware('role:admin');
+    Route::post('/api/reference-data/{resource}', [ReferenceDataController::class, 'store'])->middleware('role:super');
     Route::put('/api/reference-data/{resource}/{id}', [ReferenceDataController::class, 'update'])
         ->whereNumber('id')
-        ->middleware('role:admin');
+        ->middleware('role:super');
     Route::delete('/api/reference-data/{resource}/{id}', [ReferenceDataController::class, 'destroy'])
         ->whereNumber('id')
-        ->middleware('role:admin');
+        ->middleware('role:super');
     Route::post('/api/logout', [AuthController::class, 'logout']);
     Route::post('/api/password/change', [AuthController::class, 'changePassword'])->middleware('throttle:5,1');
     Route::post('/api/account/email-alerts', [EmailAlertController::class, 'update'])->middleware(['role:resident', 'throttle:20,1']);
@@ -69,16 +70,16 @@ Route::middleware('api.auth')->group(function (): void {
     Route::get('/api/analytics/map', [ReportController::class, 'mapPoints'])->middleware('role:admin');
     Route::get('/api/reports/export', [ReportExportController::class, 'csv'])->middleware(['role:admin', 'throttle:10,1']);
     Route::get('/api/analytics/dss', [DssController::class, 'index'])->middleware('role:admin');
-    Route::post('/api/analytics/dss/snapshots', [DssController::class, 'store'])->middleware('role:admin');
-    Route::delete('/api/analytics/dss/snapshots', [DssController::class, 'destroyAll'])->middleware('role:admin');
+    Route::post('/api/analytics/dss/snapshots', [DssController::class, 'store'])->middleware('role:staff');
+    Route::delete('/api/analytics/dss/snapshots', [DssController::class, 'destroyAll'])->middleware('role:super');
     Route::get('/api/reports', [ReportController::class, 'index'])->middleware('role:resident,admin');
     Route::get('/api/reports/archived', [ReportController::class, 'archived'])->middleware('role:admin');
     Route::post('/api/reports/{id}/archive', [ReportController::class, 'archive'])
         ->whereNumber('id')
-        ->middleware('role:admin');
+        ->middleware('role:staff');
     Route::post('/api/reports/{id}/restore', [ReportController::class, 'restore'])
         ->whereNumber('id')
-        ->middleware('role:admin');
+        ->middleware('role:staff');
     Route::post('/api/reports', [ReportController::class, 'store'])->middleware(['role:resident', 'throttle:10,1']);
     Route::put('/api/reports/{id}', [ReportController::class, 'residentUpdate'])
         ->whereNumber('id')
@@ -95,23 +96,28 @@ Route::middleware('api.auth')->group(function (): void {
     Route::get('/api/reports/{id}/history', [ReportController::class, 'history'])
         ->whereNumber('id')
         ->middleware('role:resident,admin');
-    Route::post('/api/reports/update', [ReportController::class, 'update'])->middleware('role:admin');
-    Route::post('/api/reports/clear', [ReportController::class, 'clear'])->middleware('role:admin');
+    Route::post('/api/reports/update', [ReportController::class, 'update'])->middleware('role:staff');
+    Route::post('/api/reports/clear', [ReportController::class, 'clear'])->middleware('role:super');
     Route::delete('/api/reports/{id}/archived', [ReportController::class, 'destroyArchived'])
         ->whereNumber('id')
-        ->middleware('role:admin');
+        ->middleware('role:super');
     Route::post('/api/triage/category', [TriageController::class, 'suggestCategory'])
         ->middleware(['role:resident', 'throttle:20,1']);
     Route::get('/api/reports/{id}/triage', [TriageController::class, 'review'])
         ->whereNumber('id')
         ->middleware(['role:admin', 'throttle:60,1']);
+    Route::get('/api/admins', [AdminAccountController::class, 'index'])->middleware('role:super');
+    Route::post('/api/admins', [AdminAccountController::class, 'store'])->middleware(['role:super', 'throttle:10,1']);
+    Route::put('/api/admins/{id}', [AdminAccountController::class, 'update'])
+        ->whereNumber('id')
+        ->middleware(['role:super', 'throttle:30,1']);
     Route::get('/api/residents', [ResidentController::class, 'index'])->middleware('role:admin');
     Route::post('/api/residents/{id}/approval', [ResidentController::class, 'updateApproval'])
         ->whereNumber('id')
-        ->middleware('role:admin');
+        ->middleware('role:staff');
     Route::delete('/api/residents/{id}', [ResidentController::class, 'destroy'])
         ->whereNumber('id')
-        ->middleware('role:admin');
+        ->middleware('role:super');
     Route::get('/api/attachments/{id}', [AttachmentController::class, 'show'])
         ->whereNumber('id')
         ->middleware('role:resident,admin');

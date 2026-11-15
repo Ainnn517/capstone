@@ -267,5 +267,15 @@ SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE USERS ADD COLUMN email_notific
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
+-- ============== USERS: administrator levels ==============
+SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE USERS ADD COLUMN admin_level ENUM(''super'', ''staff'', ''viewer'') NULL AFTER role', 'DO 0') FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'USERS' AND column_name = 'admin_level');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+UPDATE USERS SET admin_level = 'super' WHERE role = 'admin' AND admin_level IS NULL;
+SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE USERS ADD CONSTRAINT chk_users_admin_level CHECK ((role = ''admin'') = (admin_level IS NOT NULL))', 'DO 0') FROM information_schema.table_constraints WHERE table_schema = DATABASE() AND table_name = 'USERS' AND constraint_name = 'chk_users_admin_level');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 -- ============================== Done ==============================
 SELECT 'Upgrade to schema v2 finished.' AS result;

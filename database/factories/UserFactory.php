@@ -14,11 +14,12 @@ class UserFactory extends Factory
     // Reuse the hashed test password for generated users.
     protected static ?string $password;
 
-    // Build an administrator account state.
-    public function admin(): static
+    // Build an administrator account state (super, staff, or viewer).
+    public function admin(string $level = 'super'): static
     {
         return $this->afterMaking(static fn (User $user) => $user->forceFill([
             'role' => 'admin',
+            'admin_level' => $level,
             'account_status' => 'approved',
         ]));
     }

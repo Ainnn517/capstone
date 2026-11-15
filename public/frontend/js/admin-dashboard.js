@@ -10,6 +10,9 @@ const API_ENDPOINTS = {
   saveDssSnapshot: '/api/analytics/dss/snapshots',
   clearDssSnapshots: '/api/analytics/dss/snapshots',
   getResidents: '/api/residents',
+  getAdmins: '/api/admins',
+  createAdmin: '/api/admins',
+  updateAdmin: '/api/admins/{id}',
   getReferenceData: '/api/reference-data',
   createReference: '/api/reference-data/{resource}',
   updateReference: '/api/reference-data/{resource}/{id}',
@@ -701,6 +704,89 @@ function initAdminDashboardPage() {
     }
   });
 
+  // ----- Admin accounts (super admins only) -----
+  const LEVEL_LABELS = { super: 'Super admin', staff: 'Staff', viewer: 'Viewer' };
+
+  async function loadAdmins() {
+    const body = document.getElementById('adminAccountsBody');
+    try {
+      const { admins } = await apiRequest('getAdmins', {}, 'GET');
+      body.innerHTML = admins.map(admin => {
+        const id = escapeHTML(admin.id);
+        const level = admin.isYou
+          ? `${escapeHTML(admin.levelLabel)} <span class="small text-secondary">(you)</span>`
+          : `<label class="visually-hidden" for="adminLevel${id}">Level for ${escapeHTML(admin.fullName)}</label>
+             <select id="adminLevel${id}" class="form-select form-select-sm admin-level-select" data-admin-level-for="${id}">
+               ${Object.entries(LEVEL_LABELS).map(([value, label]) => `<option value="${value}" ${value === admin.level ? 'selected' : ''}>${label}</option>`).join('')}
+             </select>`;
+        const status = admin.isYou
+          ? '<span class="badge-soft soft-green">Active</span>'
+          : `<span class="badge-soft ${admin.active ? 'soft-green' : 'soft-red'}">${admin.active ? 'Active' : 'Disabled'}</span>
+             <button class="btn btn-sm btn-light ms-1" type="button" data-admin-active-for="${id}" data-admin-active="${admin.active ? 'false' : 'true'}">${admin.active ? 'Disable' : 'Enable'}</button>`;
+        return `<tr>
+          <td><strong>${escapeHTML(admin.fullName)}</strong></td>
+          <td>${escapeHTML(admin.username)}</td>
+          <td>${escapeHTML(admin.email)}</td>
+          <td>${level}</td>
+          <td>${status}</td>
+        </tr>`;
+      }).join('');
+    } catch (error) {
+      body.innerHTML = `<tr><td colspan="5" class="admin-empty-state alert-error">${escapeHTML(error.message)}</td></tr>`;
+    }
+  }
+
+  document.getElementById('adminAccountsBody').addEventListener('change', async event => {
+    const select = event.target.closest('[data-admin-level-for]');
+    if (!select) return;
+    try {
+      await apiRequest('updateAdmin', { level: select.value }, 'PUT', select.dataset.adminLevelFor);
+      window.showToast(`Level changed to ${LEVEL_LABELS[select.value]}.`, 'success');
+    } catch (error) {
+      window.showToast(error.message, 'error');
+    }
+    loadAdmins();
+  });
+
+  document.getElementById('adminAccountsBody').addEventListener('click', async event => {
+    const button = event.target.closest('[data-admin-active-for]');
+    if (!button) return;
+    const enable = button.dataset.adminActive === 'true';
+    if (!enable) {
+      const confirmed = await window.confirmAction('Disable this administrator? They are signed out right away and cannot sign in until enabled again. Their past actions stay in the records.');
+      if (!confirmed) return;
+    }
+    try {
+      await apiRequest('updateAdmin', { active: enable }, 'PUT', button.dataset.adminActiveFor);
+      window.showToast(enable ? 'Administrator enabled.' : 'Administrator disabled.', 'success');
+    } catch (error) {
+      window.showToast(error.message, 'error');
+    }
+    loadAdmins();
+  });
+
+  document.getElementById('addAdminForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const message = document.getElementById('addAdminMessage');
+    const value = id => document.getElementById(id).value.trim();
+    message.textContent = '';
+    try {
+      await apiRequest('createAdmin', {
+        fullName: value('newAdminName'),
+        username: value('newAdminUsername'),
+        email: value('newAdminEmail'),
+        level: document.getElementById('newAdminLevel').value,
+        password: document.getElementById('newAdminPassword').value,
+        password_confirmation: document.getElementById('newAdminPasswordConfirm').value
+      });
+      event.target.reset();
+      message.textContent = 'Administrator added. Give them the temporary password in person.';
+      loadAdmins();
+    } catch (error) {
+      message.textContent = error.message;
+    }
+  });
+
   // Load resident accounts and aggregate report counts.
   async function loadResidents({ quiet = false } = {}) {
     const residentsList = document.getElementById('residentsList');
@@ -1037,7 +1123,7 @@ function initAdminDashboardPage() {
     const id = escapeHTML(resident.id);
     return resident.emailVerified
       ? `<button class="btn btn-sm btn-success" type="button" data-resident-approval="approved" data-resident-id="${id}">${label}</button>`
-      : `<button class="btn btn-sm btn-success" type="button" disabled title="Waiting for the resident to verify their email">${label}</button>`;
+      : `<button class="btn btn-sm btn-success" type="button" disabled data-requires="staff" title="Waiting for the resident to verify their email">${label}</button>`;
   }
   function verificationNote(resident) {
     return resident.emailVerified
@@ -1445,6 +1531,8 @@ function initAdminDashboardPage() {
         renderArchivedReports();
       } else if (selectedView === 'referenceData') {
         loadReferenceData();
+      } else if (selectedView === 'adminAccounts') {
+        loadAdmins();
       } else if (['dashboard', 'incidents', 'resolved', 'analytics'].includes(selectedView)) {
         render();
       }
@@ -1572,6 +1660,9 @@ async function startAdminDashboard() {
       return;
     }
     document.getElementById('adminName').textContent = `Welcome, ${result.user.fullName || result.user.username}`;
+    // Show only what this administrator's level allows (the server enforces it as well).
+    document.body.dataset.adminLevel = result.user.adminLevel || 'viewer';
+    document.getElementById('viewOnlyBadge').hidden = result.user.adminLevel !== 'viewer';
     window.fillAccountDetails(result.user);
     initAdminDashboardPage();
   } catch (error) {

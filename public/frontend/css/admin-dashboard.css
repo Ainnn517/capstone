@@ -727,6 +727,35 @@ h1, h2, h3, h4, h5, h6 { margin-top: 0; }
   background: #000;
 }
 
+/* Admin levels. The server refuses these actions anyway; this hides the buttons. */
+body[data-admin-level="viewer"] :is([data-report-id], [data-archive-report-id], [data-restore-report-id], [data-resident-approval], [data-requires="staff"], #saveDssSnapshotBtn) {
+  display: none !important;
+}
+
+body:not([data-admin-level="super"]) :is([data-resident-delete], [data-delete-archived-id], [data-requires="super"], #clearReportsBtn, #clearDssSnapshotsBtn, [data-admin-view="referenceData"], [data-admin-view="adminAccounts"]) {
+  display: none !important;
+}
+
+.view-only-badge {
+  padding: .15rem .6rem;
+  border: 1px solid rgba(255, 255, 255, .6);
+  border-radius: 999px;
+  color: #fff;
+  font-weight: 600;
+}
+
+.view-only-badge[hidden] { display: none; }
+
+.add-admin-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: .75rem 1rem;
+}
+
+.add-admin-wide { grid-column: 1 / -1; }
+
+.admin-level-select { min-width: 9rem; }
+
 /* Report search boxes. */
 .report-search { min-width: 15rem; max-width: 100%; }
 
