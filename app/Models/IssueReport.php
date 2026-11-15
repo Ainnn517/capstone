@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -33,6 +35,8 @@ class IssueReport extends Model
         'status',
         'date_submitted',
         'date_resolved',
+        'resident_confirmed_at',
+        'reopen_count',
         'archived_at',
         'archived_by',
     ];
@@ -77,5 +81,40 @@ class IssueReport extends Model
     public function latestAttachment(): HasOne
     {
         return $this->hasOne(Attachment::class, 'report_id', 'report_id')->latestOfMany('attachment_id');
+    }
+
+    // ----- Resident confirmation of a resolved report -----
+
+    // Last moment the resident can confirm or reopen; null unless the report is Resolved.
+    public function confirmationDeadline(): ?CarbonImmutable
+    {
+        if ($this->status !== 'Resolved' || $this->date_resolved === null) {
+            return null;
+        }
+
+        return CarbonImmutable::parse($this->date_resolved, config('app.timezone'))
+            ->addDays((int) config('dss.resident_confirmation_days'));
+    }
+
+    // 'confirmed' (resident said it is fixed), 'awaiting' (resident can still answer),
+    // 'accepted' (no answer in time, so the fix stands), or null when not Resolved.
+    public function confirmationState(): ?string
+    {
+        if ($this->status !== 'Resolved') {
+            return null;
+        }
+        if ($this->resident_confirmed_at !== null) {
+            return 'confirmed';
+        }
+
+        return $this->confirmationDeadline()?->isFuture() ? 'awaiting' : 'accepted';
+    }
+
+    // Resolved reports the resident has not answered yet and can still answer.
+    public function scopeAwaitingConfirmation(Builder $query): Builder
+    {
+        return $query->where('status', 'Resolved')
+            ->whereNull('resident_confirmed_at')
+            ->where('date_resolved', '>', now()->subDays((int) config('dss.resident_confirmation_days')));
     }
 }

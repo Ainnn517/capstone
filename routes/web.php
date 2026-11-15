@@ -71,6 +71,12 @@ Route::middleware('api.auth')->group(function (): void {
     Route::put('/api/reports/{id}', [ReportController::class, 'residentUpdate'])
         ->whereNumber('id')
         ->middleware(['role:resident', 'throttle:20,1']);
+    Route::post('/api/reports/{id}/confirm', [ReportController::class, 'confirmResolution'])
+        ->whereNumber('id')
+        ->middleware(['role:resident', 'throttle:20,1']);
+    Route::post('/api/reports/{id}/reopen', [ReportController::class, 'reopen'])
+        ->whereNumber('id')
+        ->middleware(['role:resident', 'throttle:10,1']);
     Route::post('/api/reports/{id}/withdraw', [ReportController::class, 'withdraw'])
         ->whereNumber('id')
         ->middleware(['role:resident', 'throttle:20,1']);

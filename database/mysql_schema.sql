@@ -113,6 +113,8 @@ CREATE TABLE IF NOT EXISTS ISSUE_REPORT (
   status ENUM('Submitted', 'Validated', 'Dispatched', 'Resolved', 'Rejected', 'Withdrawn') NOT NULL DEFAULT 'Submitted',
   date_submitted DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   date_resolved DATETIME NULL,
+  resident_confirmed_at DATETIME NULL,
+  reopen_count TINYINT UNSIGNED NOT NULL DEFAULT 0,
   archived_at DATETIME NULL,
   archived_by INT UNSIGNED NULL,
   PRIMARY KEY (report_id),
@@ -131,6 +133,7 @@ CREATE TABLE IF NOT EXISTS ISSUE_REPORT (
   CONSTRAINT chk_report_resolved_date CHECK (status <> 'Resolved' OR date_resolved IS NOT NULL),
   CONSTRAINT chk_report_resolved_only CHECK (status = 'Resolved' OR date_resolved IS NULL),
   CONSTRAINT chk_report_date_order CHECK (date_resolved IS NULL OR date_resolved >= date_submitted),
+  CONSTRAINT chk_report_confirmed_resolved CHECK (resident_confirmed_at IS NULL OR status = 'Resolved'),
   CONSTRAINT fk_report_user FOREIGN KEY (user_id) REFERENCES USERS (user_id)
     ON UPDATE CASCADE ON DELETE RESTRICT,
   CONSTRAINT fk_report_category FOREIGN KEY (category_id) REFERENCES CATEGORY (category_id)

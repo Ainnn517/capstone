@@ -257,5 +257,10 @@ SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE USERS ADD COLUMN address_locat
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
+-- ============== ISSUE_REPORT: resident confirms the fix ==============
+SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE ISSUE_REPORT ADD COLUMN resident_confirmed_at DATETIME NULL AFTER date_resolved, ADD COLUMN reopen_count TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER resident_confirmed_at, ADD CONSTRAINT chk_report_confirmed_resolved CHECK (resident_confirmed_at IS NULL OR status = ''Resolved'')', 'DO 0') FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'ISSUE_REPORT' AND column_name = 'resident_confirmed_at');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 -- ============================== Done ==============================
 SELECT 'Upgrade to schema v2 finished.' AS result;

@@ -329,6 +329,15 @@
           <tbody id="resolutionBody"></tbody>
         </table>
       </div>
+      <div class="confirmation-summary" aria-label="Resident confirmation of resolved reports">
+        <h5 class="fw-bold mb-1">Resident confirmation</h5>
+        <p class="small text-secondary mb-2">After a report is resolved, the resident has 7 days to confirm the fix or reopen the report.</p>
+        <div class="confirmation-stats">
+          <div><strong id="confirmedCount">0</strong><span>Confirmed fixed by residents</span></div>
+          <div><strong id="awaitingCount">0</strong><span>Waiting for the resident's answer</span></div>
+          <div><strong id="reopenedCount">0</strong><span>Reopened by residents</span></div>
+        </div>
+      </div>
     </div>
 
       </section>

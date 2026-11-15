@@ -234,7 +234,7 @@ function initAdminDashboardPage() {
             ${escapeHTML(item.purok)}<br>
             <small class="text-secondary">${escapeHTML(item.location || '')}</small>
           </td>
-          <td><span class="badge text-bg-light border">${item.stage}</span></td>
+          <td><span class="badge text-bg-light border">${item.stage}</span>${confirmationBadge(item)}</td>
           <td>${getPriorityBadge(item.priority)}${item.overdue ? '<div><span class="badge-soft soft-red overdue-badge" title="Open longer than the target time for its priority">Overdue</span></div>' : ''}</td>
           <td>
             ${item.attachmentId
@@ -280,6 +280,7 @@ function initAdminDashboardPage() {
     renderCharts(summary);
     renderHotspotGrid(summary.hotspots || []);
     renderResolution(summary.resolution);
+    renderConfirmation(summary.confirmation || {});
     renderHotspotMap();
   }
 
@@ -397,6 +398,23 @@ function initAdminDashboardPage() {
   });
 
   // Resolution times per category, against the target for that category's priority.
+  function renderConfirmation(confirmation) {
+    document.getElementById('confirmedCount').textContent = confirmation.confirmed ?? 0;
+    document.getElementById('awaitingCount').textContent = confirmation.awaiting ?? 0;
+    document.getElementById('reopenedCount').textContent = confirmation.reopened ?? 0;
+  }
+
+  // What the resident said about the fix, shown under the status in the report tables.
+  function confirmationBadge(item) {
+    if (item.confirmation === 'confirmed') return '<div><span class="badge-soft soft-green" title="The resident confirmed the issue is fixed">Resident confirmed</span></div>';
+    if (item.confirmation === 'awaiting') return '<div><span class="badge-soft soft-blue" title="The resident can still confirm or reopen this report">Awaiting resident</span></div>';
+    if (item.confirmation === 'accepted') return '<div><span class="badge-soft" title="The resident did not answer within 7 days">No reply · closed</span></div>';
+    if (item.reopenCount > 0 && !['Rejected', 'Withdrawn'].includes(item.stage)) {
+      return `<div><span class="badge-soft soft-yellow" title="The resident said the problem was not fixed">Reopened${item.reopenCount > 1 ? ` ×${item.reopenCount}` : ''}</span></div>`;
+    }
+    return '';
+  }
+
   function renderResolution(resolution) {
     const body = document.getElementById('resolutionBody');
     const overdueBadge = document.getElementById('resolutionOverdue');

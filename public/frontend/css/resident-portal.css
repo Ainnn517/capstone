@@ -290,6 +290,56 @@ body {
   object-fit: contain;
 }
 
+/* "Is the problem fixed?" after the barangay resolves a report. */
+.resolution-check {
+  margin-top: 0.9rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(53, 183, 121, .7);
+  border-radius: 12px;
+  background: rgba(53, 183, 121, .16);
+}
+
+.resolution-check-question {
+  margin: 0 0 0.2rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.resolution-check-hint {
+  margin: 0 0 0.6rem;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, .8);
+}
+
+.resolution-check .issue-actions .resolution-check-hint { margin: 0; align-self: center; }
+
+.resolution-check .btn-success {
+  background: #1f8a57;
+  border-color: #1f8a57;
+  color: #fff;
+}
+
+.resolution-check .btn-success:hover { background: #17724a; border-color: #17724a; }
+
+.resolution-check .btn-outline-danger {
+  background: transparent;
+  border-color: #ffb4b4;
+  color: #fff;
+}
+
+.resolution-check .btn-outline-danger:hover { background: rgba(220, 53, 69, .35); }
+
+.resolution-done,
+.resolution-reopened {
+  margin-top: 0.85rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.resolution-done { color: #8ee6b8; }
+.resolution-done-auto { color: rgba(255, 255, 255, .7); font-weight: 500; }
+.resolution-reopened { color: #ffd27a; }
+
 .issue-status-note {
   margin-top: 0.85rem;
   padding-top: 0.75rem;

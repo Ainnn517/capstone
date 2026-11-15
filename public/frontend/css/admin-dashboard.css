@@ -690,6 +690,33 @@ h1, h2, h3, h4, h5, h6 { margin-top: 0; }
   .live-dot { animation: none; }
 }
 
+/* Resident confirmation counts on Analytics. */
+.confirmation-summary {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.confirmation-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: .75rem;
+}
+
+.confirmation-stats > div {
+  display: flex;
+  flex-direction: column;
+  padding: .75rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .08);
+}
+
+.confirmation-stats strong { font-size: 1.5rem; line-height: 1.2; }
+.confirmation-stats span { font-size: .82rem; color: rgba(255, 255, 255, .8); }
+
+.badge-soft + div, td > div > .badge-soft { margin-top: .3rem; }
+
 /* Hotspot map (Leaflet). */
 .hotspot-map {
   width: 100%;

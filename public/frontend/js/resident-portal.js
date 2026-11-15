@@ -10,6 +10,8 @@ const API_ENDPOINTS = {
   createReport: '/api/reports',
   updateReport: '/api/reports/{id}',
   withdrawReport: '/api/reports/{id}/withdraw',
+  confirmReport: '/api/reports/{id}/confirm',
+  reopenReport: '/api/reports/{id}/reopen',
   suggestCategory: '/api/triage/category',
   session: '/api/session',
   logout: '/api/logout'
@@ -248,6 +250,35 @@ function initResidentPortalPage() {
     `;
   }
 
+  // After the barangay resolves a report, ask the resident whether it is really fixed.
+  function resolutionCheckHTML(item) {
+    const id = escapeHTML(item.id);
+    if (item.confirmation === 'awaiting') {
+      const deadline = new Date(item.respondBy).toLocaleDateString([], { month: 'long', day: 'numeric' });
+      return `
+        <div class="resolution-check" role="group" aria-label="Is the problem in report ${escapeHTML(item.tracking)} fixed?">
+          <p class="resolution-check-question">The barangay marked this report resolved. Is the problem fixed?</p>
+          <p class="resolution-check-hint">Please answer by ${escapeHTML(deadline)}. With no answer, the report closes as fixed.</p>
+          <div class="issue-actions">
+            <button class="btn btn-sm btn-success" type="button" data-report-confirm="${id}">Yes, it's fixed</button>
+            ${item.canReopen
+              ? `<button class="btn btn-sm btn-outline-danger" type="button" data-report-reopen="${id}">No, still a problem</button>`
+              : '<span class="resolution-check-hint">Still a problem? This report was already reopened twice, so please contact the barangay office.</span>'}
+          </div>
+        </div>`;
+    }
+    if (item.confirmation === 'confirmed') {
+      return `<div class="resolution-done"><i class="fi fi-rr-check" aria-hidden="true"></i> You confirmed this is fixed on ${escapeHTML(new Date(item.confirmedAt).toLocaleDateString())}.</div>`;
+    }
+    if (item.confirmation === 'accepted') {
+      return '<div class="resolution-done resolution-done-auto">Closed as fixed (no reply within 7 days).</div>';
+    }
+    if (item.reopenCount > 0 && !['Rejected', 'Withdrawn'].includes(item.stage)) {
+      return '<div class="resolution-reopened">You reopened this report. The barangay will send the team again.</div>';
+    }
+    return '';
+  }
+
   // Build the HTML for one report card.
   function createReportCardHTML(item) {
     const currentStageIndex = STAGES.indexOf(item.stage);
@@ -287,6 +318,8 @@ function initResidentPortalPage() {
         ${item.attachmentId ? `<img class="issue-attachment" src="/api/attachments/${encodeURIComponent(item.attachmentId)}" alt="Report attachment" loading="lazy">` : ''}
 
         ${workflowHTML}
+
+        ${resolutionCheckHTML(item)}
 
         <div class="issue-status-note">
           <strong>Latest Status:</strong> ${escapeHTML(item.updatedMessage || 'Report received and queued for administrative validation.')}
@@ -355,6 +388,42 @@ function initResidentPortalPage() {
       document.getElementById('editReportLandmark').value = report.landmark || '';
       document.getElementById('editReportMessage').textContent = '';
       editDialog.showModal();
+      return;
+    }
+
+    const confirmButton = event.target.closest('[data-report-confirm]');
+    if (confirmButton) {
+      const confirmed = await window.confirmAction('Confirm that the problem is fixed? This closes the report.');
+      if (!confirmed) return;
+      try {
+        await apiRequest('confirmReport', { id: confirmButton.dataset.reportConfirm });
+        window.showToast('Thank you for confirming. The report is now closed.', 'success');
+        await render();
+      } catch (error) {
+        window.showToast(error.message, 'error');
+      }
+      return;
+    }
+
+    const reopenButton = event.target.closest('[data-report-reopen]');
+    if (reopenButton) {
+      const reason = await window.promptAction(
+        'What is still wrong? The report goes back to the barangay so they can send the team again.',
+        {
+          maxLength: 300,
+          placeholder: 'For example: the pothole was only partly filled',
+          confirmLabel: 'Reopen report',
+          suggestions: ['The problem is still there.', 'It was only partly fixed.', 'The problem came back.']
+        }
+      );
+      if (reason === null) return;
+      try {
+        await apiRequest('reopenReport', { id: reopenButton.dataset.reportReopen, reason });
+        window.showToast('Your report was reopened and sent back to the barangay.', 'success');
+        await render();
+      } catch (error) {
+        window.showToast(error.message, 'error');
+      }
       return;
     }
 

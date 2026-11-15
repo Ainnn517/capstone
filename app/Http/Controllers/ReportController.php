@@ -57,10 +57,15 @@ class ReportController extends ApiController
         if ($user->role !== 'admin') {
             $reportsQuery->where('user_id', $user->user_id);
             $view = $request->query('view', 'all');
+            // Resolved reports waiting for the resident's confirmation stay in "current",
+            // so the resident sees the question without opening Past Reports.
             if ($view === 'current') {
-                $reportsQuery->whereNotIn('status', IssueReport::CLOSED_STATUSES);
+                $reportsQuery->where(fn ($query) => $query
+                    ->whereNotIn('status', IssueReport::CLOSED_STATUSES)
+                    ->orWhere(fn ($awaiting) => $awaiting->awaitingConfirmation()));
             } elseif ($view === 'past') {
-                $reportsQuery->whereIn('status', IssueReport::CLOSED_STATUSES);
+                $reportsQuery->whereIn('status', IssueReport::CLOSED_STATUSES)
+                    ->whereNot(fn ($awaiting) => $awaiting->awaitingConfirmation());
             } elseif ($view !== 'all') {
                 return $this->error('Select a valid report view.', 422);
             }
@@ -200,6 +205,11 @@ class ReportController extends ApiController
                 'resolutionRate' => $total === 0 ? 0 : (int) round(($resolved / $total) * 100),
                 'hotspotCount' => $hotspotCount,
                 'resolution' => app(InsightService::class)->resolutionStats(),
+                'confirmation' => [
+                    'confirmed' => (clone $reports)->where('status', 'Resolved')->whereNotNull('resident_confirmed_at')->count(),
+                    'awaiting' => IssueReport::query()->whereNull('archived_at')->awaitingConfirmation()->count(),
+                    'reopened' => (clone $reports)->where('reopen_count', '>', 0)->count(),
+                ],
                 'openByPriority' => [
                     'critical' => (int) ($openByPriority->critical ?? 0),
                     'high' => (int) ($openByPriority->high ?? 0),
@@ -426,6 +436,11 @@ class ReportController extends ApiController
                     ? (string) $report->latestAttachment->attachment_id
                     : null,
                 'updatedMessage' => $remarks ?: 'Report received and queued for administrative validation.',
+                'confirmation' => $report->confirmationState(),
+                'confirmedAt' => $this->clientTimestamp($report->resident_confirmed_at),
+                'respondBy' => $report->confirmationDeadline()?->toIso8601String(),
+                'reopenCount' => (int) $report->reopen_count,
+                'canReopen' => $report->reopen_count < (int) config('dss.max_reopens'),
             ];
         });
 
@@ -678,6 +693,87 @@ class ReportController extends ApiController
 
             return response()->json(['success' => true]);
         });
+    }
+
+    // The resident confirms that a resolved report is really fixed.
+    public function confirmResolution(int $id): JsonResponse
+    {
+        $user = $this->currentUser();
+
+        return DB::transaction(function () use ($user, $id): JsonResponse {
+            $report = $this->residentReportForAnswer($user, $id);
+            if ($report instanceof JsonResponse) {
+                return $report;
+            }
+
+            $report->update(['resident_confirmed_at' => now()]);
+            StatusLog::create([
+                'report_id' => $report->report_id,
+                'changed_by' => $user->user_id,
+                'old_status' => 'Resolved',
+                'new_status' => 'Resolved',
+                'remarks' => 'The resident confirmed that the issue is fixed.',
+            ]);
+
+            return response()->json(['success' => true]);
+        });
+    }
+
+    // The resident says a resolved report is not fixed: it goes back to the barangay as
+    // Validated (same team), so an administrator dispatches the team again.
+    public function reopen(Request $request, int $id): JsonResponse
+    {
+        $user = $this->currentUser();
+        $reason = trim((string) $request->input('reason', ''));
+        if (mb_strlen($reason) < 5 || mb_strlen($reason) > 300) {
+            return $this->error('Tell the barangay what is still wrong (5 to 300 characters).', 422);
+        }
+
+        return DB::transaction(function () use ($user, $id, $reason): JsonResponse {
+            $report = $this->residentReportForAnswer($user, $id);
+            if ($report instanceof JsonResponse) {
+                return $report;
+            }
+            if ($report->reopen_count >= (int) config('dss.max_reopens')) {
+                return $this->error('This report has already been reopened the most times allowed. Please contact the barangay office directly.', 409);
+            }
+
+            $report->update([
+                'status' => 'Validated',
+                'date_resolved' => null,
+                'reopen_count' => $report->reopen_count + 1,
+            ]);
+            StatusLog::create([
+                'report_id' => $report->report_id,
+                'changed_by' => $user->user_id,
+                'old_status' => 'Resolved',
+                'new_status' => 'Validated',
+                'remarks' => "Reopened by the resident: {$reason}",
+            ]);
+
+            return response()->json(['success' => true]);
+        });
+    }
+
+    // A resident's own resolved report that is still waiting for their answer, locked for update.
+    private function residentReportForAnswer(User $user, int $id): IssueReport|JsonResponse
+    {
+        $report = IssueReport::query()
+            ->where('report_id', $id)
+            ->where('user_id', $user->user_id)
+            ->whereNull('archived_at')
+            ->lockForUpdate()
+            ->first();
+        if (! $report) {
+            return $this->error('Report not found.', 404);
+        }
+
+        return match ($report->confirmationState()) {
+            'awaiting' => $report,
+            'confirmed' => $this->error('You already confirmed that this issue is fixed.', 409),
+            'accepted' => $this->error('The time to answer has passed. If the problem is back, please submit a new report.', 409),
+            default => $this->error('Only resolved reports can be confirmed or reopened.', 409),
+        };
     }
 
     // Update a report's status, assignment, history, and notification.
