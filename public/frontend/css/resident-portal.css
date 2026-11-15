@@ -945,3 +945,34 @@ body.menu-open { overflow: hidden; }
 }
 
 .issue-media { margin: 0.75rem 0; }
+
+/* English / Filipino switch in the top bar. */
+.language-switch {
+  display: inline-flex;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, .55);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.language-switch button {
+  padding: 0.25rem 0.75rem;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.language-switch button[aria-pressed="true"] {
+  background: #fff;
+  color: #304a39;
+}
+
+.language-switch button:focus-visible { outline: 2px solid #fff; outline-offset: -3px; }
+
+@media (max-width: 420px) {
+  .language-switch button { padding: 0.25rem 0.55rem; }
+}

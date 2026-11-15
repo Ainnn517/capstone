@@ -21,6 +21,10 @@
         <span id="menuNotifBadge" class="menu-badge" aria-label="Unread notifications" hidden></span>
       </button>
       <div class="d-flex align-items-center gap-3 navbar-actions">
+        <div class="language-switch" role="group" aria-label="Language">
+          <button type="button" data-language="en" aria-pressed="true" lang="en">English</button>
+          <button type="button" data-language="fil" aria-pressed="false" lang="fil">Filipino</button>
+        </div>
         <span id="residentName" class="small text-white-50 fw-semibold">Welcome,</span>
       </div>
     </div>
@@ -216,6 +220,7 @@
     </form>
   </dialog>
   <script src="{{ \App\Support\Asset::url('/frontend/js/csrf.js') }}" nonce="{{ app('csp.nonce') }}"></script>
+  <script src="{{ \App\Support\Asset::url('/frontend/js/resident-i18n.js') }}" nonce="{{ app('csp.nonce') }}"></script>
   <script src="{{ \App\Support\Asset::url('/frontend/js/notifications.js') }}" nonce="{{ app('csp.nonce') }}"></script>
   <script src="{{ \App\Support\Asset::url('/frontend/js/session-handler.js') }}" nonce="{{ app('csp.nonce') }}"></script>
   <script src="{{ \App\Support\Asset::url('/frontend/js/password-toggle.js') }}" nonce="{{ app('csp.nonce') }}"></script>

@@ -215,7 +215,7 @@ function initResidentPortalPage() {
       updateNotifications(await apiRequest('getNotifications', { view: notifFilter }, 'GET'));
     } catch (error) {
       const notifContainer = document.getElementById('notifications');
-      notifContainer.textContent = `Notifications unavailable: ${error.message}`;
+      notifContainer.textContent = t('Notifications unavailable: {message}', { message: error.message });
       document.getElementById('notifNavCount').textContent = '!';
     }
   }
@@ -225,7 +225,7 @@ function initResidentPortalPage() {
     const issuesListContainer = document.getElementById('issuesList');
     const issueCountBadge = document.getElementById('issueCount');
     const filterLabel = reportFilter === 'past' ? 'past report' : reportFilter === 'active' ? 'current report' : 'report';
-    issueCountBadge.textContent = `${reportPagination.total} ${filterLabel}${reportPagination.total === 1 ? '' : 's'}`;
+    issueCountBadge.textContent = t(`{n} ${filterLabel}${reportPagination.total === 1 ? '' : 's'}`, { n: reportPagination.total });
 
     if (reportPagination.total === 0) {
       const emptyMessage = reportFilter === 'active'
@@ -245,7 +245,7 @@ function initResidentPortalPage() {
     const { currentPage, lastPage, total } = reportPagination;
     container.innerHTML = `
       <button class="btn btn-sm btn-outline-secondary" type="button" data-report-page="${currentPage - 1}" ${currentPage <= 1 ? 'disabled' : ''}>Previous</button>
-      <span class="small text-secondary">Page ${currentPage} of ${lastPage} · ${total} reports</span>
+      <span class="small text-secondary">${escapeHTML(t('Page {page} of {last} · {total} reports', { page: currentPage, last: lastPage, total }))}</span>
       <button class="btn btn-sm btn-outline-secondary" type="button" data-report-page="${currentPage + 1}" ${currentPage >= lastPage ? 'disabled' : ''}>Next</button>
     `;
   }
@@ -270,7 +270,7 @@ function initResidentPortalPage() {
       return `
         <div class="resolution-check" role="group" aria-label="Is the problem in report ${escapeHTML(item.tracking)} fixed?">
           <p class="resolution-check-question">The barangay marked this report resolved. Is the problem fixed?</p>
-          <p class="resolution-check-hint">Please answer by ${escapeHTML(deadline)}. With no answer, the report closes as fixed.</p>
+          <p class="resolution-check-hint">${escapeHTML(t('Please answer by {date}. With no answer, the report closes as fixed.', { date: deadline }))}</p>
           <div class="issue-actions">
             <button class="btn btn-sm btn-success" type="button" data-report-confirm="${id}">Yes, it's fixed</button>
             ${item.canReopen
@@ -283,13 +283,13 @@ function initResidentPortalPage() {
     }
     if (item.confirmation === 'confirmed' || item.confirmation === 'accepted') {
       const closedText = item.confirmation === 'confirmed'
-        ? `<i class="fi fi-rr-check" aria-hidden="true"></i> You confirmed this is fixed on ${escapeHTML(new Date(item.confirmedAt).toLocaleDateString())}.`
+        ? `<i class="fi fi-rr-check" aria-hidden="true"></i> ${escapeHTML(t('You confirmed this is fixed on {date}.', { date: new Date(item.confirmedAt).toLocaleDateString() }))}`
         : 'Closed as fixed (no reply within 7 days).';
       // Problems like a drain that floods at the next heavy rain can show up later.
       const cameBack = item.canReopen
         ? `<div class="resolution-came-back">
             <button class="btn btn-sm btn-outline-secondary" type="button" data-report-reopen="${id}">Problem came back?</button>
-            <span class="resolution-check-hint">You can reopen this report until ${escapeHTML(new Date(item.reopenUntil).toLocaleDateString([], { month: 'long', day: 'numeric' }))}.</span>
+            <span class="resolution-check-hint">${escapeHTML(t('You can reopen this report until {date}.', { date: new Date(item.reopenUntil).toLocaleDateString([], { month: 'long', day: 'numeric' }) }))}</span>
           </div>`
         : '';
       return `<div class="resolution-done ${item.confirmation === 'accepted' ? 'resolution-done-auto' : ''}">${closedText}</div>${cameBack}`;
@@ -331,10 +331,10 @@ function initResidentPortalPage() {
               ${escapeHTML(item.category)} · ${escapeHTML(item.purok)} · ${new Date(item.created).toLocaleString()}
             </div>
           </div>
-          <span class="badge-soft ${priorityClass}">${item.priority || 'Normal'} Priority</span>
+          <span class="badge-soft ${priorityClass}">${escapeHTML(t('{priority} Priority', { priority: t(item.priority || 'Normal') }))}</span>
         </div>
 
-        <p class="issue-description">${escapeHTML(item.description)}</p>
+        <p class="issue-description" data-no-i18n>${escapeHTML(item.description)}</p>
 
         ${mediaGalleryHTML(item)}
 
@@ -505,7 +505,7 @@ function initResidentPortalPage() {
   function mediaProblem() {
     const photos = [...imageInput.files];
     const video = videoInput.files[0];
-    if (photos.length > MEDIA_LIMITS.photos) return `Choose at most ${MEDIA_LIMITS.photos} photos.`;
+    if (photos.length > MEDIA_LIMITS.photos) return t('Choose at most {n} photos.', { n: MEDIA_LIMITS.photos });
     if (photos.some(file => file.size > MEDIA_LIMITS.fileBytes)) return 'Each photo must be 10 MB or less.';
     if (video && video.size > MEDIA_LIMITS.fileBytes) return 'The video must be 10 MB or less.';
     const total = photos.reduce((sum, file) => sum + file.size, 0) + (video ? video.size : 0);
@@ -569,8 +569,8 @@ function initResidentPortalPage() {
     } else {
       locationMarker.setLatLng([latitude, longitude]);
     }
-    mapStatus.textContent = `Selected location: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}. Click or drag the marker to adjust it.`;
-    geoMsg.textContent = `Map location attached: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+    mapStatus.textContent = t('Selected location: {lat}, {lng}. Click or drag the marker to adjust it.', { lat: latitude.toFixed(5), lng: longitude.toFixed(5) });
+    geoMsg.textContent = t('Map location attached: {lat}, {lng}', { lat: latitude.toFixed(5), lng: longitude.toFixed(5) });
   }
 
   function initializeLocationMap() {
@@ -737,7 +737,13 @@ function initResidentPortalPage() {
         return;
       }
       applyReferenceData(await apiRequest('getReferenceData', {}, 'GET'));
-      document.getElementById('residentName').textContent = `Welcome, ${result.user.username}`;
+      const showWelcome = () => { document.getElementById('residentName').textContent = t('Welcome, {name}', { name: result.user.username }); };
+      showWelcome();
+      // Switching language rebuilds the parts made from values (counts, dates, names).
+      document.addEventListener('residentlanguagechange', () => {
+        showWelcome();
+        render();
+      });
       window.fillAccountDetails(result.user);
       showView(window.location.hash.slice(1));
       await render();
