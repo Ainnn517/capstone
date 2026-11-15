@@ -303,7 +303,7 @@
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div>
           <h4 class="section-title mb-1">Hotspot Map <span id="hotspotMapArea" class="hotspot-map-area"></span></h4>
-          <p class="small text-secondary mb-0">Reports that residents pinned on the map. The dashed line is the barangay boundary; red rings mark places with several open reports close together.</p>
+          <p class="small text-secondary mb-0">Reports that residents pinned on the map. Only the barangay is shown; the dashed line is the area it serves. Red rings mark places with several open reports close together.</p>
         </div>
         <label class="hotspot-map-scope">
           <span class="visually-hidden">Reports to show on the map</span>

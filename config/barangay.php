@@ -6,12 +6,7 @@ return [
     'name' => 'Barangay Langgam',
     'place' => 'San Pedro, Laguna',
 
-    // Map pins on reports must fall inside this box: the barangay's outline plus about 1 km,
-    // so residents near the border can still pin a spot just outside it.
-    'pin_bounds' => [
-        'south' => 14.3115,
-        'north' => 14.3458,
-        'west' => 120.9975,
-        'east' => 121.0335,
-    ],
+    // Outline of the area the barangay serves, drawn on both maps. Report pins must fall
+    // inside it (its "pinArea" allows about 50 m of leeway at the edges).
+    'boundary_file' => 'frontend/data/barangay-boundary.json',
 ];

@@ -15,6 +15,7 @@ use App\Services\AttachmentFileRemover;
 use App\Services\InsightService;
 use App\Services\ReportAlertService;
 use App\Services\UploadedImageSanitizer;
+use App\Support\BarangayArea;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -536,11 +537,8 @@ class ReportController extends ApiController
         if (($latitude === null) !== ($longitude === null)) {
             return $this->error('Both GPS coordinates are required.');
         }
-        // A pin far from the barangay is a mistake (or a phone reporting the wrong place).
-        $bounds = config('barangay.pin_bounds');
-        if ($latitude !== null && is_array($bounds)
-            && ($latitude < $bounds['south'] || $latitude > $bounds['north']
-                || $longitude < $bounds['west'] || $longitude > $bounds['east'])) {
+        // A pin outside the barangay is a mistake (or a phone reporting the wrong place).
+        if ($latitude !== null && ! BarangayArea::acceptsPin((float) $latitude, (float) $longitude)) {
             return $this->error('The map pin is outside '.config('barangay.name').'. Move the pin to where the problem is, or remove it.', 422);
         }
 

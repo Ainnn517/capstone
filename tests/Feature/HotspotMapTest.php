@@ -63,7 +63,7 @@ class HotspotMapTest extends TestCase
             ->assertJsonCount(2, 'points');
     }
 
-    public function test_a_pin_far_from_the_barangay_is_refused(): void
+    public function test_a_pin_outside_the_barangay_is_refused(): void
     {
         $report = fn (float $lat, float $lng) => $this->actingAs($this->resident)->postJson('/api/reports', [
             'category' => 'Road Damage',
@@ -73,12 +73,14 @@ class HotspotMapTest extends TestCase
             'longitude' => $lng,
         ]);
 
-        // San Jose del Monte, Bulacan: a different city.
-        $report(14.8136, 121.0450)->assertStatus(422)
-            ->assertJsonPath('message', 'The map pin is outside Barangay Langgam. Move the pin to where the problem is, or remove it.');
-        // Inside Barangay Langgam, and just outside its border.
+        $refused = 'The map pin is outside Barangay Langgam. Move the pin to where the problem is, or remove it.';
+        // San Jose del Monte, Bulacan (a different city) and Southville 3A (next door).
+        $report(14.8136, 121.0450)->assertStatus(422)->assertJsonPath('message', $refused);
+        $report(14.3323, 121.0086)->assertStatus(422)->assertJsonPath('message', $refused);
+        // St. Joseph Village 10, St. Joseph Ridgeview and Southern Heights 2 are all served.
         $report(14.3286, 121.0155)->assertCreated();
-        $report(14.3400, 121.0155)->assertCreated();
+        $report(14.3193, 121.0078)->assertCreated();
+        $report(14.3368, 121.0224)->assertCreated();
     }
 
     public function test_only_admins_can_see_the_map(): void

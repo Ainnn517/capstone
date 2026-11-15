@@ -811,8 +811,8 @@ td .badge-soft.confirm-badge { white-space: normal; }
 /* Hotspot map (Leaflet). */
 .hotspot-map {
   width: 100%;
-  height: min(60vh, 460px);
-  min-height: 300px;
+  height: min(75vh, 620px);
+  min-height: 320px;
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid var(--line);

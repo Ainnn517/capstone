@@ -551,6 +551,7 @@ function initResidentPortalPage() {
   let gpsCoordinates = null;
   let locationMap = null;
   let locationMarker = null;
+  let barangayArea = null;
 
   function setSelectedLocation(latitude, longitude) {
     gpsCoordinates = { latitude, longitude };
@@ -564,6 +565,12 @@ function initResidentPortalPage() {
         .addTo(locationMap);
       locationMarker.on('dragend', () => {
         const position = locationMarker.getLatLng();
+        // A pin dragged outside the barangay goes back to where it was.
+        if (barangayArea && !barangayArea.acceptsPin(position.lat, position.lng)) {
+          locationMarker.setLatLng([gpsCoordinates.latitude, gpsCoordinates.longitude]);
+          mapStatus.textContent = 'That spot is outside the barangay. Place the pin inside the dashed line.';
+          return;
+        }
         setSelectedLocation(position.lat, position.lng);
       });
     } else {
@@ -576,11 +583,18 @@ function initResidentPortalPage() {
   function initializeLocationMap() {
     locationMap = L.map(mapCanvas, { center: window.MAP_DEFAULT_CENTER, zoom: 15 });
     L.tileLayer(window.MAP_TILE_URL, { maxZoom: 19, attribution: window.MAP_ATTRIBUTION }).addTo(locationMap);
-    // Show the barangay's outline; the map cannot be dragged far outside it.
-    window.addBarangayBoundary(locationMap).then(() => {
+    // Only the barangay is shown; the rest is dimmed and cannot be pinned.
+    window.addBarangayBoundary(locationMap).then(area => {
+      barangayArea = area;
       if (gpsCoordinates) locationMap.setView([gpsCoordinates.latitude, gpsCoordinates.longitude], 17);
     });
-    locationMap.on('click', event => setSelectedLocation(event.latlng.lat, event.latlng.lng));
+    locationMap.on('click', event => {
+      if (barangayArea && !barangayArea.acceptsPin(event.latlng.lat, event.latlng.lng)) {
+        mapStatus.textContent = 'That spot is outside the barangay. Place the pin inside the dashed line.';
+        return;
+      }
+      setSelectedLocation(event.latlng.lat, event.latlng.lng);
+    });
   }
 
   geoBtn.addEventListener('click', async () => {
@@ -595,7 +609,7 @@ function initResidentPortalPage() {
         locationMap.setView([gpsCoordinates.latitude, gpsCoordinates.longitude], 17);
         setSelectedLocation(gpsCoordinates.latitude, gpsCoordinates.longitude);
       } else {
-        mapStatus.textContent = 'The dashed line is the barangay boundary. Click the map to place a marker, or drag it to adjust the location.';
+        mapStatus.textContent = 'Click inside the dashed line (the barangay) to place a marker, or drag it to adjust the location.';
         geoMsg.textContent = '';
       }
     } catch (error) {
@@ -625,8 +639,7 @@ function initResidentPortalPage() {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         // Someone reporting from outside the barangay places the pin by hand instead.
-        const limits = locationMap.options.maxBounds;
-        if (limits && !limits.contains([position.coords.latitude, position.coords.longitude])) {
+        if (barangayArea && !barangayArea.acceptsPin(position.coords.latitude, position.coords.longitude)) {
           mapStatus.textContent = 'You seem to be outside the barangay right now. Click the map to place the pin where the problem is.';
           return;
         }
