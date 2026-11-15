@@ -946,7 +946,15 @@ body.menu-open { overflow: hidden; }
 
 .issue-media { margin: 0.75rem 0; }
 
-/* English / Filipino switch in the top bar. */
+/* English / Filipino switch in Account. */
+.account-language {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
 .language-switch {
   display: inline-flex;
   flex-shrink: 0;
@@ -956,12 +964,12 @@ body.menu-open { overflow: hidden; }
 }
 
 .language-switch button {
-  padding: 0.25rem 0.75rem;
+  padding: 0.4rem 1rem;
   border: 0;
   background: transparent;
   color: #fff;
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
 }
@@ -972,7 +980,3 @@ body.menu-open { overflow: hidden; }
 }
 
 .language-switch button:focus-visible { outline: 2px solid #fff; outline-offset: -3px; }
-
-@media (max-width: 420px) {
-  .language-switch button { padding: 0.25rem 0.55rem; }
-}

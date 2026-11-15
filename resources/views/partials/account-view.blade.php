@@ -17,6 +17,17 @@
   </div>
 
   @if ($viewClass === 'resident-view')
+    <div class="card p-4 mb-4 account-language">
+      <div>
+        <h2 class="account-heading mb-1">Language</h2>
+        <p class="text-secondary small mb-0">Choose the language of this portal. Your choice is remembered on this device.</p>
+      </div>
+      <div class="language-switch" role="group" aria-label="Language">
+        <button type="button" data-language="en" aria-pressed="true" lang="en">English</button>
+        <button type="button" data-language="fil" aria-pressed="false" lang="fil">Filipino</button>
+      </div>
+    </div>
+
     <div class="card p-4 mb-4">
       <h2 class="account-heading">Email updates</h2>
       <label class="account-toggle" for="emailAlertsToggle">

@@ -12,7 +12,12 @@ def test_resident_portal_in_filipino(app, new_page):
     submit_report(page)
     expect(page.locator("#reportTitle")).to_have_text("Report an Issue")
 
+    # The switch lives in Account.
+    open_resident_view(page, "account")
     page.click("[data-language=fil]")
+    expect(page.locator("#accountTitle")).to_have_text("Account")
+    expect(page.locator(".account-language h2")).to_have_text("Wika")
+    open_resident_view(page, "report")
     expect(page.locator("#reportTitle")).to_have_text("Mag-ulat ng Problema")
     expect(page.locator("#residentName")).to_have_text("Maligayang pagdating, e2eresident")
     expect(page.locator("#description")).to_have_attribute("placeholder", "Ilarawan ang problema (1 hanggang 500 titik).")
@@ -28,10 +33,11 @@ def test_resident_portal_in_filipino(app, new_page):
 
     # The choice is remembered on this device.
     page.reload()
-    expect(page.locator("#reportTitle")).to_have_text("Mag-ulat ng Problema")
+    expect(page.locator("#issueCount")).to_have_text("1 kasalukuyang ulat")
 
+    open_resident_view(page, "account")
     page.click("[data-language=en]")
-    expect(page.locator("#reportTitle")).to_have_text("Report an Issue")
+    expect(page.locator(".account-language h2")).to_have_text("Language")
     expect(page.locator("#residentName")).to_have_text("Welcome, e2eresident")
     open_resident_view(page, "reports")
     expect(page.locator("#issueCount")).to_have_text("1 current report")

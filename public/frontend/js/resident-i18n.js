@@ -17,6 +17,7 @@
     'Notifications': 'Mga Abiso',
     'Account': 'Account',
     'Language': 'Wika',
+    'Choose the language of this portal. Your choice is remembered on this device.': 'Piliin ang wika ng portal na ito. Tatandaan ang pinili mo sa device na ito.',
 
     // Report an issue
     'Submit an incident and receive an automated tracking ID.': 'Magpadala ng ulat at makatanggap ng tracking ID.',
