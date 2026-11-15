@@ -536,6 +536,13 @@ class ReportController extends ApiController
         if (($latitude === null) !== ($longitude === null)) {
             return $this->error('Both GPS coordinates are required.');
         }
+        // A pin far from the barangay is a mistake (or a phone reporting the wrong place).
+        $bounds = config('barangay.pin_bounds');
+        if ($latitude !== null && is_array($bounds)
+            && ($latitude < $bounds['south'] || $latitude > $bounds['north']
+                || $longitude < $bounds['west'] || $longitude > $bounds['east'])) {
+            return $this->error('The map pin is outside '.config('barangay.name').'. Move the pin to where the problem is, or remove it.', 422);
+        }
 
         $media = $this->prepareMedia($request);
         if ($media instanceof JsonResponse) {

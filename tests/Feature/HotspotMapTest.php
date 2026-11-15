@@ -26,10 +26,10 @@ class HotspotMapTest extends TestCase
 
     public function test_map_lists_open_reports_that_have_a_gps_pin(): void
     {
-        $pinned = $this->report('Submitted', 14.8136, 121.0450);
+        $pinned = $this->report('Submitted', 14.3286, 121.0155);
         $this->report('Validated');
-        $this->report('Resolved', 14.8140, 121.0455);
-        $archived = $this->report('Dispatched', 14.8150, 121.0460);
+        $this->report('Resolved', 14.3290, 121.0160);
+        $archived = $this->report('Dispatched', 14.3300, 121.0165);
         $archived->update(['archived_at' => now()]);
 
         $admin = User::factory()->admin()->create();
@@ -45,22 +45,40 @@ class HotspotMapTest extends TestCase
         $this->assertSame('Road Damage', $point['category']);
         $this->assertSame('High', $point['priority']);
         $this->assertSame('Main Street, Barangay One', $point['area']);
-        $this->assertEqualsWithDelta(14.8136, $point['lat'], 0.00001);
-        $this->assertEqualsWithDelta(121.045, $point['lng'], 0.00001);
+        $this->assertEqualsWithDelta(14.3286, $point['lat'], 0.00001);
+        $this->assertEqualsWithDelta(121.0155, $point['lng'], 0.00001);
         $this->assertArrayNotHasKey('description', $point);
         $this->assertArrayNotHasKey('residentId', $point);
     }
 
     public function test_all_scope_includes_closed_reports(): void
     {
-        $this->report('Submitted', 14.8136, 121.0450);
-        $this->report('Resolved', 14.8140, 121.0455);
+        $this->report('Submitted', 14.3286, 121.0155);
+        $this->report('Resolved', 14.3290, 121.0160);
 
         $admin = User::factory()->admin()->create();
         $this->actingAs($admin)->getJson('/api/analytics/map?scope=all')
             ->assertOk()
             ->assertJsonPath('scope', 'all')
             ->assertJsonCount(2, 'points');
+    }
+
+    public function test_a_pin_far_from_the_barangay_is_refused(): void
+    {
+        $report = fn (float $lat, float $lng) => $this->actingAs($this->resident)->postJson('/api/reports', [
+            'category' => 'Road Damage',
+            'location_id' => $this->location->location_id,
+            'description' => 'A large pothole near the corner.',
+            'latitude' => $lat,
+            'longitude' => $lng,
+        ]);
+
+        // San Jose del Monte, Bulacan: a different city.
+        $report(14.8136, 121.0450)->assertStatus(422)
+            ->assertJsonPath('message', 'The map pin is outside Barangay Langgam. Move the pin to where the problem is, or remove it.');
+        // Inside Barangay Langgam, and just outside its border.
+        $report(14.3286, 121.0155)->assertCreated();
+        $report(14.3400, 121.0155)->assertCreated();
     }
 
     public function test_only_admins_can_see_the_map(): void

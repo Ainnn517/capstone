@@ -319,7 +319,6 @@ function initAdminDashboardPage() {
   const CLOSED_COLOR = '#8a948e';
   let hotspotMap = null;
   let hotspotLayer = null;
-  let hotspotMapFitted = false;
 
   async function renderHotspotMap() {
     const container = document.getElementById('hotspotMap');
@@ -339,8 +338,11 @@ function initAdminDashboardPage() {
     if (document.getElementById('analyticsView').hidden) return;
 
     if (!hotspotMap) {
-      hotspotMap = L.map(container, { center: window.MAP_DEFAULT_CENTER, zoom: 14, scrollWheelZoom: false });
+      hotspotMap = L.map(container, { center: window.MAP_DEFAULT_CENTER, zoom: 15, scrollWheelZoom: false });
       L.tileLayer(window.MAP_TILE_URL, { maxZoom: 19, attribution: window.MAP_ATTRIBUTION }).addTo(hotspotMap);
+      // The map always shows the whole barangay, with its outline.
+      const area = await window.addBarangayBoundary(hotspotMap);
+      document.getElementById('hotspotMapArea').textContent = [area.name, area.place].filter(Boolean).join(', ');
       hotspotLayer = L.layerGroup().addTo(hotspotMap);
       // Zoom with the scroll wheel only after the admin clicks the map, so the page still scrolls.
       hotspotMap.on('click', () => hotspotMap.scrollWheelZoom.enable());
@@ -384,11 +386,6 @@ function initAdminDashboardPage() {
         .addTo(hotspotLayer);
     });
 
-    // Fit the view to the pins the first time (and whenever the scope changes), not on every refresh.
-    if (!hotspotMapFitted && points.length) {
-      hotspotMap.fitBounds(L.latLngBounds(points.map(point => [point.lat, point.lng])), { padding: [30, 30], maxZoom: 17 });
-      hotspotMapFitted = true;
-    }
 
     const noun = points.length === 1 ? 'report' : 'reports';
     const parts = [`${points.length} ${scope === 'all' ? noun : `open ${noun}`} on the map`];
@@ -441,7 +438,6 @@ function initAdminDashboardPage() {
   exportMonth.addEventListener('change', updateExportLinks);
 
   document.getElementById('hotspotMapScope').addEventListener('change', () => {
-    hotspotMapFitted = false;
     renderHotspotMap();
   });
 

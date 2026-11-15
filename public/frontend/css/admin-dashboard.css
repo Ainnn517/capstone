@@ -853,6 +853,19 @@ td .badge-soft.confirm-badge { white-space: normal; }
   background: rgba(220, 53, 69, .18);
 }
 
+.legend-boundary {
+  width: 18px;
+  height: 0;
+  border-top: 2.5px dashed #8ee6b8;
+}
+
+.hotspot-map-area {
+  margin-left: .4rem;
+  font-size: .85rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, .8);
+}
+
 /* Map popups use dark text on Leaflet's white bubble. */
 .hotspot-map .leaflet-popup-content { color: #1f2a24; font-size: .85rem; line-height: 1.4; }
 .hotspot-map .leaflet-popup-content strong { display: block; font-size: .95rem; }

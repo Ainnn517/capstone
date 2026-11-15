@@ -302,8 +302,8 @@
     <div class="card p-4 mt-4">
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div>
-          <h4 class="section-title mb-1">Hotspot Map</h4>
-          <p class="small text-secondary mb-0">Reports that residents pinned on the map. Red rings mark places with several open reports close together.</p>
+          <h4 class="section-title mb-1">Hotspot Map <span id="hotspotMapArea" class="hotspot-map-area"></span></h4>
+          <p class="small text-secondary mb-0">Reports that residents pinned on the map. The dashed line is the barangay boundary; red rings mark places with several open reports close together.</p>
         </div>
         <label class="hotspot-map-scope">
           <span class="visually-hidden">Reports to show on the map</span>
@@ -319,6 +319,7 @@
         <li><span class="legend-dot legend-normal"></span>Normal</li>
         <li><span class="legend-dot legend-closed"></span>Closed</li>
         <li><span class="legend-ring"></span>Hotspot</li>
+        <li><span class="legend-boundary"></span>Barangay boundary</li>
       </ul>
       <div id="hotspotMap" class="hotspot-map mt-2" role="region" aria-label="Map of reported issues"></div>
       <p id="hotspotMapNote" class="small text-secondary mt-2 mb-0" aria-live="polite"></p>

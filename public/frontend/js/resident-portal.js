@@ -574,8 +574,12 @@ function initResidentPortalPage() {
   }
 
   function initializeLocationMap() {
-    locationMap = L.map(mapCanvas, { center: window.MAP_DEFAULT_CENTER, zoom: 14 });
+    locationMap = L.map(mapCanvas, { center: window.MAP_DEFAULT_CENTER, zoom: 15 });
     L.tileLayer(window.MAP_TILE_URL, { maxZoom: 19, attribution: window.MAP_ATTRIBUTION }).addTo(locationMap);
+    // Show the barangay's outline; the map cannot be dragged far outside it.
+    window.addBarangayBoundary(locationMap).then(() => {
+      if (gpsCoordinates) locationMap.setView([gpsCoordinates.latitude, gpsCoordinates.longitude], 17);
+    });
     locationMap.on('click', event => setSelectedLocation(event.latlng.lat, event.latlng.lng));
   }
 
@@ -591,7 +595,7 @@ function initResidentPortalPage() {
         locationMap.setView([gpsCoordinates.latitude, gpsCoordinates.longitude], 17);
         setSelectedLocation(gpsCoordinates.latitude, gpsCoordinates.longitude);
       } else {
-        mapStatus.textContent = 'Map centered near San Jose del Monte. Click the map to place a marker, or drag it to adjust the location.';
+        mapStatus.textContent = 'The dashed line is the barangay boundary. Click the map to place a marker, or drag it to adjust the location.';
         geoMsg.textContent = '';
       }
     } catch (error) {
@@ -620,6 +624,12 @@ function initResidentPortalPage() {
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        // Someone reporting from outside the barangay places the pin by hand instead.
+        const limits = locationMap.options.maxBounds;
+        if (limits && !limits.contains([position.coords.latitude, position.coords.longitude])) {
+          mapStatus.textContent = 'You seem to be outside the barangay right now. Click the map to place the pin where the problem is.';
+          return;
+        }
         locationMap.setView([position.coords.latitude, position.coords.longitude], 17);
         setSelectedLocation(position.coords.latitude, position.coords.longitude);
       },
