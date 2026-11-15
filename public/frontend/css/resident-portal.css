@@ -913,3 +913,35 @@ body.menu-open { overflow: hidden; }
 .navbar > .container { flex-wrap: nowrap; align-items: center; }
 .navbar > .container > .navbar-actions { width: auto; flex: 1 1 auto; min-width: 0; justify-content: flex-end; }
 #residentName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Photos and video: preview before sending, and the gallery on each report card. */
+.media-error { color: #ffb4b4; min-height: 0; }
+.media-error:empty { display: none; }
+
+.media-preview,
+.issue-media {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.media-preview img,
+.issue-media img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
+}
+
+.media-preview video,
+.issue-media-video {
+  grid-column: 1 / -1;
+  width: 100%;
+  max-height: 260px;
+  border-radius: 8px;
+  background: #000;
+}
+
+.issue-media { margin: 0.75rem 0; }

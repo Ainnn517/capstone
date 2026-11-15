@@ -47,11 +47,7 @@ class ReportController extends ApiController
             'location',
             'team',
             'latestStatusLog',
-            'latestAttachment' => fn ($query) => $query->select(
-                'ATTACHMENT.attachment_id',
-                'ATTACHMENT.report_id',
-                'ATTACHMENT.mime_type',
-            ),
+            'attachments' => fn ($query) => $query->select('attachment_id', 'report_id', 'mime_type'),
         ])->whereNull('archived_at')
             ->orderByDesc('date_submitted')
             ->orderByDesc('report_id');
@@ -153,11 +149,7 @@ class ReportController extends ApiController
             'location',
             'team',
             'latestStatusLog',
-            'latestAttachment' => fn ($query) => $query->select(
-                'ATTACHMENT.attachment_id',
-                'ATTACHMENT.report_id',
-                'ATTACHMENT.mime_type',
-            ),
+            'attachments' => fn ($query) => $query->select('attachment_id', 'report_id', 'mime_type'),
         ])->whereNotNull('archived_at');
         if ($error = $this->applySearch($query, $request)) {
             return $error;
@@ -464,9 +456,14 @@ class ReportController extends ApiController
                 'assignee' => $report->team?->name ?? 'Unassigned',
                 'dispatchNote' => $remarks ?? '',
                 'archivedAt' => $this->clientTimestamp($report->archived_at),
-                'attachmentId' => $report->latestAttachment
-                    ? (string) $report->latestAttachment->attachment_id
+                // First photo, for thumbnails; the full list follows.
+                'attachmentId' => ($photo = $report->attachments->first(fn (Attachment $file) => ! $file->isVideo()))
+                    ? (string) $photo->attachment_id
                     : null,
+                'attachments' => $report->attachments->map(fn (Attachment $file): array => [
+                    'id' => (string) $file->attachment_id,
+                    'type' => $file->isVideo() ? 'video' : 'image',
+                ])->values(),
                 'updatedMessage' => $remarks ?: 'Report received and queued for administrative validation.',
                 'confirmation' => $report->confirmationState(),
                 'confirmedAt' => $this->clientTimestamp($report->resident_confirmed_at),
@@ -496,7 +493,7 @@ class ReportController extends ApiController
             : Carbon::parse($timestamp, config('app.timezone'))->toIso8601String();
     }
 
-    // Validate and save a resident's report and optional image.
+    // Validate and save a resident's report with its optional photos and video.
     public function store(Request $request): JsonResponse
     {
         $user = $this->currentUser();
@@ -540,49 +537,13 @@ class ReportController extends ApiController
             return $this->error('Both GPS coordinates are required.');
         }
 
-        $image = $request->file('image');
-        if ($image) {
-            $fileValidator = Validator::make(['image' => $image], [
-                'image' => ['file', 'mimes:jpg,jpeg,png,gif,webp', 'max:5120'],
-            ]);
-            if ($fileValidator->fails()) {
-                return $this->error('Image upload failed or exceeds the 5 MB limit.');
-            }
-            if (! in_array($image->getMimeType(), ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true)) {
-                return $this->error('Upload a JPG, PNG, GIF, or WebP image.');
-            }
+        $media = $this->prepareMedia($request);
+        if ($media instanceof JsonResponse) {
+            return $media;
         }
-
-        $imagePath = $image?->getRealPath();
-        if ($image && ! is_string($imagePath)) {
-            return $this->error('Could not read the uploaded image.');
-        }
-        $imageData = null;
-        if ($imagePath !== null) {
-            $uploadedBytes = file_get_contents($imagePath);
-            if ($uploadedBytes === false) {
-                return $this->error('Could not read the uploaded image.');
-            }
-            try {
-                $imageData = $this->imageSanitizer->sanitize($uploadedBytes, $image->getMimeType());
-            } catch (InvalidArgumentException $exception) {
-                return $this->error($exception->getMessage(), 422);
-            }
-        }
-
-        $imageExtension = match ($image?->getMimeType()) {
-            'image/jpeg' => 'jpg',
-            'image/png' => 'png',
-            'image/gif' => 'gif',
-            'image/webp' => 'webp',
-            default => null,
-        };
-        $imageStoragePath = $imageData !== null
-            ? 'report-attachments/'.bin2hex(random_bytes(32)).'.'.$imageExtension
-            : null;
         $trackingCode = 'BR-'.now('UTC')->format('ymd-His').'-'.strtoupper(bin2hex(random_bytes(3)));
         try {
-            $report = DB::transaction(function () use ($user, $category, $location, $data, $latitude, $longitude, $trackingCode, $image, $imageData, $imageStoragePath, $minuteKey, $dayKey): IssueReport {
+            $report = DB::transaction(function () use ($user, $category, $location, $data, $latitude, $longitude, $trackingCode, $media, $minuteKey, $dayKey): IssueReport {
                 $report = IssueReport::create([
                     'tracking_code' => $trackingCode,
                     'user_id' => $user->user_id,
@@ -607,14 +568,14 @@ class ReportController extends ApiController
                     'type' => 'submitted',
                 ]);
 
-                if ($image && $imageData !== null && $imageStoragePath !== null) {
-                    if (! Storage::disk('local')->put($imageStoragePath, $imageData)) {
-                        throw new RuntimeException('Could not store the report image.');
+                foreach ($media as $file) {
+                    if (! Storage::disk('local')->put($file['path'], $file['bytes'])) {
+                        throw new RuntimeException('Could not store the report attachment.');
                     }
                     Attachment::create([
                         'report_id' => $report->report_id,
-                        'mime_type' => $image->getMimeType(),
-                        'file_path' => $imageStoragePath,
+                        'mime_type' => $file['mime'],
+                        'file_path' => $file['path'],
                     ]);
                 }
 
@@ -624,9 +585,7 @@ class ReportController extends ApiController
                 return $report;
             });
         } catch (Throwable $exception) {
-            if ($imageStoragePath !== null) {
-                Storage::disk('local')->delete($imageStoragePath);
-            }
+            Storage::disk('local')->delete(array_column($media, 'path'));
             throw $exception;
         }
 
@@ -635,6 +594,77 @@ class ReportController extends ApiController
             'id' => (string) $report->report_id,
             'tracking' => $trackingCode,
         ], 201);
+    }
+
+    /**
+     * Check the uploaded photos (up to 5, re-encoded to strip hidden data) and the optional
+     * video (checked by its content, not its name), and give each a random storage path.
+     *
+     * @return list<array{bytes: string, mime: string, path: string}>|JsonResponse
+     */
+    private function prepareMedia(Request $request): array|JsonResponse
+    {
+        $limits = config('security.uploads');
+        // "image" is the older single-photo field; it still works.
+        $photos = array_values(array_filter(array_merge(
+            (array) $request->file('images', []),
+            $request->hasFile('image') ? [$request->file('image')] : [],
+        )));
+        $video = $request->file('video');
+        if (count($photos) > $limits['max_photos']) {
+            return $this->error("Attach at most {$limits['max_photos']} photos.", 422);
+        }
+
+        $totalBytes = array_sum(array_map(fn ($file) => (int) $file->getSize(), $photos)) + (int) $video?->getSize();
+        if ($totalBytes > $limits['report_total_kb'] * 1024) {
+            return $this->error('All photos and the video together must be '.($limits['report_total_kb'] / 1024).' MB or less.', 422);
+        }
+
+        $media = [];
+        foreach ($photos as $photo) {
+            if (! $photo->isValid() || $photo->getSize() > $limits['photo_max_kb'] * 1024) {
+                return $this->error('Each photo must be '.($limits['photo_max_kb'] / 1024).' MB or less.', 422);
+            }
+            $mime = $photo->getMimeType();
+            if (! array_key_exists($mime, Attachment::IMAGE_TYPES)) {
+                return $this->error('Upload photos as JPG, PNG, GIF, or WebP.', 422);
+            }
+            $bytes = file_get_contents($photo->getRealPath());
+            if ($bytes === false) {
+                return $this->error('Could not read an uploaded photo.', 422);
+            }
+            try {
+                $bytes = $this->imageSanitizer->sanitize($bytes, $mime);
+            } catch (InvalidArgumentException $exception) {
+                return $this->error($exception->getMessage(), 422);
+            }
+            $media[] = ['bytes' => $bytes, 'mime' => $mime, 'path' => $this->newAttachmentPath(Attachment::IMAGE_TYPES[$mime])];
+        }
+
+        if ($video) {
+            if (! $video->isValid() || $video->getSize() > $limits['video_max_kb'] * 1024) {
+                return $this->error('The video must be '.($limits['video_max_kb'] / 1024).' MB or less.', 422);
+            }
+            $bytes = file_get_contents($video->getRealPath());
+            $mime = $bytes === false ? null : (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
+            if ($bytes === false || ! array_key_exists((string) $mime, Attachment::VIDEO_TYPES) || ! $this->looksLikeVideo($bytes)) {
+                return $this->error('Upload the video as MP4, WebM, or MOV.', 422);
+            }
+            $media[] = ['bytes' => $bytes, 'mime' => $mime, 'path' => $this->newAttachmentPath(Attachment::VIDEO_TYPES[$mime])];
+        }
+
+        return $media;
+    }
+
+    // MP4 and MOV files carry "ftyp" at byte 4; WebM files start with the EBML marker.
+    private function looksLikeVideo(string $bytes): bool
+    {
+        return substr($bytes, 4, 4) === 'ftyp' || str_starts_with($bytes, "\x1A\x45\xDF\xA3");
+    }
+
+    private function newAttachmentPath(string $extension): string
+    {
+        return 'report-attachments/'.bin2hex(random_bytes(32)).'.'.$extension;
     }
 
     // Resident: change a report that nobody has reviewed yet (status Submitted).

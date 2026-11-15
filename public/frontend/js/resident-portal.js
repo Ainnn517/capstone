@@ -250,6 +250,18 @@ function initResidentPortalPage() {
     `;
   }
 
+  // The report's photos (tap to open full size) and video.
+  function mediaGalleryHTML(item) {
+    const files = item.attachments || [];
+    if (!files.length) return '';
+    return `<div class="issue-media">${files.map((file, index) => {
+      const src = `/api/attachments/${encodeURIComponent(file.id)}`;
+      return file.type === 'video'
+        ? `<video class="issue-media-video" src="${src}" controls preload="metadata" aria-label="Video for report ${escapeHTML(item.tracking)}"></video>`
+        : `<a href="${src}" target="_blank" rel="noopener"><img src="${src}" alt="Photo ${index + 1} for report ${escapeHTML(item.tracking)}" loading="lazy"></a>`;
+    }).join('')}</div>`;
+  }
+
   // After the barangay resolves a report, ask the resident whether it is really fixed.
   function resolutionCheckHTML(item) {
     const id = escapeHTML(item.id);
@@ -324,7 +336,7 @@ function initResidentPortalPage() {
 
         <p class="issue-description">${escapeHTML(item.description)}</p>
 
-        ${item.attachmentId ? `<img class="issue-attachment" src="/api/attachments/${encodeURIComponent(item.attachmentId)}" alt="Report attachment" loading="lazy">` : ''}
+        ${mediaGalleryHTML(item)}
 
         ${workflowHTML}
 
@@ -481,23 +493,54 @@ function initResidentPortalPage() {
     render();
   });
 
+  // Photos (up to 5) and one video. Limits match the server: 10 MB each, 25 MB in total.
   const imageInput = document.getElementById('image');
-  const imagePreview = document.getElementById('preview');
+  const videoInput = document.getElementById('video');
+  const mediaPreview = document.getElementById('mediaPreview');
+  const mediaError = document.getElementById('mediaError');
+  const MB = 1024 * 1024;
+  const MEDIA_LIMITS = { photos: 5, fileBytes: 10 * MB, totalBytes: 25 * MB };
 
-  // Preview the selected report image.
-  imageInput.addEventListener('change', () => {
-    const file = imageInput.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        imagePreview.src = reader.result;
-        imagePreview.classList.remove('d-none');
-      };
-      reader.readAsDataURL(file);
-    } else {
-      imagePreview.classList.add('d-none');
+  // A message describing what is wrong with the chosen files, or '' when they are fine.
+  function mediaProblem() {
+    const photos = [...imageInput.files];
+    const video = videoInput.files[0];
+    if (photos.length > MEDIA_LIMITS.photos) return `Choose at most ${MEDIA_LIMITS.photos} photos.`;
+    if (photos.some(file => file.size > MEDIA_LIMITS.fileBytes)) return 'Each photo must be 10 MB or less.';
+    if (video && video.size > MEDIA_LIMITS.fileBytes) return 'The video must be 10 MB or less.';
+    const total = photos.reduce((sum, file) => sum + file.size, 0) + (video ? video.size : 0);
+    if (total > MEDIA_LIMITS.totalBytes) return 'Photos and video together must be 25 MB or less.';
+    return '';
+  }
+
+  let previewUrls = [];
+  function renderMediaPreview() {
+    previewUrls.forEach(url => URL.revokeObjectURL(url));
+    previewUrls = [];
+    mediaPreview.innerHTML = '';
+    mediaError.textContent = mediaProblem();
+    [...imageInput.files].slice(0, MEDIA_LIMITS.photos).forEach(file => {
+      const url = URL.createObjectURL(file);
+      previewUrls.push(url);
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = `Selected photo ${file.name}`;
+      mediaPreview.appendChild(img);
+    });
+    const video = videoInput.files[0];
+    if (video) {
+      const url = URL.createObjectURL(video);
+      previewUrls.push(url);
+      const player = document.createElement('video');
+      player.src = url;
+      player.muted = true;
+      player.controls = true;
+      player.setAttribute('aria-label', `Selected video ${video.name}`);
+      mediaPreview.appendChild(player);
     }
-  });
+  }
+  imageInput.addEventListener('change', renderMediaPreview);
+  videoInput.addEventListener('change', renderMediaPreview);
 
   const geoBtn = document.getElementById('geoBtn');
   const geoMsg = document.getElementById('geoMsg');
@@ -633,6 +676,13 @@ function initResidentPortalPage() {
       return;
     }
 
+    const fileProblem = mediaProblem();
+    if (fileProblem) {
+      document.getElementById('submitAlert').innerHTML = `<div class="alert alert-danger" role="alert">${escapeHTML(fileProblem)}</div>`;
+      imageInput.focus();
+      return;
+    }
+
     document.getElementById('submitAlert').innerHTML = '';
 
     try {
@@ -645,7 +695,8 @@ function initResidentPortalPage() {
         payload.append('latitude', gpsCoordinates.latitude);
         payload.append('longitude', gpsCoordinates.longitude);
       }
-      if (imageInput.files[0]) payload.append('image', imageInput.files[0]);
+      [...imageInput.files].forEach(file => payload.append('images[]', file));
+      if (videoInput.files[0]) payload.append('video', videoInput.files[0]);
 
       const result = await apiRequest('createReport', payload);
 
@@ -660,7 +711,7 @@ function initResidentPortalPage() {
         locationMarker = null;
       }
       this.classList.remove('was-validated');
-      imagePreview.classList.add('d-none');
+      renderMediaPreview();
       geoMsg.textContent = '';
 
       document.getElementById('submitAlert').innerHTML = `

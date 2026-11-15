@@ -77,6 +77,12 @@ class IssueReport extends Model
         return $this->hasOne(StatusLog::class, 'report_id', 'report_id')->latestOfMany('log_id');
     }
 
+    // All photos and the video, oldest first.
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(Attachment::class, 'report_id', 'report_id')->orderBy('attachment_id');
+    }
+
     // Get the most recently uploaded attachment.
     public function latestAttachment(): HasOne
     {

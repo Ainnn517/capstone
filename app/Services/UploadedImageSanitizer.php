@@ -6,16 +6,17 @@ use InvalidArgumentException;
 
 class UploadedImageSanitizer
 {
-    private const MAX_DIMENSION = 4000;
+    // Phone cameras produce 4032 x 3024 (12 MP) up to about 8000 x 6000 (48 MP) photos.
+    private const MAX_DIMENSION = 10000;
 
     public function sanitize(string $image, string $mimeType): string
     {
-        $size = getimagesizefromstring($image);
+        $size = @getimagesizefromstring($image); // @: a non-image is refused below, not a crash.
         if ($size === false
             || $size[0] > self::MAX_DIMENSION
             || $size[1] > self::MAX_DIMENSION
             || ($size['mime'] ?? null) !== $mimeType) {
-            throw new InvalidArgumentException('Images must be valid and no larger than 4000 by 4000 pixels.');
+            throw new InvalidArgumentException('Photos must be valid images no larger than 10000 by 10000 pixels.');
         }
 
         return match ($mimeType) {

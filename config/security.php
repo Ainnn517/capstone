@@ -11,6 +11,13 @@ return [
     'admin_two_factor' => (bool) env('ADMIN_TWO_FACTOR', true),
 
     // Automatic clean-up (php artisan data:purge, scheduled daily). Days; 0 disables a rule.
+    // Report attachments: photos and one short video. Each file and the whole report are capped.
+    'uploads' => [
+        'max_photos' => 5,
+        'photo_max_kb' => 10240,
+        'video_max_kb' => 10240,
+        'report_total_kb' => 25600,
+    ],
     'retention' => [
         'rejected_applications_days' => (int) env('RETENTION_REJECTED_DAYS', 30),
         // Pending sign-ups whose email was never verified (for example a fake address).

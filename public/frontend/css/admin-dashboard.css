@@ -704,6 +704,29 @@ h1, h2, h3, h4, h5, h6 { margin-top: 0; }
 .export-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
 .export-controls .form-control { width: auto; }
 
+/* Photos and video in the Manage window. */
+.admin-media {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: .5rem;
+}
+
+.admin-media img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.admin-media video {
+  grid-column: 1 / -1;
+  width: 100%;
+  max-height: 300px;
+  border-radius: 8px;
+  background: #000;
+}
+
 /* Report search boxes. */
 .report-search { min-width: 15rem; max-width: 100%; }
 

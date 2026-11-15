@@ -131,9 +131,13 @@
               </dialog>
 
               <div class="col-md-5">
-                <label class="form-label fw-medium" for="image">Image Attachment</label>
-                <input id="image" type="file" class="form-control" accept="image/*">
-                <img id="preview" class="img-fluid rounded mt-2 d-none" style="max-height: 140px; width: 100%; object-fit: cover;">
+                <label class="form-label fw-medium" for="image">Photos (up to 5)</label>
+                <input id="image" type="file" class="form-control" accept="image/jpeg,image/png,image/gif,image/webp" multiple aria-describedby="mediaHint">
+                <label class="form-label fw-medium mt-2" for="video">Video (optional, 1)</label>
+                <input id="video" type="file" class="form-control" accept="video/mp4,video/webm,video/quicktime" aria-describedby="mediaHint">
+                <small id="mediaHint" class="text-secondary d-block mt-1">Each photo or video up to 10 MB; 25 MB in total.</small>
+                <small id="mediaError" class="media-error d-block" role="alert"></small>
+                <div id="mediaPreview" class="media-preview" aria-label="Selected photos and video"></div>
               </div>
 
               <div class="col-12 mt-4">

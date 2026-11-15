@@ -110,6 +110,34 @@ function initAdminDashboardPage() {
     })[character]);
   }
 
+  // Table cell: the first photo, plus how many more photos and whether there is a video.
+  function attachmentCellHTML(item) {
+    const files = item.attachments || [];
+    if (!files.length) return '<span class="small text-secondary">None</span>';
+    const photos = files.filter(file => file.type === 'image');
+    const hasVideo = files.some(file => file.type === 'video');
+    const thumb = item.attachmentId
+      ? `<a href="/api/attachments/${encodeURIComponent(item.attachmentId)}" target="_blank" rel="noopener" aria-label="View photos for ${escapeHTML(item.tracking)}"><img class="img-fluid rounded" src="/api/attachments/${encodeURIComponent(item.attachmentId)}" alt="Resident upload for ${escapeHTML(item.tracking)}" loading="lazy" style="width: 88px; height: 64px; object-fit: cover;"></a>`
+      : '';
+    const extras = [
+      photos.length > 1 ? `+${photos.length - 1} photo${photos.length > 2 ? 's' : ''}` : '',
+      hasVideo ? 'Video' : ''
+    ].filter(Boolean).join(' · ');
+    return `${thumb}${extras ? `<div class="small text-secondary mt-1">${extras}</div>` : ''}`;
+  }
+
+  // Manage window: every photo (opens full size) and the video player.
+  function attachmentGalleryHTML(issue) {
+    const files = issue.attachments || [];
+    if (!files.length) return '';
+    return `<div class="admin-media mt-2">${files.map((file, index) => {
+      const src = `/api/attachments/${encodeURIComponent(file.id)}`;
+      return file.type === 'video'
+        ? `<video src="${src}" controls preload="metadata" aria-label="Video for ${escapeHTML(issue.tracking)}"></video>`
+        : `<a href="${src}" target="_blank" rel="noopener"><img src="${src}" alt="Photo ${index + 1} for ${escapeHTML(issue.tracking)}" loading="lazy"></a>`;
+    }).join('')}</div>`;
+  }
+
   // Return a colored badge for a report's priority.
   function getPriorityBadge(priority) {
     const p = priority || 'Normal';
@@ -238,9 +266,7 @@ function initAdminDashboardPage() {
           <td><span class="badge text-bg-light border">${item.stage}</span>${confirmationBadge(item)}</td>
           <td>${getPriorityBadge(item.priority)}${item.overdue ? '<div><span class="badge-soft soft-red overdue-badge" title="Open longer than the target time for its priority">Overdue</span></div>' : ''}</td>
           <td>
-            ${item.attachmentId
-              ? `<a href="/api/attachments/${encodeURIComponent(item.attachmentId)}" aria-label="View attachment for ${escapeHTML(item.tracking)}"><img class="img-fluid rounded" src="/api/attachments/${encodeURIComponent(item.attachmentId)}" alt="Resident upload for ${escapeHTML(item.tracking)}" loading="lazy" style="width: 88px; height: 64px; object-fit: cover;"></a>`
-              : '<span class="small text-secondary">None</span>'}
+            ${attachmentCellHTML(item)}
           </td>
           <td>
             ${archived
@@ -1028,7 +1054,7 @@ function initAdminDashboardPage() {
     document.getElementById('incidentSummary').innerHTML = `
       <strong>${escapeHTML(issue.tracking)}</strong> — ${escapeHTML(issue.category)} in <strong>${escapeHTML(issue.purok)}</strong><br>
       <small class="text-secondary">${escapeHTML(issue.description)}</small>
-      ${issue.attachmentId ? `<div class="mt-2"><img class="img-fluid rounded" src="/api/attachments/${encodeURIComponent(issue.attachmentId)}" alt="Report attachment" loading="lazy" style="max-height: 240px;"></div>` : ''}
+      ${attachmentGalleryHTML(issue)}
     `;
 
     document.getElementById('editPriority').value = issue.priority || 'Normal';

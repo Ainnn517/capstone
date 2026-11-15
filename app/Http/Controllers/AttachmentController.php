@@ -6,11 +6,12 @@ use App\Models\Attachment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class AttachmentController extends ApiController
 {
-    // Return an image only when the signed-in user can access its report.
-    public function show(int $id): JsonResponse|Response
+    // Return a photo or video only when the signed-in user can access its report.
+    public function show(int $id): JsonResponse|Response|BinaryFileResponse
     {
         $user = $this->currentUser();
 
@@ -28,11 +29,21 @@ class AttachmentController extends ApiController
 
         $imageData = $attachment->file_data;
         $mimeType = $attachment->mime_type;
-        if ($imageData === null
-            && preg_match('#\Areport-attachments/[a-f0-9]{64}\.(?:jpg|png|gif|webp)\z#', (string) $attachment->file_path)) {
-            if (Storage::disk('local')->exists($attachment->file_path)) {
-                $imageData = Storage::disk('local')->get($attachment->file_path);
+        $allowed = array_merge(array_keys(Attachment::IMAGE_TYPES), array_keys(Attachment::VIDEO_TYPES));
+        // Files on disk are streamed with byte-range support, which phones need to play
+        // and seek videos.
+        if ($imageData === null && preg_match(Attachment::STORED_PATH, (string) $attachment->file_path)
+            && in_array($mimeType, $allowed, true)) {
+            if (! Storage::disk('local')->exists($attachment->file_path)) {
+                return $this->error('Attachment not found.', 404);
             }
+
+            return response()->file(Storage::disk('local')->path($attachment->file_path), [
+                'Content-Type' => $mimeType,
+                'Content-Disposition' => 'inline',
+                'X-Content-Type-Options' => 'nosniff',
+                'Cache-Control' => 'private, no-store',
+            ]);
         }
         if ($imageData === null && $attachment->file_path !== null
             && preg_match('#\Adatabase/uploads/[a-f0-9]{32}\.(?:jpg|png|gif|webp)\z#', $attachment->file_path)) {

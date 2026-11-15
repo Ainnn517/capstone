@@ -98,7 +98,7 @@ def server():
         for command in ("config:cache", "route:cache", "view:cache", "event:cache"):
             _artisan(command)
     process = subprocess.Popen(
-        ["php", "-S", f"127.0.0.1:{PORT}", "../vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php"],
+        ["php", "-d", "upload_max_filesize=12M", "-d", "post_max_size=30M", "-d", "max_file_uploads=10", "-d", "memory_limit=256M", "-S", f"127.0.0.1:{PORT}", "../vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php"],
         cwd=PROJECT / "public", env=ENV, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
     for _ in range(50):

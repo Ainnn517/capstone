@@ -26,7 +26,7 @@
     <ul>
       <li>Account details: your full name, username, email address, and password (stored only in scrambled, hashed form that no one can read).</li>
       <li>Your home address (village or phase, street, and house number or landmark) and, if you choose to give it, your mobile number. Barangay staff use these only to confirm that you live in the barangay and to contact you about your account or reports.</li>
-      <li>Report details: issue category, description, selected area or street, optional landmark, optional GPS location, and optional photos.</li>
+      <li>Report details: issue category, description, selected area or street, optional landmark, optional GPS location, and optional photos (up to 5) and one short video.</li>
       <li>Report history: when a report was submitted, edited, withdrawn, reviewed, assigned to a team, and resolved.</li>
       <li>Your consent to this notice and the date you gave it.</li>
       <li>Short-lived security records, such as a count of failed sign-in attempts, used to protect accounts from misuse.</li>
