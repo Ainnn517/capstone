@@ -115,4 +115,10 @@ return [
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
 
+    // Replies to system emails go to a real inbox (the sender is a no-reply address).
+    'reply_to' => [
+        'address' => env('MAIL_REPLY_TO_ADDRESS'),
+        'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
+    ],
+
 ];
