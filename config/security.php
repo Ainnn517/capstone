@@ -13,6 +13,8 @@ return [
     // Automatic clean-up (php artisan data:purge, scheduled daily). Days; 0 disables a rule.
     'retention' => [
         'rejected_applications_days' => (int) env('RETENTION_REJECTED_DAYS', 30),
+        // Pending sign-ups whose email was never verified (for example a fake address).
+        'unverified_registrations_days' => (int) env('RETENTION_UNVERIFIED_DAYS', 7),
         'archived_reports_days' => (int) env('RETENTION_ARCHIVED_DAYS', 365),
         'audit_log_days' => (int) env('RETENTION_AUDIT_DAYS', 730),
     ],

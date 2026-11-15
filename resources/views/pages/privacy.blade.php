@@ -58,7 +58,7 @@
     <p>All connections use HTTPS encryption. Passwords are stored only in hashed form. Administrator sign-in requires an emailed one-time code, repeated sign-in attempts are limited, and changing your password signs out your other devices.</p>
 
     <h2>Retention and deletion</h2>
-    <p>Reports and attachments are kept while they are active. Archived reports, with their attachments and history, are deleted automatically one year after archiving, or earlier when an administrator deletes them. Registration requests that were not approved are deleted 30 days after rejection. Administrator activity records are kept for two years. Daily backups are kept for 14 days, so deleted information can remain in a backup until that backup expires.</p>
+    <p>Reports and attachments are kept while they are active. Archived reports, with their attachments and history, are deleted automatically one year after archiving, or earlier when an administrator deletes them. Registration requests that were not approved are deleted 30 days after rejection, and sign-ups whose email address is never verified are deleted after 7 days. Administrator activity records are kept for two years. Daily backups are kept for 14 days, so deleted information can remain in a backup until that backup expires.</p>
 
     <h2>Your rights</h2>
     <p>Under the Data Privacy Act, you have the right to be informed about how your information is used, to access it, to have mistakes corrected, to object to its processing, and to ask for it to be deleted when it is no longer needed. You may also file a complaint with the National Privacy Commission.</p>

@@ -32,6 +32,8 @@ class ResidentController extends ApiController
                 'fullName' => $resident->full_name,
                 'email' => $resident->email,
                 'accountStatus' => $resident->account_status,
+                // A fake or mistyped address can never be verified, so approval waits for it.
+                'emailVerified' => ! config('auth.require_email_verification') || $resident->hasVerifiedEmail(),
                 'registered' => Carbon::parse($resident->created_at, config('app.timezone'))->toIso8601String(),
                 'reportCount' => $resident->reports_count,
             ]);
@@ -83,6 +85,10 @@ class ResidentController extends ApiController
                     'rejected' => 'Only pending resident accounts can be rejected.',
                     'suspended' => 'Only approved resident accounts can be suspended.',
                 }, 409);
+            }
+
+            if ($status === 'approved' && config('auth.require_email_verification') && ! $resident->hasVerifiedEmail()) {
+                return $this->error('This resident has not verified their email address yet. Approve the account after they open the link in their verification email, or reject it.', 409);
             }
 
             $previousStatus = $resident->account_status;

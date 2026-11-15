@@ -47,7 +47,7 @@ Administrators confirm every sign-in with a 6-digit code emailed to them (`ADMIN
 
 ## Scheduled clean-up and backups
 
-`php artisan data:purge` deletes rejected applications after 30 days, archived reports (with their photos and history) after one year, administrator audit entries after two years, and expired password-reset links. The periods are `RETENTION_*` settings in `.env`; `0` disables a rule. It runs daily at 02:00 through Laravel's scheduler, which needs one cron entry on the server:
+`php artisan data:purge` deletes rejected applications after 30 days, pending sign-ups whose email was never verified after 7 days, archived reports (with their photos and history) after one year, administrator audit entries after two years, and expired password-reset links. The periods are `RETENTION_*` settings in `.env`; `0` disables a rule. It runs daily at 02:00 through Laravel's scheduler, which needs one cron entry on the server:
 
 ```
 * * * * * cd /path/to/CAPSTONE && php artisan schedule:run >> /dev/null 2>&1

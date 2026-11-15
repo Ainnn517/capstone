@@ -550,17 +550,18 @@ function initAdminDashboardPage() {
             <h2>${escapeHTML(resident.fullName)}</h2>
             <div class="small text-secondary">@${escapeHTML(resident.username)} · ${escapeHTML(resident.email)}</div>
           </div>
-          ${badge}
+          <div class="d-flex flex-column align-items-end gap-2">${badge}${emailBadge(resident)}</div>
         </div>
         <div class="resident-card-meta">Registered ${new Date(resident.registered).toLocaleDateString()}</div>
-        <div class="d-flex gap-2 mt-3">${buttons}</div>
+        <div class="d-flex flex-wrap gap-2 mt-3">${buttons}</div>
+        ${verificationNote(resident)}
       </article>`;
 
     const pendingHTML = count === 0
       ? '<div class="card p-4 text-secondary">There are no pending resident registrations.</div>'
       : pendingResidents.map(resident => applicationCard(resident,
           '<span class="badge-soft soft-yellow">Pending approval</span>',
-          `<button class="btn btn-sm btn-success" type="button" data-resident-approval="approved" data-resident-id="${escapeHTML(resident.id)}">Approve</button>
+          `${approveButton(resident, 'Approve')}
            <button class="btn btn-sm btn-outline-danger" type="button" data-resident-approval="rejected" data-resident-id="${escapeHTML(resident.id)}">Reject</button>`
         )).join('');
 
@@ -568,7 +569,7 @@ function initAdminDashboardPage() {
       <h2 class="applications-subheading">Rejected applications <span class="badge-soft soft-red">${rejectedResidents.length}</span></h2>
       ${rejectedResidents.map(resident => applicationCard(resident,
         '<span class="badge-soft soft-red">Rejected</span>',
-        `<button class="btn btn-sm btn-success" type="button" data-resident-approval="approved" data-resident-id="${escapeHTML(resident.id)}">Approve account</button>
+        `${approveButton(resident, 'Approve account')}
          <button class="btn btn-sm btn-outline-danger" type="button" data-resident-delete data-resident-id="${escapeHTML(resident.id)}">Delete account</button>`
       )).join('')}`;
 
@@ -765,18 +766,18 @@ function initAdminDashboardPage() {
       const residentId = escapeHTML(resident.id);
       const approvalButtons = {
         pending: `
-          <button class="btn btn-sm btn-success" type="button" data-resident-approval="approved" data-resident-id="${residentId}">Approve</button>
+          ${approveButton(resident, 'Approve')}
           <button class="btn btn-sm btn-outline-danger" type="button" data-resident-approval="rejected" data-resident-id="${residentId}">Reject</button>`,
         rejected: `
-          <button class="btn btn-sm btn-success" type="button" data-resident-approval="approved" data-resident-id="${residentId}">Approve account</button>
+          ${approveButton(resident, 'Approve account')}
           <button class="btn btn-sm btn-outline-danger" type="button" data-resident-delete data-resident-id="${residentId}">Delete account</button>`,
         approved: `
           <button class="btn btn-sm btn-outline-danger" type="button" data-resident-approval="suspended" data-resident-id="${residentId}">Suspend account</button>`,
         suspended: `
-          <button class="btn btn-sm btn-success" type="button" data-resident-approval="approved" data-resident-id="${residentId}">Reactivate account</button>`
+          ${approveButton(resident, 'Reactivate account')}`
       }[resident.accountStatus];
       const approvalActions = approvalButtons
-        ? `<div class="d-flex gap-2 mt-3">${approvalButtons}</div>`
+        ? `<div class="d-flex flex-wrap gap-2 mt-3">${approvalButtons}</div>${resident.accountStatus === 'approved' ? '' : verificationNote(resident)}`
         : '';
       const complaintHTML = reportPage
         ? reportPage.reports.map(report => `
@@ -809,6 +810,7 @@ function initAdminDashboardPage() {
             </div>
             <div class="d-flex flex-column align-items-end gap-2">
               ${statusBadge}
+              ${emailBadge(resident)}
               <span class="badge-soft soft-blue">${Number(resident.reportCount || 0)} complaint${Number(resident.reportCount || 0) === 1 ? '' : 's'}</span>
             </div>
           </div>
@@ -819,6 +821,25 @@ function initAdminDashboardPage() {
         </article>
       `;
     }).join('');
+  }
+
+  // Email verification status: a fake or mistyped address can never be verified, so the
+  // account cannot be approved until the resident opens the link sent to them.
+  function emailBadge(resident) {
+    return resident.emailVerified
+      ? '<span class="badge-soft soft-green">Email verified</span>'
+      : '<span class="badge-soft soft-yellow" title="The resident has not opened the verification link yet">Email not verified</span>';
+  }
+  function approveButton(resident, label) {
+    const id = escapeHTML(resident.id);
+    return resident.emailVerified
+      ? `<button class="btn btn-sm btn-success" type="button" data-resident-approval="approved" data-resident-id="${id}">${label}</button>`
+      : `<button class="btn btn-sm btn-success" type="button" disabled title="Waiting for the resident to verify their email">${label}</button>`;
+  }
+  function verificationNote(resident) {
+    return resident.emailVerified
+      ? ''
+      : '<p class="small text-secondary mt-2 mb-0">Waiting for the resident to verify their email. Unverified sign-ups are removed automatically after 7 days.</p>';
   }
 
   // Fill and open the report action dialog.

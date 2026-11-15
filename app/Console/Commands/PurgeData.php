@@ -15,7 +15,7 @@ class PurgeData extends Command
 {
     protected $signature = 'data:purge {--dry-run : Show what would be deleted without deleting anything}';
 
-    protected $description = 'Delete old rejected applications, archived reports, audit entries, and expired reset links';
+    protected $description = 'Delete old rejected applications, unverified sign-ups, archived reports, audit entries, and expired reset links';
 
     public function handle(AttachmentFileRemover $files): int
     {
@@ -28,6 +28,16 @@ class PurgeData extends Command
             ->whereDoesntHave('reports')
             ->when(($days['rejected_applications_days'] ?? 0) > 0,
                 fn ($query) => $query->where('created_at', '<', now()->subDays($days['rejected_applications_days'])),
+                fn ($query) => $query->whereRaw('1 = 0'))
+            ->get();
+
+        $unverified = User::query()
+            ->where('role', 'resident')
+            ->where('account_status', 'pending')
+            ->whereNull('email_verified_at')
+            ->whereDoesntHave('reports')
+            ->when(config('auth.require_email_verification') && ($days['unverified_registrations_days'] ?? 0) > 0,
+                fn ($query) => $query->where('created_at', '<', now()->subDays($days['unverified_registrations_days'])),
                 fn ($query) => $query->whereRaw('1 = 0'))
             ->get();
 
@@ -48,6 +58,7 @@ class PurgeData extends Command
 
         $summary = [
             'rejected_applications' => $rejected->count(),
+            'unverified_registrations' => $unverified->count(),
             'archived_reports' => $archived->count(),
             'audit_entries' => $auditQuery->count(),
             'expired_reset_links' => $tokenQuery->count(),
@@ -66,8 +77,8 @@ class PurgeData extends Command
             return self::SUCCESS;
         }
 
-        $paths = DB::transaction(function () use ($rejected, $archived, $auditQuery, $tokenQuery, $summary): array {
-            foreach ($rejected as $user) {
+        $paths = DB::transaction(function () use ($rejected, $unverified, $archived, $auditQuery, $tokenQuery, $summary): array {
+            foreach ($rejected->concat($unverified) as $user) {
                 DB::table('PASSWORD_RESET_TOKENS')->where('email', $user->email)->delete();
                 $user->delete();
             }
