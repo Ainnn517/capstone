@@ -454,11 +454,11 @@ function initAdminDashboardPage() {
 
   // What the resident said about the fix, shown under the status in the report tables.
   function confirmationBadge(item) {
-    if (item.confirmation === 'confirmed') return '<div><span class="badge-soft soft-green" title="The resident confirmed the issue is fixed">Resident confirmed</span></div>';
-    if (item.confirmation === 'awaiting') return '<div><span class="badge-soft soft-blue" title="The resident can still confirm or reopen this report">Awaiting resident</span></div>';
-    if (item.confirmation === 'accepted') return '<div><span class="badge-soft" title="The resident did not answer within 7 days">No reply · closed</span></div>';
+    if (item.confirmation === 'confirmed') return '<div><span class="badge-soft confirm-badge soft-green" title="The resident confirmed the issue is fixed">Resident confirmed</span></div>';
+    if (item.confirmation === 'awaiting') return '<div><span class="badge-soft confirm-badge soft-blue" title="The resident can still confirm or reopen this report">Awaiting resident</span></div>';
+    if (item.confirmation === 'accepted') return '<div><span class="badge-soft confirm-badge" title="The resident did not answer within 7 days">No reply · closed</span></div>';
     if (item.reopenCount > 0 && !['Rejected', 'Withdrawn'].includes(item.stage)) {
-      return `<div><span class="badge-soft soft-yellow" title="The resident said the problem was not fixed">Reopened${item.reopenCount > 1 ? ` ×${item.reopenCount}` : ''}</span></div>`;
+      return `<div><span class="badge-soft confirm-badge soft-yellow" title="The resident said the problem was not fixed">Reopened${item.reopenCount > 1 ? ` ×${item.reopenCount}` : ''}</span></div>`;
     }
     return '';
   }

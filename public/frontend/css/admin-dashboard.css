@@ -757,7 +757,17 @@ body:not([data-admin-level="super"]) :is([data-resident-delete], [data-delete-ar
 .admin-level-select { min-width: 9rem; }
 
 /* Report search boxes. */
-.report-search { min-width: 15rem; max-width: 100%; }
+/* A fixed, modest width: as a full-width field it pushed the filters and count badge onto a new line. */
+.form-control.report-search {
+  flex: 0 1 15rem;
+  width: 15rem;
+  max-width: 100%;
+}
+
+.report-search::placeholder {
+  color: rgba(255, 255, 255, .8);
+  opacity: 1;
+}
 
 /* Resident confirmation counts on Analytics. */
 .confirmation-summary {
@@ -784,7 +794,19 @@ body:not([data-admin-level="super"]) :is([data-resident-delete], [data-delete-ar
 .confirmation-stats strong { font-size: 1.5rem; line-height: 1.2; }
 .confirmation-stats span { font-size: .82rem; color: rgba(255, 255, 255, .8); }
 
-.badge-soft + div, td > div > .badge-soft { margin-top: .3rem; }
+/* The resident's answer, under the status. Small and allowed to wrap, so it stays inside
+   the narrow Status column instead of covering the Priority badge. */
+.confirm-badge {
+  margin-top: .35rem;
+  padding: .2rem .5rem;
+  border-radius: 8px;
+  font-size: .72rem;
+  line-height: 1.25;
+  max-width: 100%;
+}
+
+/* Beats the general "badges in tables never wrap" rule further down. */
+td .badge-soft.confirm-badge { white-space: normal; }
 
 /* Hotspot map (Leaflet). */
 .hotspot-map {
