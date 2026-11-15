@@ -1269,7 +1269,7 @@ function initAdminDashboardPage() {
       try {
         await apiRequest('logout');
       } finally {
-        window.location.href = 'index.html';
+        window.location.href = '/';
       }
     }
   });
@@ -1287,18 +1287,18 @@ async function startAdminDashboard() {
   try {
     const result = await apiRequest('session', {}, 'GET');
     if (result.user.role !== 'admin') {
-      window.location.href = result.user.role === 'resident' ? 'resident-portal.html' : 'index.html';
+      window.location.href = result.user.role === 'resident' ? '/resident' : '/';
       return;
     }
     document.getElementById('adminName').textContent = `Welcome, ${result.user.fullName || result.user.username}`;
     window.fillAccountDetails(result.user);
     initAdminDashboardPage();
   } catch (error) {
-    window.location.href = 'index.html';
+    window.location.href = '/';
   }
 }
 
 // Load Chart.js before starting the dashboard.
 loadScript('/frontend/vendor/chart.js/chart.umd.js', 'chartjs-admin')
   .then(() => startAdminDashboard())
-  .catch(() => console.error('Chart.js failed to load for admin-dashboard.html'));
+  .catch(() => console.error('Chart.js failed to load for the admin dashboard'));

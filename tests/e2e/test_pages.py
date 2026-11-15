@@ -19,7 +19,7 @@ def test_all_views_render_cleanly(app, new_page, mail, size):
         overflow = page.evaluate("document.documentElement.scrollWidth > innerWidth + 1")
         assert not overflow, f"{label}: page scrolls sideways"
 
-    for url, action in (("/frontend/pages/index.html", None), ("/frontend/pages/index.html", "#formSwitch"), ("/privacy", None)):
+    for url, action in (("/", None), ("/", "#formSwitch"), ("/privacy", None)):
         page.goto(app + url)
         page.wait_for_load_state("networkidle")
         if action:
@@ -32,7 +32,7 @@ def test_all_views_render_cleanly(app, new_page, mail, size):
         check(f"resident/{view}")
     page.click("#logoutBtn")
     page.locator(".app-confirm-button").click()
-    page.wait_for_url(re.compile(r"/index\.html"))
+    page.wait_for_url(re.compile(r"^https?://[^/]+/(\?[^#]*)?(#.*)?$"))
 
     log_in(page, app, "e2eadmin", mail=mail)
     for view in ("dashboard", "analytics", "incidents", "resolved", "archived", "referenceData", "account", "residents", "pendingApprovals"):

@@ -11,11 +11,11 @@ use Symfony\Component\HttpFoundation\Response;
 // signed in with an allowed role is redirected before any page HTML is sent.
 class RequirePageRole
 {
-    private const LOGIN_PAGE = '/frontend/pages/index.html';
+    private const LOGIN_PAGE = '/';
 
     private const PORTAL = [
-        'admin' => '/frontend/pages/admin-dashboard.html',
-        'resident' => '/frontend/pages/resident-portal.html',
+        'admin' => '/admin',
+        'resident' => '/resident',
     ];
 
     public function handle(Request $request, Closure $next, string ...$roles): Response

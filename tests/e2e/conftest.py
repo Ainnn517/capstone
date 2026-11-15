@@ -192,7 +192,7 @@ def log_in(page, base_url: str, username: str, password: str = PASSWORD, mail: M
     """Signs in through the login form; administrators also enter the emailed code."""
     if mail:
         mail.mark()
-    page.goto(base_url + "/frontend/pages/index.html")
+    page.goto(base_url + "/")
     page.fill("#username", username)
     page.fill("#password", password)
     page.click("#loginForm button[type=submit]")
@@ -200,7 +200,7 @@ def log_in(page, base_url: str, username: str, password: str = PASSWORD, mail: M
         page.wait_for_selector("#twoFactorForm:not([hidden])")
         page.fill("#loginCode", mail.code())
         page.click("#twoFactorForm button[type=submit]")
-    page.wait_for_url(re.compile(r"(admin-dashboard|resident-portal)\.html"))
+    page.wait_for_url(re.compile(r"/(admin|resident)(\?.*|#.*)?$"))
     page.wait_for_load_state("networkidle")
 
 

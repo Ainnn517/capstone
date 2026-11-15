@@ -13,9 +13,12 @@ class ExampleTest extends TestCase
      */
     public function test_the_application_returns_a_successful_response(): void
     {
-        $response = $this->get('/');
+        $this->get('/')->assertOk()->assertSee('id="loginForm"', false);
 
-        $response->assertRedirect('/frontend/pages/index.html');
+        // Old addresses move permanently, keeping any query string.
+        $this->get('/frontend/pages/index.html?verified=1')->assertStatus(301)->assertRedirect('/?verified=1');
+        $this->get('/frontend/pages/admin-dashboard.html')->assertStatus(301)->assertRedirect('/admin');
+        $this->get('/frontend/pages/resident-portal.html')->assertStatus(301)->assertRedirect('/resident');
     }
 
     public function test_the_privacy_notice_is_available_without_signing_in(): void
@@ -34,7 +37,7 @@ class ExampleTest extends TestCase
 
     public function test_login_page_uses_a_relative_privacy_notice_link(): void
     {
-        $this->get('/frontend/pages/index.html')
+        $this->get('/')
             ->assertOk()
             ->assertSee('href="/privacy"', false);
     }
@@ -42,7 +45,7 @@ class ExampleTest extends TestCase
     public function test_admin_has_a_separate_pending_approvals_workspace(): void
     {
         // The admin page is only served to a signed-in administrator.
-        $response = $this->actingAs(User::factory()->admin()->create())->get('/frontend/pages/admin-dashboard.html');
+        $response = $this->actingAs(User::factory()->admin()->create())->get('/admin');
 
         $response
             ->assertOk()

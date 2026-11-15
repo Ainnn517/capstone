@@ -7,11 +7,11 @@ use Tests\TestCase;
 
 class PortalPageAccessTest extends TestCase
 {
-    private const ADMIN_PAGE = '/frontend/pages/admin-dashboard.html';
+    private const ADMIN_PAGE = '/admin';
 
-    private const RESIDENT_PAGE = '/frontend/pages/resident-portal.html';
+    private const RESIDENT_PAGE = '/resident';
 
-    private const LOGIN_PAGE = '/frontend/pages/index.html';
+    private const LOGIN_PAGE = '/';
 
     public function test_signed_out_visitors_are_sent_to_the_login_page_without_seeing_the_portal(): void
     {

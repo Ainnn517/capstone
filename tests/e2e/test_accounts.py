@@ -25,7 +25,7 @@ def test_password_change_needs_the_emailed_code(app, new_page, mail):
 
 def test_forgotten_password_can_be_reset_from_the_email(app, new_page, mail):
     page = new_page()
-    page.goto(f"{app}/frontend/pages/index.html")
+    page.goto(f"{app}/")
     page.click("#forgotPasswordButton")
     page.fill("#forgotEmail", "e2e-resident@example.test")
     mail.mark()
@@ -56,7 +56,7 @@ def test_a_suspended_resident_is_signed_out_and_cannot_sign_in(app, new_page, ma
     # The open session is ended on its next request.
     open_resident_view(resident, 'reports')
     resident.reload()
-    resident.wait_for_url(re.compile(r"/index\.html"))
+    resident.wait_for_url(re.compile(r"^https?://[^/]+/(\?[^#]*)?(#.*)?$"))
     resident.fill("#username", "e2eresident")
     resident.fill("#password", PASSWORD)
     resident.click("#loginForm button[type=submit]")

@@ -57,7 +57,7 @@ function emailDeliveryNotice(status) {
 
 // Open the correct portal after a successful login or registration.
 function enterPortal(user) {
-    window.location.href = user.role === "admin" ? "admin-dashboard.html" : "resident-portal.html";
+    window.location.href = user.role === "admin" ? "/admin" : "/resident";
 }
 
 
@@ -307,7 +307,7 @@ registerForm.addEventListener("submit", async (event) => {
     }
 });
 
-// A link to index.html?register=1 opens the Create account form directly.
+// A link to /?register=1 opens the Create account form directly.
 if (new URLSearchParams(window.location.search).get("register") === "1" && registerForm.hidden) {
     formSwitch.click();
 }

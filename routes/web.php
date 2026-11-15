@@ -8,13 +8,20 @@ use App\Http\Controllers\ReferenceDataController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ResidentController;
 use App\Http\Controllers\TriageController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // Show the login and portal pages.
-Route::redirect('/', '/frontend/pages/index.html')->name('home');
-Route::view('/frontend/pages/index.html', 'pages.index');
-Route::view('/frontend/pages/resident-portal.html', 'pages.resident-portal')->middleware('page.role:resident');
-Route::view('/frontend/pages/admin-dashboard.html', 'pages.admin-dashboard')->middleware('page.role:admin');
+Route::view('/', 'pages.index')->name('home');
+Route::view('/resident', 'pages.resident-portal')->middleware('page.role:resident')->name('resident');
+Route::view('/admin', 'pages.admin-dashboard')->middleware('page.role:admin')->name('admin');
+
+// Old page addresses (bookmarks, links in emails already sent) move permanently to the new ones.
+foreach (['index.html' => '/', 'resident-portal.html' => '/resident', 'admin-dashboard.html' => '/admin'] as $old => $new) {
+    Route::get('/frontend/pages/'.$old, fn (Request $request) => redirect(
+        $new.($request->getQueryString() ? '?'.$request->getQueryString() : ''), 301
+    ));
+}
 Route::view('/privacy', 'pages.privacy')->name('privacy');
 
 // Handle login, registration, and session requests.

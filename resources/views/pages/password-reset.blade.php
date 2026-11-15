@@ -21,7 +21,7 @@
                 <button type="submit" class="login-button">Save new password</button>
                 <p id="passwordResetMessage" class="form-message" role="status" aria-live="polite"></p>
             </form>
-            <a href="/frontend/pages/index.html">Return to sign in</a>
+            <a href="/">Return to sign in</a>
         </section>
     </main>
     <script src="{{ \App\Support\Asset::url('/frontend/js/csrf.js') }}" nonce="{{ app('csp.nonce') }}"></script>

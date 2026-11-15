@@ -11,7 +11,7 @@ PASSWORD = "Maria-santos123!"
 
 def test_sign_up_after_logging_out_in_another_tab(app, new_page):
     signup = new_page()
-    signup.goto(f"{app}/frontend/pages/index.html")
+    signup.goto(f"{app}/")
     signup.click("#formSwitch")
 
     # Same browser, second tab: log in and out, which gives the session a new token.
@@ -20,7 +20,7 @@ def test_sign_up_after_logging_out_in_another_tab(app, new_page):
     open_resident_view(other, 'account')
     other.click("#logoutBtn")
     confirm_dialog(other)
-    other.wait_for_url(re.compile(r"/index\.html"))
+    other.wait_for_url(re.compile(r"^https?://[^/]+/(\?[^#]*)?(#.*)?$"))
     other.close()
 
     # The first tab still holds the old token; the sign-up must succeed anyway.

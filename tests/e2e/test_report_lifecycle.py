@@ -9,7 +9,7 @@ NEW_PASSWORD = "Juan-delacruz123!"
 
 
 def register_and_verify(app, page, mail) -> None:
-    page.goto(f"{app}/frontend/pages/index.html")
+    page.goto(f"{app}/")
     page.click("#formSwitch")
     page.fill("#registerName", "Juan Dela Cruz")
     page.fill("#registerEmail", "juan@example.test")

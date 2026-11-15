@@ -412,7 +412,7 @@ class ReportAuthorizationTest extends TestCase
 
     public function test_security_headers_are_added_to_responses(): void
     {
-        $response = $this->get('/frontend/pages/index.html');
+        $response = $this->get('/');
 
         $response
             ->assertOk()
@@ -436,7 +436,7 @@ class ReportAuthorizationTest extends TestCase
         $middleware = new AddSecurityHeaders;
 
         $secureResponse = $middleware->handle(
-            Request::create('https://localhost/frontend/pages/index.html'),
+            Request::create('https://localhost/'),
             static fn (Request $request) => response('OK'),
         );
         $this->assertSame(
@@ -445,7 +445,7 @@ class ReportAuthorizationTest extends TestCase
         );
 
         $insecureResponse = $middleware->handle(
-            Request::create('http://localhost/frontend/pages/index.html'),
+            Request::create('http://localhost/'),
             static fn (Request $request) => response('OK'),
         );
         $this->assertFalse($insecureResponse->headers->has('Strict-Transport-Security'));
@@ -645,7 +645,7 @@ class ReportAuthorizationTest extends TestCase
             ['id' => $user->user_id, 'hash' => sha1($user->email)],
         );
 
-        $this->get($url)->assertRedirect('/frontend/pages/index.html?verified=1');
+        $this->get($url)->assertRedirect('/?verified=1');
         $this->assertNotNull($user->fresh()->email_verified_at);
     }
 

@@ -647,7 +647,7 @@ function initResidentPortalPage() {
     try {
       const result = await apiRequest('session', {}, 'GET');
       if (result.user.role !== 'resident') {
-        window.location.href = result.user.role === 'admin' ? 'admin-dashboard.html' : 'index.html';
+        window.location.href = result.user.role === 'admin' ? '/admin' : '/';
         return;
       }
       applyReferenceData(await apiRequest('getReferenceData', {}, 'GET'));
@@ -657,7 +657,7 @@ function initResidentPortalPage() {
       await render();
       setInterval(render, 15000);
     } catch (error) {
-      window.location.href = 'index.html';
+      window.location.href = '/';
     }
   }
 
@@ -789,7 +789,7 @@ function initResidentPortalPage() {
       try {
         await apiRequest('logout');
       } finally {
-        window.location.href = 'index.html';
+        window.location.href = '/';
       }
     }
   });

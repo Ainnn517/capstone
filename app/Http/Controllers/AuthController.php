@@ -614,6 +614,6 @@ class AuthController extends ApiController
             $user->markEmailAsVerified();
         }
 
-        return redirect('/frontend/pages/index.html?verified=1');
+        return redirect('/?verified=1');
     }
 }
