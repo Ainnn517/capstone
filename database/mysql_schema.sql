@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS USERS (
   contact_number VARCHAR(30) NULL,
   address_location_id INT UNSIGNED NULL,
   address_details VARCHAR(150) NULL,
+  email_notifications TINYINT(1) NOT NULL DEFAULT 1,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (user_id),
   UNIQUE KEY uq_users_username (username),
@@ -46,7 +47,8 @@ CREATE TABLE IF NOT EXISTS USERS (
   KEY idx_users_role_status (role, account_status),
   KEY idx_users_address_location (address_location_id),
   CONSTRAINT chk_users_username_length CHECK (CHAR_LENGTH(username) >= 3),
-  CONSTRAINT chk_users_consent_pair CHECK ((privacy_consent_at IS NULL) = (privacy_notice_version IS NULL))
+  CONSTRAINT chk_users_consent_pair CHECK ((privacy_consent_at IS NULL) = (privacy_notice_version IS NULL)),
+  CONSTRAINT chk_users_email_notifications CHECK (email_notifications IN (0, 1))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Password reset tokens (config/auth.php uses PASSWORD_RESET_TOKENS).

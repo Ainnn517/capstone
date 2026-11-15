@@ -30,6 +30,7 @@ class User extends Authenticatable implements MustVerifyEmailContract
         'contact_number',
         'address_location_id',
         'address_details',
+        'email_notifications',
         'privacy_consent_at',
         'privacy_notice_version',
         'email_verified_at',
@@ -37,10 +38,14 @@ class User extends Authenticatable implements MustVerifyEmailContract
 
     protected $hidden = ['password_hash'];
 
+    // Same as the column default: report-update emails are on unless the resident turns them off.
+    protected $attributes = ['email_notifications' => true];
+
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
+            'email_notifications' => 'boolean',
         ];
     }
 

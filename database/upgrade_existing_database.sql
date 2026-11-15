@@ -262,5 +262,10 @@ SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE ISSUE_REPORT ADD COLUMN reside
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
+-- ============== USERS: email alerts about report updates ==============
+SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE USERS ADD COLUMN email_notifications TINYINT(1) NOT NULL DEFAULT 1 AFTER address_details, ADD CONSTRAINT chk_users_email_notifications CHECK (email_notifications IN (0, 1))', 'DO 0') FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'USERS' AND column_name = 'email_notifications');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 -- ============================== Done ==============================
 SELECT 'Upgrade to schema v2 finished.' AS result;

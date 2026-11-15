@@ -32,6 +32,7 @@ abstract class ApiController extends Controller
             'email' => $user->email,
             'role' => $user->role,
             'accountStatus' => $user->account_status,
+            'emailNotifications' => (bool) $user->email_notifications,
         ];
     }
 

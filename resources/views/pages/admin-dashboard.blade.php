@@ -134,6 +134,7 @@
             
             <!-- Filters -->
             <div class="incident-filters">
+              <input id="incidentSearch" class="form-control form-control-sm report-search" type="search" maxlength="100" placeholder="Search code, resident, text" aria-label="Search open incidents by tracking code, resident, description or landmark">
               <select id="filterStatus" class="form-select form-select-sm" aria-label="Filter by status">
                 <option>All Status</option>
                 <option>Submitted</option>
@@ -199,8 +200,11 @@
       <section id="archivedView" class="admin-view" hidden>
         <div class="card p-4 admin-panel">
           <div class="admin-panel-header">
-            <h1 class="section-title mb-1">Archived Incidents</h1>
-            <small class="text-secondary">Archived records are hidden from active lists. Permanent deletion also removes related attachments and history.</small>
+            <div>
+              <h1 class="section-title mb-1">Archived Incidents</h1>
+              <small class="text-secondary">Archived records are hidden from active lists. Permanent deletion also removes related attachments and history.</small>
+            </div>
+            <input id="archivedSearch" class="form-control form-control-sm report-search" type="search" maxlength="100" placeholder="Search code, resident, text" aria-label="Search archived incidents by tracking code, resident, description or landmark">
           </div>
           <div class="table-responsive">
             <table class="table align-middle">
@@ -229,7 +233,10 @@
               <h1 class="section-title mb-1">Resolved Incidents</h1>
               <small class="text-secondary">Completed reports are read-only and cannot be changed.</small>
             </div>
-            <span id="resolvedCount" class="badge-soft soft-green">0 resolved</span>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <input id="resolvedSearch" class="form-control form-control-sm report-search" type="search" maxlength="100" placeholder="Search code, resident, text" aria-label="Search resolved incidents by tracking code, resident, description or landmark">
+              <span id="resolvedCount" class="badge-soft soft-green">0 resolved</span>
+            </div>
           </div>
           <div class="table-responsive">
             <table class="table align-middle">
@@ -255,6 +262,18 @@
         <div class="mb-4">
           <h1 class="section-title mb-1">Analytics</h1>
           <p class="text-secondary mb-0">Explore report categories, monthly trends, and active issue hotspots.</p>
+        </div>
+        <div class="card p-4 export-card">
+          <div>
+            <h5 class="fw-bold mb-1">Monthly report and export</h5>
+            <p class="small text-secondary mb-0">A printable summary for barangay meetings, or every report in the month as a spreadsheet (CSV, opens in Excel). Residents' names and contact details are not included.</p>
+          </div>
+          <div class="export-controls">
+            <label class="visually-hidden" for="exportMonth">Month</label>
+            <input id="exportMonth" class="form-control form-control-sm" type="month">
+            <a id="openSummaryBtn" class="btn btn-sm btn-primary" href="/admin/summary" target="_blank" rel="noopener">Printable summary</a>
+            <a id="downloadCsvBtn" class="btn btn-sm btn-light" href="/api/reports/export">Download CSV</a>
+          </div>
         </div>
     <!-- Analytics Charts Row -->
     <div class="row g-4 mt-1">

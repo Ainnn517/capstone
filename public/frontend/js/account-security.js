@@ -7,7 +7,40 @@ window.fillAccountDetails = user => {
   set('accountUsername', user.username);
   set('accountEmail', user.email);
   set('accountRole', user.role === 'admin' ? 'Administrator' : 'Resident');
+  const alertsToggle = document.getElementById('emailAlertsToggle');
+  if (alertsToggle) alertsToggle.checked = Boolean(user.emailNotifications);
 };
+
+// Residents: turn report-update emails on or off.
+const emailAlertsToggle = document.getElementById('emailAlertsToggle');
+if (emailAlertsToggle) {
+  emailAlertsToggle.addEventListener('change', async () => {
+    const message = document.getElementById('emailAlertsMessage');
+    const enabled = emailAlertsToggle.checked;
+    emailAlertsToggle.disabled = true;
+    try {
+      const response = await window.csrfFetch('/api/account/email-alerts', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+        },
+        body: JSON.stringify({ enabled })
+      });
+      window.handleExpiredSession(response);
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || 'Could not save your choice.');
+      message.textContent = enabled ? 'Emails turned on.' : 'Emails turned off. Updates still appear in Notifications.';
+    } catch (error) {
+      emailAlertsToggle.checked = !enabled;
+      message.textContent = error.message || 'Could not save your choice. Please try again.';
+    } finally {
+      emailAlertsToggle.disabled = false;
+    }
+  });
+}
 
 // Password change happens in two steps:
 //   1. current + new password  -> the server emails a 6-digit code (password not changed yet)

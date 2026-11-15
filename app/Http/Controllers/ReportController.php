@@ -13,9 +13,11 @@ use App\Models\Team;
 use App\Models\User;
 use App\Services\AttachmentFileRemover;
 use App\Services\InsightService;
+use App\Services\ReportAlertService;
 use App\Services\UploadedImageSanitizer;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -96,6 +98,10 @@ class ReportController extends ApiController
                 $reportsQuery->where('status', $status);
             }
 
+            if ($error = $this->applySearch($reportsQuery, $request)) {
+                return $error;
+            }
+
             $priority = $request->query('priority');
             if ($priority && $priority !== 'All Priority') {
                 $range = match ($priority) {
@@ -116,11 +122,33 @@ class ReportController extends ApiController
         return $this->reportsResponse($reports, $user);
     }
 
+    // Admin search: tracking code, description, landmark, or the resident's name or username.
+    private function applySearch(Builder $query, Request $request): ?JsonResponse
+    {
+        $search = trim((string) $request->query('q', ''));
+        if ($search === '') {
+            return null;
+        }
+        if (mb_strlen($search) > 100) {
+            return $this->error('Keep the search under 100 characters.', 422);
+        }
+        $like = '%'.addcslashes($search, '%_\\').'%';
+        $query->where(fn ($matches) => $matches
+            ->where('tracking_code', 'like', $like)
+            ->orWhere('description', 'like', $like)
+            ->orWhere('landmark', 'like', $like)
+            ->orWhereHas('resident', fn ($resident) => $resident
+                ->where('full_name', 'like', $like)
+                ->orWhere('username', 'like', $like)));
+
+        return null;
+    }
+
     // Let administrators review reports removed from active lists.
-    public function archived(): JsonResponse
+    public function archived(Request $request): JsonResponse
     {
         $user = $this->currentUser();
-        $reports = IssueReport::with([
+        $query = IssueReport::with([
             'category',
             'location',
             'team',
@@ -130,7 +158,11 @@ class ReportController extends ApiController
                 'ATTACHMENT.report_id',
                 'ATTACHMENT.mime_type',
             ),
-        ])->whereNotNull('archived_at')
+        ])->whereNotNull('archived_at');
+        if ($error = $this->applySearch($query, $request)) {
+            return $error;
+        }
+        $reports = $query
             ->orderByDesc('archived_at')
             ->orderByDesc('report_id')
             ->paginate((int) config('security.report_page_size'))
@@ -820,7 +852,8 @@ class ReportController extends ApiController
             return $this->error('The selected team does not exist.', 422);
         }
 
-        $result = DB::transaction(function () use ($data, $user, $team, $teamName, $dispatchNote): ?JsonResponse {
+        $changedReport = null;
+        $result = DB::transaction(function () use ($data, $user, $team, $teamName, $dispatchNote, &$changedReport): ?JsonResponse {
             $report = IssueReport::where('report_id', $data['id'])
                 ->whereNull('archived_at')
                 ->lockForUpdate()
@@ -847,6 +880,9 @@ class ReportController extends ApiController
             // A report cannot be dispatched or resolved without a responsible team.
             if (in_array($data['status'], ['Dispatched', 'Resolved'], true) && $team === null) {
                 return $this->error("Assign a team before marking this report {$data['status']}.", 422);
+            }
+            if ($data['status'] !== $oldStatus) {
+                $changedReport = $report;
             }
             $report->status = $data['status'];
             $report->team_id = $team?->team_id;
@@ -875,6 +911,11 @@ class ReportController extends ApiController
 
             return null;
         });
+
+        // Email only after the change is committed, so a rollback never sends a false alert.
+        if ($result === null && $changedReport !== null) {
+            app(ReportAlertService::class)->statusChanged($changedReport->fresh(['team']), $dispatchNote);
+        }
 
         return $result ?? response()->json(['success' => true]);
     }

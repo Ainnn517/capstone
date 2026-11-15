@@ -3,9 +3,11 @@
 use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DssController;
+use App\Http\Controllers\EmailAlertController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ReferenceDataController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\ReportExportController;
 use App\Http\Controllers\ResidentController;
 use App\Http\Controllers\TriageController;
 use Illuminate\Http\Request;
@@ -15,6 +17,7 @@ use Illuminate\Support\Facades\Route;
 Route::view('/', 'pages.index')->name('home');
 Route::view('/resident', 'pages.resident-portal')->middleware('page.role:resident')->name('resident');
 Route::view('/admin', 'pages.admin-dashboard')->middleware('page.role:admin')->name('admin');
+Route::get('/admin/summary', [ReportExportController::class, 'summary'])->middleware('page.role:admin')->name('admin.summary');
 
 // Old page addresses (bookmarks, links in emails already sent) move permanently to the new ones.
 foreach (['index.html' => '/', 'resident-portal.html' => '/resident', 'admin-dashboard.html' => '/admin'] as $old => $new) {
@@ -32,6 +35,13 @@ Route::post('/api/login/verify', [AuthController::class, 'verifyLogin'])->middle
 Route::post('/api/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
 Route::post('/api/password/forgot', [AuthController::class, 'forgotPassword'])->middleware('throttle:5,1');
 Route::post('/api/password/reset', [AuthController::class, 'resetPassword'])->middleware('throttle:5,1');
+Route::get('/email-alerts/{user}/off', [EmailAlertController::class, 'confirm'])
+    ->whereNumber('user')
+    ->middleware(['signed', 'throttle:20,1'])
+    ->name('email-alerts.unsubscribe');
+Route::post('/email-alerts/{user}/off', [EmailAlertController::class, 'unsubscribe'])
+    ->whereNumber('user')
+    ->middleware(['signed', 'throttle:20,1']);
 Route::get('/api/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
     ->middleware(['signed', 'throttle:6,1'])
     ->name('verification.verify');
@@ -49,6 +59,7 @@ Route::middleware('api.auth')->group(function (): void {
         ->middleware('role:admin');
     Route::post('/api/logout', [AuthController::class, 'logout']);
     Route::post('/api/password/change', [AuthController::class, 'changePassword'])->middleware('throttle:5,1');
+    Route::post('/api/account/email-alerts', [EmailAlertController::class, 'update'])->middleware(['role:resident', 'throttle:20,1']);
     Route::post('/api/password/change/confirm', [AuthController::class, 'confirmPasswordChange'])->middleware('throttle:10,1');
     Route::get('/api/notifications', [NotificationController::class, 'index'])->middleware('role:resident');
     Route::post('/api/notifications/{id}/read', [NotificationController::class, 'markAsRead'])
@@ -56,6 +67,7 @@ Route::middleware('api.auth')->group(function (): void {
         ->middleware('role:resident');
     Route::get('/api/analytics/summary', [ReportController::class, 'summary'])->middleware('role:admin');
     Route::get('/api/analytics/map', [ReportController::class, 'mapPoints'])->middleware('role:admin');
+    Route::get('/api/reports/export', [ReportExportController::class, 'csv'])->middleware(['role:admin', 'throttle:10,1']);
     Route::get('/api/analytics/dss', [DssController::class, 'index'])->middleware('role:admin');
     Route::post('/api/analytics/dss/snapshots', [DssController::class, 'store'])->middleware('role:admin');
     Route::delete('/api/analytics/dss/snapshots', [DssController::class, 'destroyAll'])->middleware('role:admin');

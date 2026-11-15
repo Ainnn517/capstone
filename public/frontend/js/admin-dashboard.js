@@ -129,9 +129,10 @@ function initAdminDashboardPage() {
           view: 'active',
           page: incidentPage,
           status: document.getElementById('filterStatus').value,
-          priority: document.getElementById('filterPriority').value
+          priority: document.getElementById('filterPriority').value,
+          q: document.getElementById('incidentSearch').value.trim()
         }, 'GET'),
-        apiRequest('getReports', { view: 'resolved', page: resolvedPage }, 'GET'),
+        apiRequest('getReports', { view: 'resolved', page: resolvedPage, q: document.getElementById('resolvedSearch').value.trim() }, 'GET'),
         apiRequest('getReportSummary', {}, 'GET'),
         apiRequest('getDssRecommendations', {}, 'GET')
       ]);
@@ -154,11 +155,11 @@ function initAdminDashboardPage() {
     const resolvedReports = resolvedResult.reports || [];
     document.getElementById('incidentBody').innerHTML = currentReports.length
       ? currentReports.map(item => createIncidentRowHTML(item)).join('')
-      : '<tr><td colspan="7" class="admin-empty-state">No active incidents match the selected filters.</td></tr>';
+      : `<tr><td colspan="7" class="admin-empty-state">${document.getElementById('incidentSearch').value.trim() ? 'No open incidents match your search.' : 'No active incidents match the selected filters.'}</td></tr>`;
 
     document.getElementById('resolvedBody').innerHTML = resolvedReports.length
       ? resolvedReports.map(item => createIncidentRowHTML(item, { readOnly: true })).join('')
-      : '<tr><td colspan="7" class="admin-empty-state">No resolved incidents yet.</td></tr>';
+      : `<tr><td colspan="7" class="admin-empty-state">${document.getElementById('resolvedSearch').value.trim() ? 'No resolved incidents match your search.' : 'No resolved incidents yet.'}</td></tr>`;
     document.getElementById('resolvedCount').textContent = `${summary.summary.resolved} resolved`;
     document.getElementById('resolvedNavCount').textContent = summary.summary.resolved;
     renderPriorityCounts(summary.summary.openByPriority || {});
@@ -391,6 +392,24 @@ function initAdminDashboardPage() {
     });
     return hotspots;
   }
+
+  // Monthly report and export: point both links at the chosen month.
+  const exportMonth = document.getElementById('exportMonth');
+  function updateExportLinks() {
+    const [year, month] = exportMonth.value.split('-').map(Number);
+    if (!year || !month) return;
+    const pad = value => String(value).padStart(2, '0');
+    const lastDay = new Date(year, month, 0).getDate();
+    document.getElementById('openSummaryBtn').href = `/admin/summary?month=${year}-${pad(month)}`;
+    document.getElementById('downloadCsvBtn').href = `/api/reports/export?from=${year}-${pad(month)}-01&to=${year}-${pad(month)}-${pad(lastDay)}`;
+  }
+  {
+    const now = new Date();
+    exportMonth.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    exportMonth.max = exportMonth.value;
+    updateExportLinks();
+  }
+  exportMonth.addEventListener('change', updateExportLinks);
 
   document.getElementById('hotspotMapScope').addEventListener('change', () => {
     hotspotMapFitted = false;
@@ -1222,6 +1241,18 @@ function initAdminDashboardPage() {
     render();
   });
   document.getElementById('residentSearch').addEventListener('input', renderResidents);
+
+  // Report search boxes: wait until typing pauses, then reload from page 1.
+  function onSearch(inputId, run) {
+    let timer;
+    document.getElementById(inputId).addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(run, 300);
+    });
+  }
+  onSearch('incidentSearch', () => { incidentPage = 1; render(); });
+  onSearch('resolvedSearch', () => { resolvedPage = 1; render(); });
+  onSearch('archivedSearch', () => { archivedPage = 1; renderArchivedReports(); });
   async function handleResidentApproval(event) {
     const reportButton = event.target.closest('[data-resident-report-page]');
     if (reportButton) {
@@ -1347,12 +1378,13 @@ function initAdminDashboardPage() {
   async function renderArchivedReports() {
     const body = document.getElementById('archivedBody');
     try {
-      const result = await apiRequest('getArchivedReports', { page: archivedPage }, 'GET');
+      const search = document.getElementById('archivedSearch').value.trim();
+      const result = await apiRequest('getArchivedReports', { page: archivedPage, q: search }, 'GET');
       const reports = result.reports || [];
       body.innerHTML = reports.length
         ? reports.map(item => createIncidentRowHTML(item, { readOnly: true, archived: true })).join('')
-        : '<tr><td colspan="7" class="admin-empty-state">No archived reports.</td></tr>';
-      document.getElementById('archivedNavCount').textContent = result.pagination.total;
+        : `<tr><td colspan="7" class="admin-empty-state">${search ? 'No archived incidents match your search.' : 'No archived reports.'}</td></tr>`;
+      if (!search) document.getElementById('archivedNavCount').textContent = result.pagination.total;
       renderPagination('archivedPagination', result.pagination, page => {
         archivedPage = page;
         renderArchivedReports();

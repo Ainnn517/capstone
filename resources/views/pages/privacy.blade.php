@@ -47,7 +47,7 @@
     <p>The system relies on a few outside services to work:</p>
     <ul>
       <li><strong>Cloudflare</strong> carries traffic between your browser and the system and protects it with HTTPS encryption.</li>
-      <li><strong>Resend</strong> delivers the system's emails (verification links, sign-in and password codes, and account updates). It receives your name, email address, and the content of those emails.</li>
+      <li><strong>Resend</strong> delivers the system's emails (verification links, sign-in and password codes, account updates, and updates about your reports, which you can turn off in Account or from any of those emails). It receives your name, email address, and the content of those emails.</li>
       <li><strong>OpenStreetMap</strong> provides the map pictures shown when you pin a report's location and on the administrators' hotspot map. Your browser downloads these map pictures directly from OpenStreetMap, which sees your internet address and the map area being viewed, but not your account or report details.</li>
     </ul>
 

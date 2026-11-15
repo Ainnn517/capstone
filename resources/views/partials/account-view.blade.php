@@ -16,6 +16,17 @@
     <p class="text-secondary small mb-0">To change your name or email, contact the barangay office.</p>
   </div>
 
+  @if ($viewClass === 'resident-view')
+    <div class="card p-4 mb-4">
+      <h2 class="account-heading">Email updates</h2>
+      <label class="account-toggle" for="emailAlertsToggle">
+        <input id="emailAlertsToggle" type="checkbox">
+        <span>Email me when the barangay updates one of my reports (reviewed, team sent, resolved, or not accepted)</span>
+      </label>
+      <p id="emailAlertsMessage" class="account-message mb-0" role="status" aria-live="polite"></p>
+    </div>
+  @endif
+
   <div class="card p-4">
     <h2 class="account-heading">Change password</h2>
     <form id="changePasswordForm" class="account-form">

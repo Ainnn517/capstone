@@ -64,3 +64,20 @@
 .account-logout, .account-signout .btn.account-logout { background: #fff; border: 1px solid #fff; color: #b42318; font-weight: 700; padding: 0.45rem 1.1rem; border-radius: 999px; }
 .account-signout .btn.account-logout:hover, .account-signout .btn.account-logout:focus-visible { background: #fde8e7; color: #8f1d14; }
 @media (max-width: 600px) { .account-logout { flex: 1 1 100%; } }
+
+/* Email updates switch (residents). */
+.account-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  cursor: pointer;
+  line-height: 1.45;
+}
+
+.account-toggle input {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+  accent-color: #35b779;
+}

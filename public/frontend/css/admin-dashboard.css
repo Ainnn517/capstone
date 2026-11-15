@@ -604,7 +604,9 @@ h1, h2, h3, h4, h5, h6 { margin-top: 0; }
 .form-select option { color: #26372c; }
 .form-select:focus, .form-control:focus { outline: 2px solid rgba(255,255,255,.75); }
 
-.form-select-sm { padding: 0.45rem 0.65rem; font-size: 0.85rem; }
+.form-select-sm,
+.form-control-sm { padding: 0.45rem 0.65rem; font-size: 0.85rem; }
+.form-control[type="month"] { color-scheme: dark; }
 .form-label { display: block; margin-bottom: 0.45rem; font-weight: 600; }
 .fw-medium { font-weight: 600; }
 .fw-bold { font-weight: 700; }
@@ -689,6 +691,21 @@ h1, h2, h3, h4, h5, h6 { margin-top: 0; }
 @media (prefers-reduced-motion: reduce) {
   .live-dot { animation: none; }
 }
+
+/* Monthly report and export card on Analytics. */
+.export-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.export-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.export-controls .form-control { width: auto; }
+
+/* Report search boxes. */
+.report-search { min-width: 15rem; max-width: 100%; }
 
 /* Resident confirmation counts on Analytics. */
 .confirmation-summary {
