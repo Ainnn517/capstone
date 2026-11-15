@@ -5,6 +5,7 @@ seeds reference data and two accounts, and serves the app on a free local port. 
 written to the Laravel log (MAIL_MAILER=log), and helpers read links and codes from there.
 """
 
+import base64
 import os
 import quopri
 import re
@@ -22,6 +23,12 @@ LOG_FILE = PROJECT / "storage" / "logs" / "laravel.log"
 TEST_DATABASE = "barangay_reporting_test"
 PASSWORD = "E2e-password123!"
 BROWSERS = os.environ.get("E2E_BROWSERS", "firefox,chromium").split(",")
+
+
+# A 1x1 transparent PNG.
+BLANK_TILE = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+)
 
 
 def _free_port() -> int:
@@ -48,7 +55,6 @@ ENV = {
     "EMAIL_VERIFICATION_REQUIRED": "true",
     "TRIAGE_AI_ENABLED": "false",
     "ANTHROPIC_API_KEY": "",
-    "GOOGLE_MAPS_API_KEY": "",
     "PILOT_ADMIN_USERNAME": "",
     "PILOT_RESIDENT_USERNAME": "",
 }
@@ -141,6 +147,9 @@ def new_page(browser, app):
     def open_page(width: int = 1352, height: int = 760):
         context = browser.new_context(viewport={"width": width, "height": height})
         contexts.append(context)
+        # Serve blank map tiles locally so tests never depend on OpenStreetMap being reachable.
+        context.route("https://tile.openstreetmap.org/**", lambda route: route.fulfill(
+            status=200, content_type="image/png", body=BLANK_TILE))
         page = context.new_page()
         page.set_default_timeout(10_000)
         page.on("pageerror", lambda error: errors.append(str(error)))

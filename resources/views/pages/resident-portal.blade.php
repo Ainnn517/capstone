@@ -5,7 +5,6 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token() }}">
-  <meta name="google-maps-api-key" content="{{ config('services.google_maps.key') }}">
   <title>Barangay Issue Reporting System - Resident Portal</title>
   <link rel="stylesheet" href="{{ \App\Support\Asset::url('/frontend/css/resident-portal.css') }}">
   <link rel="stylesheet" href="{{ \App\Support\Asset::url('/frontend/css/notifications.css') }}">
@@ -124,7 +123,7 @@
                   </div>
                   <button type="button" class="btn btn-light btn-sm" id="closeMapBtn" aria-label="Close map">Close</button>
                 </div>
-                <div id="locationMap" class="location-map" role="application" aria-label="Google Map location picker"></div>
+                <div id="locationMap" class="location-map" role="application" aria-label="Map location picker"></div>
                 <div class="location-map-footer">
                   <button type="button" class="btn btn-outline-primary" id="currentLocationBtn">Use my current location</button>
                   <button type="button" class="btn btn-primary" id="confirmLocationBtn">Use this location</button>
@@ -217,6 +216,7 @@
   <script src="{{ \App\Support\Asset::url('/frontend/js/session-handler.js') }}" nonce="{{ app('csp.nonce') }}"></script>
   <script src="{{ \App\Support\Asset::url('/frontend/js/password-toggle.js') }}" nonce="{{ app('csp.nonce') }}"></script>
   <script src="{{ \App\Support\Asset::url('/frontend/js/account-security.js') }}" nonce="{{ app('csp.nonce') }}"></script>
+  <script src="{{ \App\Support\Asset::url('/frontend/js/leaflet-loader.js') }}" nonce="{{ app('csp.nonce') }}"></script>
   <script src="{{ \App\Support\Asset::url('/frontend/js/resident-portal.js') }}" nonce="{{ app('csp.nonce') }}"></script>
 
 </body>

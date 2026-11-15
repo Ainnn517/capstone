@@ -660,7 +660,86 @@ h1, h2, h3, h4, h5, h6 { margin-top: 0; }
 .soft-yellow { background: #fff4d6; color: #9a6700; }
 .soft-red { background: #fde8ea; color: #b42318; }
 
-/* Hotspot map and action dialog. */
+/* "Live" indicator for the dashboard's automatic refresh. */
+.live-status {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  color: rgba(255, 255, 255, .85);
+}
+
+.live-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #35b779;
+  box-shadow: 0 0 0 0 rgba(53, 183, 121, .6);
+  animation: live-pulse 2s infinite;
+}
+
+.live-status.is-paused .live-dot { background: #f59e0b; animation: none; }
+.live-status.is-offline .live-dot { background: #dc3545; animation: none; }
+
+@keyframes live-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(53, 183, 121, .6); }
+  70% { box-shadow: 0 0 0 8px rgba(53, 183, 121, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(53, 183, 121, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-dot { animation: none; }
+}
+
+/* Hotspot map (Leaflet). */
+.hotspot-map {
+  width: 100%;
+  height: min(60vh, 460px);
+  min-height: 300px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: #dfe7e2;
+}
+
+.hotspot-map-scope .form-select { min-width: 13rem; }
+
+.hotspot-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem 1rem;
+  margin: .9rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: .85rem;
+}
+
+.hotspot-map-legend li { display: inline-flex; align-items: center; gap: .4rem; }
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+}
+
+.legend-critical { background: #dc3545; }
+.legend-high { background: #f59e0b; }
+.legend-normal { background: #2f80ed; }
+.legend-closed { background: #8a948e; }
+
+.legend-ring {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #dc3545;
+  background: rgba(220, 53, 69, .18);
+}
+
+/* Map popups use dark text on Leaflet's white bubble. */
+.hotspot-map .leaflet-popup-content { color: #1f2a24; font-size: .85rem; line-height: 1.4; }
+.hotspot-map .leaflet-popup-content strong { display: block; font-size: .95rem; }
+
+/* Hotspot grid and action dialog. */
 .hotspot-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);

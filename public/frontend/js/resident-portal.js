@@ -15,43 +15,6 @@ const API_ENDPOINTS = {
   logout: '/api/logout'
 };
 
-let googleMapsLoaderPromise;
-
-function loadGoogleMapsApi(apiKey) {
-  if (window.google?.maps) {
-    return Promise.resolve();
-  }
-
-  if (!googleMapsLoaderPromise) {
-    googleMapsLoaderPromise = new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&loading=async&v=weekly`;
-      script.async = true;
-      window.gm_authFailure = () => {
-        const status = document.getElementById('mapStatus');
-        if (status) {
-          status.textContent = 'Google Maps authorization failed. Check the API key, billing, and allowed website referrers.';
-        }
-      };
-      script.onerror = () => {
-        googleMapsLoaderPromise = null;
-        reject(new Error('Google Maps could not be loaded. Check your API key, enabled API, billing, and network connection.'));
-      };
-      script.onload = () => {
-        if (window.google?.maps) {
-          resolve();
-        } else {
-          googleMapsLoaderPromise = null;
-          reject(new Error('Google Maps did not initialize. Check that the Maps JavaScript API is enabled for your key.'));
-        }
-      };
-      document.head.appendChild(script);
-    });
-  }
-
-  return googleMapsLoaderPromise;
-}
-
 // Send a request to the Laravel API.
 async function apiRequest(action, payload = {}, method = 'POST') {
   const isFormData = payload instanceof FormData;
@@ -134,8 +97,10 @@ function initResidentPortalPage() {
       streetSel.add(new Option('Area-wide', streets[0]?.location_id || ''));
       streetSel.disabled = true;
       streetSel.required = false;
-      locationInput.required = true;
-      locationInput.placeholder = 'Enter a specific landmark or location marker';
+      // A map pin marks the spot precisely, so it stands in for the landmark.
+      const pinned = locationInput.dataset.pinned === '1';
+      locationInput.required = !pinned;
+      locationInput.placeholder = pinned ? 'Optional: the map pin marks the spot' : 'Enter a specific landmark or location marker';
     } else {
       streetSel.add(new Option('Choose street', ''));
       streets.forEach(location => streetSel.add(new Option(location.name, location.location_id)));
@@ -199,7 +164,23 @@ function initResidentPortalPage() {
     }
   }
 
-  descriptionInput.addEventListener('blur', suggestCategory);
+  // When the resident leaves the description by pressing a button (Submit, Tag Location),
+  // wait until that press finishes: the hint appearing mid-click would push the button
+  // down and swallow the click.
+  let pointerHeld = false;
+  let suggestionPending = false;
+  document.addEventListener('pointerdown', () => { pointerHeld = true; }, true);
+  document.addEventListener('pointerup', () => {
+    pointerHeld = false;
+    if (suggestionPending) {
+      suggestionPending = false;
+      setTimeout(suggestCategory, 0);
+    }
+  }, true);
+  descriptionInput.addEventListener('blur', () => {
+    if (pointerHeld) suggestionPending = true;
+    else suggestCategory();
+  });
   suggestionBox.addEventListener('click', event => {
     const button = event.target.closest('[data-use-category]');
     if (!button) return;
@@ -446,73 +427,52 @@ function initResidentPortalPage() {
   const locationMapDialog = document.getElementById('locationMapDialog');
   const mapCanvas = document.getElementById('locationMap');
   const mapStatus = document.getElementById('mapStatus');
-  const mapApiKey = document.querySelector('meta[name="google-maps-api-key"]').content.trim();
-  const defaultMapCenter = { lat: 14.8136, lng: 121.045 };
   let gpsCoordinates = null;
   let locationMap = null;
   let locationMarker = null;
 
   function setSelectedLocation(latitude, longitude) {
     gpsCoordinates = { latitude, longitude };
-    const position = { lat: latitude, lng: longitude };
-    if (!locationMarker) {
-      locationMarker = new google.maps.Marker({ map: locationMap, draggable: true });
-      locationMarker.addListener('dragend', event => {
-        setSelectedLocation(event.latLng.lat(), event.latLng.lng());
-      });
+    locationInput.dataset.pinned = '1';
+    locationInput.required = false;
+    if (locationInput.placeholder.startsWith('Enter a specific')) {
+      locationInput.placeholder = 'Optional: the map pin marks the spot';
     }
-    locationMarker.setPosition(position);
+    if (!locationMarker) {
+      locationMarker = L.marker([latitude, longitude], { draggable: true, keyboard: true, title: 'Incident location' })
+        .addTo(locationMap);
+      locationMarker.on('dragend', () => {
+        const position = locationMarker.getLatLng();
+        setSelectedLocation(position.lat, position.lng);
+      });
+    } else {
+      locationMarker.setLatLng([latitude, longitude]);
+    }
     mapStatus.textContent = `Selected location: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}. Click or drag the marker to adjust it.`;
     geoMsg.textContent = `Map location attached: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
   }
 
   function initializeLocationMap() {
-    const center = gpsCoordinates
-      ? { lat: gpsCoordinates.latitude, lng: gpsCoordinates.longitude }
-      : defaultMapCenter;
-
-    locationMap = new google.maps.Map(mapCanvas, {
-      center,
-      zoom: gpsCoordinates ? 17 : 14,
-      mapTypeControl: false,
-      streetViewControl: false,
-      fullscreenControl: false
-    });
-
-    locationMap.addListener('click', event => {
-      if (event.latLng) {
-        setSelectedLocation(event.latLng.lat(), event.latLng.lng());
-      }
-    });
-
-    if (gpsCoordinates) {
-      setSelectedLocation(gpsCoordinates.latitude, gpsCoordinates.longitude);
-    }
+    locationMap = L.map(mapCanvas, { center: window.MAP_DEFAULT_CENTER, zoom: 14 });
+    L.tileLayer(window.MAP_TILE_URL, { maxZoom: 19, attribution: window.MAP_ATTRIBUTION }).addTo(locationMap);
+    locationMap.on('click', event => setSelectedLocation(event.latlng.lat, event.latlng.lng));
   }
 
   geoBtn.addEventListener('click', async () => {
-    if (!mapApiKey) {
-      geoMsg.textContent = 'Google Maps is not configured. Add GOOGLE_MAPS_API_KEY to .env and clear the Laravel config cache.';
-      return;
-    }
-
-    geoMsg.textContent = 'Loading Google Maps...';
+    geoMsg.textContent = 'Loading the map...';
     try {
-      await loadGoogleMapsApi(mapApiKey);
+      await window.loadLeaflet();
       locationMapDialog.showModal();
-      if (!locationMap) {
-        initializeLocationMap();
+      if (!locationMap) initializeLocationMap();
+      // The dialog was hidden while the map was created, so let Leaflet measure it again.
+      locationMap.invalidateSize();
+      if (gpsCoordinates) {
+        locationMap.setView([gpsCoordinates.latitude, gpsCoordinates.longitude], 17);
+        setSelectedLocation(gpsCoordinates.latitude, gpsCoordinates.longitude);
       } else {
-        const center = gpsCoordinates
-          ? { lat: gpsCoordinates.latitude, lng: gpsCoordinates.longitude }
-          : locationMap.getCenter();
-        locationMap.setCenter(center);
+        mapStatus.textContent = 'Map centered near San Jose del Monte. Click the map to place a marker, or drag it to adjust the location.';
+        geoMsg.textContent = '';
       }
-      google.maps.event.trigger(locationMap, 'resize');
-      mapStatus.textContent = gpsCoordinates
-        ? `Selected location: ${gpsCoordinates.latitude.toFixed(5)}, ${gpsCoordinates.longitude.toFixed(5)}. Click or drag the marker to adjust it.`
-        : 'Map centered near San Jose del Monte. Click the map to place a marker, or drag it to adjust the location.';
-      geoMsg.textContent = '';
     } catch (error) {
       geoMsg.textContent = error.message;
     }
@@ -539,11 +499,7 @@ function initResidentPortalPage() {
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        locationMap.setCenter({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        });
-        locationMap.setZoom(17);
+        locationMap.setView([position.coords.latitude, position.coords.longitude], 17);
         setSelectedLocation(position.coords.latitude, position.coords.longitude);
       },
       () => {
@@ -585,7 +541,7 @@ function initResidentPortalPage() {
       return;
     }
 
-    if (streets.length === 0 && !landmark) {
+    if (streets.length === 0 && !landmark && !gpsCoordinates) {
       this.classList.add('was-validated');
       document.getElementById('submitAlert').innerHTML = '<div class="alert alert-danger" role="alert">Add a landmark when the selected area has no street list.</div>';
       locationInput.focus();
@@ -616,12 +572,13 @@ function initResidentPortalPage() {
       const result = await apiRequest('createReport', payload);
 
       this.reset();
+      delete locationInput.dataset.pinned;
       updateStreets();
       hideCategorySuggestion();
       lastSuggestedText = '';
       gpsCoordinates = null;
       if (locationMarker) {
-        locationMarker.setMap(null);
+        locationMarker.remove();
         locationMarker = null;
       }
       this.classList.remove('was-validated');

@@ -19,6 +19,9 @@
       <div class="d-flex gap-2 align-items-center">
         <span id="adminName" class="text-white-50 small">Welcome</span>
       </div>
+      <span id="liveStatus" class="live-status small" title="The dashboard checks for new reports every 30 seconds">
+        <span class="live-dot" aria-hidden="true"></span><span id="liveStatusText">Live</span>
+      </span>
     </div>
   </nav>
 
@@ -271,12 +274,38 @@
       </div>
     </div>
 
+    <!-- Hotspot map: reports with a GPS location (Leaflet + OpenStreetMap) -->
+    <div class="card p-4 mt-4">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <h4 class="section-title mb-1">Hotspot Map</h4>
+          <p class="small text-secondary mb-0">Reports that residents pinned on the map. Red rings mark places with several open reports close together.</p>
+        </div>
+        <label class="hotspot-map-scope">
+          <span class="visually-hidden">Reports to show on the map</span>
+          <select id="hotspotMapScope" class="form-select form-select-sm">
+            <option value="open">Open reports</option>
+            <option value="all">All reports (including closed)</option>
+          </select>
+        </label>
+      </div>
+      <ul class="hotspot-map-legend" aria-label="Map legend">
+        <li><span class="legend-dot legend-critical"></span>Critical</li>
+        <li><span class="legend-dot legend-high"></span>High</li>
+        <li><span class="legend-dot legend-normal"></span>Normal</li>
+        <li><span class="legend-dot legend-closed"></span>Closed</li>
+        <li><span class="legend-ring"></span>Hotspot</li>
+      </ul>
+      <div id="hotspotMap" class="hotspot-map mt-2" role="region" aria-label="Map of reported issues"></div>
+      <p id="hotspotMapNote" class="small text-secondary mt-2 mb-0" aria-live="polite"></p>
+    </div>
+
     <!-- Hotspot Matrix Heatmap -->
     <div class="card p-4 mt-4">
       <div class="d-flex justify-content-between align-items-center">
         <div>
-          <h4 class="section-title mb-1">Hotspot Map / Grid Matrix</h4>
-          <p class="small text-secondary mb-0">Issue density across Puroks and categories.</p>
+          <h4 class="section-title mb-1">Hotspot Grid</h4>
+          <p class="small text-secondary mb-0">Open reports by area and category, including reports without a map pin.</p>
         </div>
         <span class="badge-soft soft-red">High Density Monitor</span>
       </div>
@@ -461,6 +490,7 @@
   <script src="{{ \App\Support\Asset::url('/frontend/js/session-handler.js') }}" nonce="{{ app('csp.nonce') }}"></script>
   <script src="{{ \App\Support\Asset::url('/frontend/js/password-toggle.js') }}" nonce="{{ app('csp.nonce') }}"></script>
   <script src="{{ \App\Support\Asset::url('/frontend/js/account-security.js') }}" nonce="{{ app('csp.nonce') }}"></script>
+  <script src="{{ \App\Support\Asset::url('/frontend/js/leaflet-loader.js') }}" nonce="{{ app('csp.nonce') }}"></script>
   <script src="{{ \App\Support\Asset::url('/frontend/js/admin-dashboard.js') }}" nonce="{{ app('csp.nonce') }}"></script>
 
 </body>

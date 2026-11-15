@@ -6,6 +6,7 @@ const API_ENDPOINTS = {
   getArchivedReports: '/api/reports/archived',
   getReportSummary: '/api/analytics/summary',
   getDssRecommendations: '/api/analytics/dss',
+  getMapPoints: '/api/analytics/map',
   saveDssSnapshot: '/api/analytics/dss/snapshots',
   clearDssSnapshots: '/api/analytics/dss/snapshots',
   getResidents: '/api/residents',
@@ -98,6 +99,7 @@ function initAdminDashboardPage() {
   const residentReportPages = new Map();
   let referenceData = { categories: [], teams: [], locations: [] };
   let incidentPage = 1;
+  const CLOSED_STATUSES = ['Resolved', 'Rejected', 'Withdrawn'];
   let resolvedPage = 1;
   let archivedPage = 1;
 
@@ -134,6 +136,11 @@ function initAdminDashboardPage() {
         apiRequest('getDssRecommendations', {}, 'GET')
       ]);
     } catch (error) {
+      // A failed background refresh keeps the data already on screen and just shows "Offline".
+      if (backgroundRefresh) {
+        setLiveStatus('offline', 'Offline · retrying');
+        return;
+      }
       const errorRow = '<tr><td colspan="7" class="text-center text-danger py-5">Could not load reports. Check the API connection and your session.</td></tr>';
       document.getElementById('incidentBody').innerHTML = errorRow;
       document.getElementById('resolvedBody').innerHTML = errorRow;
@@ -141,6 +148,8 @@ function initAdminDashboardPage() {
       return;
     }
 
+    announceNewReports(summary.summary.total);
+    markLive();
     currentReports = activeResult.reports || [];
     const resolvedReports = resolvedResult.reports || [];
     document.getElementById('incidentBody').innerHTML = currentReports.length
@@ -271,7 +280,121 @@ function initAdminDashboardPage() {
     renderCharts(summary);
     renderHotspotGrid(summary.hotspots || []);
     renderResolution(summary.resolution);
+    renderHotspotMap();
   }
+
+  // ----- Hotspot map (Leaflet + OpenStreetMap) -----
+  const PRIORITY_COLORS = { Critical: '#dc3545', High: '#f59e0b', Normal: '#2f80ed' };
+  const CLOSED_COLOR = '#8a948e';
+  let hotspotMap = null;
+  let hotspotLayer = null;
+  let hotspotMapFitted = false;
+
+  async function renderHotspotMap() {
+    const container = document.getElementById('hotspotMap');
+    const note = document.getElementById('hotspotMapNote');
+    const scope = document.getElementById('hotspotMapScope').value;
+    let L;
+    let data;
+    try {
+      [L, data] = await Promise.all([
+        window.loadLeaflet(),
+        apiRequest('getMapPoints', { scope }, 'GET')
+      ]);
+    } catch (error) {
+      note.textContent = error.message || 'The map could not be loaded.';
+      return;
+    }
+    if (document.getElementById('analyticsView').hidden) return;
+
+    if (!hotspotMap) {
+      hotspotMap = L.map(container, { center: window.MAP_DEFAULT_CENTER, zoom: 14, scrollWheelZoom: false });
+      L.tileLayer(window.MAP_TILE_URL, { maxZoom: 19, attribution: window.MAP_ATTRIBUTION }).addTo(hotspotMap);
+      hotspotLayer = L.layerGroup().addTo(hotspotMap);
+      // Zoom with the scroll wheel only after the admin clicks the map, so the page still scrolls.
+      hotspotMap.on('click', () => hotspotMap.scrollWheelZoom.enable());
+      hotspotMap.on('mouseout', () => hotspotMap.scrollWheelZoom.disable());
+    }
+    hotspotMap.invalidateSize();
+    hotspotLayer.clearLayers();
+
+    const points = data.points || [];
+    const hotspots = findHotspots(L, points.filter(point => !CLOSED_STATUSES.includes(point.status)),
+      data.hotspotThreshold || 3, data.hotspotRadiusMeters || 150);
+
+    hotspots.forEach(hotspot => {
+      L.circle(hotspot.center, {
+        radius: hotspot.radius,
+        color: '#dc3545',
+        weight: 2,
+        fillColor: '#dc3545',
+        fillOpacity: 0.15
+      })
+        .bindTooltip(`Hotspot: ${hotspot.count} open reports`, { sticky: true })
+        .addTo(hotspotLayer);
+    });
+
+    points.forEach(point => {
+      const closed = CLOSED_STATUSES.includes(point.status);
+      L.circleMarker([point.lat, point.lng], {
+        radius: closed ? 6 : 8,
+        color: '#ffffff',
+        weight: 2,
+        fillColor: closed ? CLOSED_COLOR : (PRIORITY_COLORS[point.priority] || PRIORITY_COLORS.Normal),
+        fillOpacity: 0.95
+      })
+        .bindPopup(`
+          <strong>${escapeHTML(point.tracking)}</strong>
+          ${escapeHTML(point.category)} · ${escapeHTML(point.priority)} priority<br>
+          ${escapeHTML(point.area)}<br>
+          Status: ${escapeHTML(point.status)}${point.overdue ? ' · <span style="color:#b42318;font-weight:600">Overdue</span>' : ''}<br>
+          <span style="color:#5b6660">Reported ${escapeHTML(new Date(point.created).toLocaleString())}</span>
+        `)
+        .addTo(hotspotLayer);
+    });
+
+    // Fit the view to the pins the first time (and whenever the scope changes), not on every refresh.
+    if (!hotspotMapFitted && points.length) {
+      hotspotMap.fitBounds(L.latLngBounds(points.map(point => [point.lat, point.lng])), { padding: [30, 30], maxZoom: 17 });
+      hotspotMapFitted = true;
+    }
+
+    const noun = points.length === 1 ? 'report' : 'reports';
+    const parts = [`${points.length} ${scope === 'all' ? noun : `open ${noun}`} on the map`];
+    if (hotspots.length) parts.push(`${hotspots.length} hotspot${hotspots.length === 1 ? '' : 's'}`);
+    if (data.withoutLocation) {
+      parts.push(`${data.withoutLocation} ${data.withoutLocation === 1 ? 'report has' : 'reports have'} no map pin (shown in the grid below only)`);
+    }
+    note.textContent = parts.join(' · ') + '.';
+  }
+
+  // Group open reports that lie within `radius` metres of each other. A group with at least
+  // `threshold` reports is a hotspot. Busiest places are picked first, and groups do not overlap.
+  function findHotspots(L, points, threshold, radius) {
+    const positions = points.map(point => L.latLng(point.lat, point.lng));
+    const neighbours = positions.map(origin =>
+      positions.map((other, index) => (origin.distanceTo(other) <= radius ? index : -1)).filter(index => index >= 0)
+    );
+    const order = neighbours.map((list, index) => index).sort((a, b) => neighbours[b].length - neighbours[a].length);
+    const used = new Set();
+    const hotspots = [];
+    order.forEach(index => {
+      const members = neighbours[index].filter(member => !used.has(member));
+      if (members.length < threshold) return;
+      members.forEach(member => used.add(member));
+      const lat = members.reduce((sum, member) => sum + positions[member].lat, 0) / members.length;
+      const lng = members.reduce((sum, member) => sum + positions[member].lng, 0) / members.length;
+      const center = L.latLng(lat, lng);
+      const reach = Math.max(...members.map(member => center.distanceTo(positions[member])));
+      hotspots.push({ center, count: members.length, radius: Math.max(radius / 2, reach + 40) });
+    });
+    return hotspots;
+  }
+
+  document.getElementById('hotspotMapScope').addEventListener('change', () => {
+    hotspotMapFitted = false;
+    renderHotspotMap();
+  });
 
   // Resolution times per category, against the target for that category's priority.
   function renderResolution(resolution) {
@@ -319,6 +442,8 @@ function initAdminDashboardPage() {
       },
       options: {
         responsive: true,
+        // No grow-in animation on the 30-second refresh, so the charts don't flicker.
+        animation: backgroundRefresh ? false : undefined,
         // The legend is HTML (below) so its rows line up in a grid; Chart.js draws its own
         // legend into the canvas, where rows wrap unevenly.
         plugins: { legend: { display: false } }
@@ -346,6 +471,7 @@ function initAdminDashboardPage() {
       },
       options: {
         responsive: true,
+        animation: backgroundRefresh ? false : undefined,
         plugins: { legend: { labels: { color: '#fff' } } },
         scales: {
           x: { ticks: { color: '#fff' } },
@@ -513,12 +639,13 @@ function initAdminDashboardPage() {
   });
 
   // Load resident accounts and aggregate report counts.
-  async function loadResidents() {
+  async function loadResidents({ quiet = false } = {}) {
     const residentsList = document.getElementById('residentsList');
-    residentsList.innerHTML = '<div class="card p-4 text-secondary">Loading residents and complaints…</div>';
+    if (!quiet) residentsList.innerHTML = '<div class="card p-4 text-secondary">Loading residents and complaints…</div>';
     try {
       const residentResult = await apiRequest('getResidents', {}, 'GET');
       residents = residentResult.residents || [];
+      announceNewApplications(residents.filter(resident => resident.accountStatus === 'pending').length);
       residentReportPages.clear();
       // Pending and rejected applications are listed under Pending Approvals, not under Residents.
       document.getElementById('residentNavCount').textContent = residents.filter(resident => ['approved', 'suspended'].includes(resident.accountStatus)).length;
@@ -1272,6 +1399,84 @@ function initAdminDashboardPage() {
         window.location.href = '/';
       }
     }
+  });
+
+  // ----- Automatic refresh (real-time tracking) -----
+  // Every 30 seconds the dashboard reloads its data so new reports and sign-ups appear without
+  // a page reload. It waits while the admin is typing or has a dialog open, so nothing they are
+  // doing is interrupted, and it pauses while the browser tab is hidden.
+  const AUTO_REFRESH_MS = 30000;
+  let lastReportTotal = null;
+  let lastPendingCount = null;
+
+  function announceNewReports(total) {
+    if (lastReportTotal !== null && total > lastReportTotal) {
+      const added = total - lastReportTotal;
+      window.showToast(`${added} new report${added === 1 ? '' : 's'} received.`, 'info');
+    }
+    lastReportTotal = total;
+  }
+
+  function announceNewApplications(count) {
+    if (lastPendingCount !== null && count > lastPendingCount) {
+      const added = count - lastPendingCount;
+      window.showToast(`${added} new account request${added === 1 ? '' : 's'} waiting for approval.`, 'info');
+    }
+    lastPendingCount = count;
+  }
+
+  function setLiveStatus(state, text) {
+    const status = document.getElementById('liveStatus');
+    status.classList.toggle('is-paused', state === 'paused');
+    status.classList.toggle('is-offline', state === 'offline');
+    document.getElementById('liveStatusText').textContent = text;
+  }
+
+  function markLive() {
+    const time = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+    setLiveStatus('live', `Live · updated ${time}`);
+  }
+
+  function adminIsBusy() {
+    if (document.getElementById('actionModal').classList.contains('show')) return true;
+    if (document.querySelector('dialog[open]')) return true;
+    const active = document.activeElement;
+    return Boolean(active && active.matches('input, textarea, [contenteditable="true"]'));
+  }
+
+  function currentView() {
+    const visible = document.querySelector('.admin-view:not([hidden])');
+    return visible ? visible.id.replace(/View$/, '') : 'dashboard';
+  }
+
+  let refreshing = false;
+  let backgroundRefresh = false;
+  async function autoRefresh() {
+    if (document.hidden || refreshing) return;
+    if (adminIsBusy()) {
+      setLiveStatus('paused', 'Paused while you work');
+      return;
+    }
+    refreshing = true;
+    backgroundRefresh = true;
+    try {
+      const view = currentView();
+      if (view === 'archived') await renderArchivedReports();
+      else await render();
+      // Keep the Pending Approvals count current. The Residents list is left alone while it is
+      // open, so expanded report lists don't collapse under the admin.
+      if (view !== 'residents') await loadResidents({ quiet: true });
+    } catch {
+      setLiveStatus('offline', 'Offline · retrying');
+    } finally {
+      refreshing = false;
+      backgroundRefresh = false;
+    }
+  }
+
+  setInterval(autoRefresh, AUTO_REFRESH_MS);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) autoRefresh();
   });
 
   // Load teams and categories from the server first, so the team dropdown and the

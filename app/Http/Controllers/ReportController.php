@@ -31,6 +31,8 @@ class ReportController extends ApiController
 {
     private const STATUSES = IssueReport::STATUSES;
 
+    private const MAP_POINT_LIMIT = 1000;
+
     public function __construct(private readonly UploadedImageSanitizer $imageSanitizer) {}
 
     // List reports visible to the signed-in user.
@@ -207,6 +209,52 @@ class ReportController extends ApiController
                 'monthly' => array_values($monthly),
                 'hotspots' => $hotspots,
             ],
+        ]);
+    }
+
+    // Reports with a GPS location, for the hotspot map on the Analytics page.
+    // scope=open (default) shows only unresolved reports; scope=all adds closed ones.
+    public function mapPoints(Request $request): JsonResponse
+    {
+        $scope = $request->query('scope') === 'all' ? 'all' : 'open';
+        $reports = IssueReport::query()
+            ->with(['category', 'location'])
+            ->whereNull('archived_at')
+            ->when($scope === 'open', fn ($query) => $query->whereNotIn('status', IssueReport::CLOSED_STATUSES));
+        $inScope = (clone $reports)->count();
+        $insights = app(InsightService::class);
+
+        $points = (clone $reports)
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->latest('date_submitted')
+            ->limit(self::MAP_POINT_LIMIT)
+            ->get()
+            ->map(function (IssueReport $report) use ($insights): array {
+                $priority = $this->priorityForWeight((int) $report->category->severity_weight);
+
+                return [
+                    'id' => (string) $report->report_id,
+                    'tracking' => $report->tracking_code,
+                    'category' => $report->category->name,
+                    'area' => $report->location->name.', '.$report->location->area_name,
+                    'status' => $report->status,
+                    'priority' => $priority,
+                    'overdue' => $insights->isOverdue($report->status, $report->date_submitted, $priority),
+                    'lat' => (float) $report->latitude,
+                    'lng' => (float) $report->longitude,
+                    'created' => $this->clientTimestamp($report->date_submitted),
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'scope' => $scope,
+            'points' => $points->values(),
+            'reportsInScope' => $inScope,
+            'withoutLocation' => max(0, $inScope - $points->count()),
+            'hotspotThreshold' => (int) config('dss.hotspot_report_threshold'),
+            'hotspotRadiusMeters' => (int) config('dss.hotspot_radius_meters'),
         ]);
     }
 

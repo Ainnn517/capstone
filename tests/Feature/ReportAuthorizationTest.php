@@ -422,8 +422,9 @@ class ReportAuthorizationTest extends TestCase
             ->assertHeader('Content-Security-Policy');
 
         $policy = $response->headers->get('Content-Security-Policy');
-        $this->assertStringContainsString('img-src \'self\' data: blob: https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.googleusercontent.com;', $policy);
-        $this->assertStringContainsString('connect-src \'self\' https://*.googleapis.com https://*.google.com https://*.gstatic.com data: blob:', $policy);
+        $this->assertStringContainsString('img-src \'self\' data: blob: https://tile.openstreetmap.org;', $policy);
+        $this->assertStringContainsString('connect-src \'self\';', $policy);
+        $this->assertStringNotContainsString('googleapis.com https://maps', $policy);
         $this->assertStringContainsString('worker-src blob:', $policy);
         $this->assertStringNotContainsString('cdn.jsdelivr.net', $policy);
         $this->assertFalse($response->headers->has('Strict-Transport-Security'));

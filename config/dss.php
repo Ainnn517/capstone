@@ -16,6 +16,8 @@ return [
     'history_window_days' => 180,
     'history_min_resolved' => 2,
     'hotspot_report_threshold' => 3,
+    // On the hotspot map, open reports pinned within this distance of each other count as one hotspot.
+    'hotspot_radius_meters' => 150,
     'team_by_category' => [
         'Sanitation' => 'Purok Leader',
         'Clogged Drainage' => 'Maintenance & Engineering Crew',

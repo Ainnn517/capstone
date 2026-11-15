@@ -16,12 +16,13 @@ def test_each_role_is_kept_to_its_own_portal(app, new_page, mail):
     resident = new_page()
     log_in(resident, app, "e2eresident")
     resident.goto(f"{app}/admin")
-    assert resident.url.endswith("/resident")
+    # The portal may add its current view (#report) to the address straight away.
+    assert resident.url.split("#")[0].endswith("/resident")
 
     admin = new_page()
     log_in(admin, app, "e2eadmin", mail=mail)
     admin.goto(f"{app}/resident")
-    assert admin.url.endswith("/admin")
+    assert admin.url.split("#")[0].endswith("/admin")
 
 
 def test_administrator_needs_the_emailed_code(app, new_page, mail):

@@ -55,6 +55,7 @@ Route::middleware('api.auth')->group(function (): void {
         ->whereNumber('id')
         ->middleware('role:resident');
     Route::get('/api/analytics/summary', [ReportController::class, 'summary'])->middleware('role:admin');
+    Route::get('/api/analytics/map', [ReportController::class, 'mapPoints'])->middleware('role:admin');
     Route::get('/api/analytics/dss', [DssController::class, 'index'])->middleware('role:admin');
     Route::post('/api/analytics/dss/snapshots', [DssController::class, 'store'])->middleware('role:admin');
     Route::delete('/api/analytics/dss/snapshots', [DssController::class, 'destroyAll'])->middleware('role:admin');

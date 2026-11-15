@@ -48,7 +48,7 @@
     <ul>
       <li><strong>Cloudflare</strong> carries traffic between your browser and the system and protects it with HTTPS encryption.</li>
       <li><strong>Resend</strong> delivers the system's emails (verification links, sign-in and password codes, and account updates). It receives your name, email address, and the content of those emails.</li>
-      <li><strong>Google Maps</strong> displays the map when you choose a location for a report. Google receives the map requests made by your browser.</li>
+      <li><strong>OpenStreetMap</strong> provides the map pictures shown when you pin a report's location and on the administrators' hotspot map. Your browser downloads these map pictures directly from OpenStreetMap, which sees your internet address and the map area being viewed, but not your account or report details.</li>
     </ul>
 
     <h2>Automated suggestions (AI-assisted triage)</h2>

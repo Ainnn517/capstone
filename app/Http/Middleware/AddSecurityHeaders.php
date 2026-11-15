@@ -17,12 +17,12 @@ class AddSecurityHeaders
         $response->headers->set(
             'Content-Security-Policy',
             "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; "
-                ."script-src 'self' 'nonce-{$nonce}' https://maps.googleapis.com https://maps.gstatic.com; "
+                ."script-src 'self' 'nonce-{$nonce}'; "
                 ."style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
                 ."font-src 'self' data: https://fonts.gstatic.com; "
-                ."img-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.googleusercontent.com; "
-                ."connect-src 'self' https://*.googleapis.com https://*.google.com https://*.gstatic.com data: blob:; "
-                .'frame-src https://*.google.com; '
+                // Map tiles come from OpenStreetMap; Leaflet itself is served from this site.
+                ."img-src 'self' data: blob: https://tile.openstreetmap.org; "
+                ."connect-src 'self'; "
                 .'worker-src blob:;',
         );
         $response->headers->set('X-Frame-Options', 'DENY');
