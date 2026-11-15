@@ -4,7 +4,7 @@ import re
 
 from playwright.sync_api import expect
 
-from conftest import confirm_dialog, log_in
+from conftest import confirm_dialog, log_in, open_resident_view
 
 PASSWORD = "Maria-santos123!"
 
@@ -17,7 +17,7 @@ def test_sign_up_after_logging_out_in_another_tab(app, new_page):
     # Same browser, second tab: log in and out, which gives the session a new token.
     other = signup.context.new_page()
     log_in(other, app, "e2eresident")
-    other.click("[data-resident-view=account]")
+    open_resident_view(other, 'account')
     other.click("#logoutBtn")
     confirm_dialog(other)
     other.wait_for_url(re.compile(r"/index\.html"))

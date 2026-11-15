@@ -3,7 +3,7 @@
 import re
 import pytest
 
-from conftest import log_in
+from conftest import log_in, open_resident_view
 
 PHONE = {"width": 390, "height": 844}
 DESKTOP = {"width": 1352, "height": 760}
@@ -28,7 +28,7 @@ def test_all_views_render_cleanly(app, new_page, mail, size):
 
     log_in(page, app, "e2eresident")
     for view in ("report", "reports", "notifications", "account"):
-        page.click(f"[data-resident-view={view}]")
+        open_resident_view(page, view)
         check(f"resident/{view}")
     page.click("#logoutBtn")
     page.locator(".app-confirm-button").click()

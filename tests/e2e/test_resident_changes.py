@@ -2,7 +2,7 @@
 
 from playwright.sync_api import expect
 
-from conftest import log_in
+from conftest import log_in, open_resident_view
 
 
 def file_report(page, description: str) -> None:
@@ -20,7 +20,7 @@ def test_resident_edits_then_withdraws_a_report(app, new_page):
     page = new_page()
     log_in(page, app, "e2eresident")
     file_report(page, "Big pothole near the corner.")
-    page.click("[data-resident-view=reports]")
+    open_resident_view(page, 'reports')
     card = page.locator(".issue-card").first
 
     # Edit while it is still Submitted.

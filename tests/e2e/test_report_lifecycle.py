@@ -3,7 +3,7 @@
 from playwright.sync_api import expect
 import re
 
-from conftest import confirm_dialog, log_in
+from conftest import confirm_dialog, log_in, open_resident_view
 
 NEW_PASSWORD = "Juan-delacruz123!"
 
@@ -99,8 +99,8 @@ def test_report_goes_from_sign_up_to_resolved(app, new_page, mail):
     # The resident sees the outcome.
     resident.reload()
     resident.wait_for_load_state("networkidle")
-    resident.click("[data-resident-view=reports]")
+    open_resident_view(resident, 'reports')
     resident.click("[data-report-filter=past]")
     resident.wait_for_selector(f"#issuesList >> text={tracking}")
-    resident.click("[data-resident-view=notifications]")
+    open_resident_view(resident, 'notifications')
     resident.wait_for_selector("#notifications >> text=Your report has been resolved")

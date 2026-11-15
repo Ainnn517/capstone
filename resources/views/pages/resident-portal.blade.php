@@ -17,6 +17,10 @@
   <!-- Navigation Bar -->
   <nav class="navbar navbar-dark sticky-top">
     <div class="container">
+      <button id="menuToggle" class="menu-toggle" type="button" aria-label="Open menu" aria-controls="residentMenu" aria-expanded="false">
+        <span class="menu-bars" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span id="menuNotifBadge" class="menu-badge" aria-label="Unread notifications" hidden></span>
+      </button>
       <div class="d-flex align-items-center gap-3 navbar-actions">
         <span id="residentName" class="small text-white-50 fw-semibold">Welcome,</span>
       </div>
@@ -25,8 +29,12 @@
 
   <!-- Main Content -->
   <main class="container page-wrap resident-layout">
-    <aside class="resident-sidebar card" aria-label="Resident navigation">
-      <p class="sidebar-label">Menu</p>
+    <div id="menuBackdrop" class="menu-backdrop" hidden></div>
+    <aside id="residentMenu" class="resident-sidebar card" aria-label="Resident navigation" inert>
+      <div class="menu-head">
+        <p class="sidebar-label">Menu</p>
+        <button id="menuClose" class="menu-close" type="button" aria-label="Close menu">&times;</button>
+      </div>
       <button class="sidebar-link active" type="button" data-resident-view="report" aria-current="page">
         <i class="fi fi-rr-megaphone sidebar-icon" aria-hidden="true"></i>
         Report an Issue

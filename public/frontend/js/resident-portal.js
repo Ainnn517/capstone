@@ -682,8 +682,48 @@ function initResidentPortalPage() {
     }
   }
 
+  // ☰ menu: a drawer that opens from the left and closes after choosing a view,
+  // clicking outside it, pressing Escape, or the close button.
+  const menu = document.getElementById('residentMenu');
+  const menuToggle = document.getElementById('menuToggle');
+  const menuBackdrop = document.getElementById('menuBackdrop');
+  function setMenu(open) {
+    const focusWasInMenu = menu.contains(document.activeElement);
+    menu.classList.toggle('open', open);
+    menu.inert = !open;
+    menuBackdrop.hidden = !open;
+    document.body.classList.toggle('menu-open', open);
+    menuToggle.setAttribute('aria-expanded', String(open));
+    menuToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    if (open) {
+      (menu.querySelector('.sidebar-link.active') || menu.querySelector('.sidebar-link')).focus();
+    } else if (focusWasInMenu) {
+      menuToggle.focus();
+    }
+  }
+  menuToggle.addEventListener('click', () => setMenu(!menu.classList.contains('open')));
+  document.getElementById('menuClose').addEventListener('click', () => setMenu(false));
+  menuBackdrop.addEventListener('click', () => setMenu(false));
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && menu.classList.contains('open')) setMenu(false);
+  });
+
+  // The unread count lives in the menu; mirror it on the ☰ button while the menu is closed.
+  const notifCount = document.getElementById('notifNavCount');
+  const menuBadge = document.getElementById('menuNotifBadge');
+  const syncMenuBadge = () => {
+    const text = notifCount.textContent.trim();
+    menuBadge.textContent = text;
+    menuBadge.hidden = text === '' || text === '0';
+  };
+  new MutationObserver(syncMenuBadge).observe(notifCount, { childList: true, characterData: true, subtree: true });
+  syncMenuBadge();
+
   document.querySelectorAll('[data-resident-view]').forEach(button => {
-    button.addEventListener('click', () => showView(button.dataset.residentView));
+    button.addEventListener('click', () => {
+      showView(button.dataset.residentView);
+      setMenu(false);
+    });
   });
   // Buttons elsewhere on the page (for example "View in My Reports") can open a view too.
   document.addEventListener('click', event => {

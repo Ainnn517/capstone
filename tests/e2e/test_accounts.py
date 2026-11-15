@@ -2,13 +2,13 @@
 
 import re
 from playwright.sync_api import expect
-from conftest import PASSWORD, confirm_dialog, log_in
+from conftest import PASSWORD, confirm_dialog, log_in, open_resident_view
 
 
 def test_password_change_needs_the_emailed_code(app, new_page, mail):
     page = new_page()
     log_in(page, app, "e2eresident")
-    page.click("[data-resident-view=account]")
+    open_resident_view(page, 'account')
     page.fill("#currentPassword", PASSWORD)
     page.fill("#newPassword", "Brand-new-pass456!")
     page.fill("#newPasswordConfirmation", "Brand-new-pass456!")
@@ -54,7 +54,7 @@ def test_a_suspended_resident_is_signed_out_and_cannot_sign_in(app, new_page, ma
     admin.wait_for_selector("#residentsList >> text=Suspended")
 
     # The open session is ended on its next request.
-    resident.click("[data-resident-view=reports]")
+    open_resident_view(resident, 'reports')
     resident.reload()
     resident.wait_for_url(re.compile(r"/index\.html"))
     resident.fill("#username", "e2eresident")

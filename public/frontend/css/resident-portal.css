@@ -48,7 +48,7 @@ body {
 
 .navbar > .container {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
   gap: 1rem;
 }
@@ -702,7 +702,7 @@ textarea.form-control {
 /* ---- Sidebar layout (matches the admin dashboard sidebar) ---- */
 .resident-layout {
   display: grid;
-  grid-template-columns: 230px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.5rem;
   align-items: start;
 }
@@ -710,13 +710,61 @@ textarea.form-control {
 .resident-content,
 .resident-view { min-width: 0; }
 
+/* The menu is a drawer: hidden off-screen until the ☰ button opens it. */
 .resident-sidebar {
-  position: sticky;
-  top: 90px;
-  display: grid;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
   gap: 0.45rem;
+  width: min(280px, 85vw);
   padding: 1rem;
+  overflow-y: auto;
+  border-radius: 0 14px 14px 0;
+  background: rgba(38, 62, 47, .97);
+  transform: translateX(-105%);
+  transition: transform .25s ease;
 }
+.resident-sidebar.open { transform: none; box-shadow: 8px 0 30px rgba(0, 0, 0, .35); }
+@media (prefers-reduced-motion: reduce) { .resident-sidebar { transition: none; } }
+
+.menu-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.25rem; }
+.menu-head .sidebar-label { margin: 0; }
+.menu-close {
+  width: 2.2rem; height: 2.2rem; border: 0; border-radius: 8px;
+  background: transparent; color: #fff; font-size: 1.6rem; line-height: 1; cursor: pointer;
+}
+.menu-close:hover, .menu-close:focus-visible { background: rgba(255, 255, 255, .14); }
+
+.menu-backdrop { position: fixed; inset: 0; z-index: 25; background: rgba(0, 0, 0, .45); }
+.menu-backdrop[hidden] { display: none; }
+body.menu-open { overflow: hidden; }
+
+/* ☰ button in the top bar. */
+.menu-toggle {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 2.6rem;
+  height: 2.6rem;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, .25);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .1);
+  cursor: pointer;
+}
+.menu-toggle:hover, .menu-toggle:focus-visible { background: rgba(255, 255, 255, .2); }
+.menu-bars { display: grid; gap: 4px; width: 1.25rem; }
+.menu-bars span { display: block; height: 2px; border-radius: 2px; background: #fff; }
+.menu-badge {
+  position: absolute; top: -6px; right: -6px; min-width: 1.15rem; padding: 0.05rem 0.3rem;
+  border-radius: 999px; background: #dc3545; color: #fff; font-size: 0.68rem; font-weight: 800; line-height: 1.4;
+}
+.menu-badge[hidden] { display: none; }
 
 .sidebar-label {
   margin: 0 0 0.45rem;
@@ -776,17 +824,10 @@ textarea.form-control {
 #reportsPanel .reports-header { justify-content: flex-end; }
 
 @media (max-width: 900px) {
-  .resident-layout { grid-template-columns: 1fr; gap: 1rem; }
-  .resident-sidebar {
-    position: static;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    padding: 0.65rem;
-  }
-  .sidebar-label { grid-column: 1 / -1; }
+  .resident-layout { gap: 1rem; }
 }
 
 @media (max-width: 600px) {
-  .sidebar-link { padding: 0.65rem 0.45rem; font-size: 0.82rem; }
   #reportsPanel .reports-header { justify-content: flex-start; }
 }
 
@@ -807,3 +848,8 @@ textarea.form-control {
 .edit-report-note { margin: 0 0 0.5rem; opacity: 0.85; }
 .edit-report-message { min-height: 1.2em; margin: 0; color: #ffb4b4; font-size: 0.9rem; }
 .edit-report-actions { display: flex; justify-content: flex-end; gap: 0.6rem; }
+
+/* Top bar: ☰ on the left, welcome text on the right, on one row at every width. */
+.navbar > .container { flex-wrap: nowrap; align-items: center; }
+.navbar > .container > .navbar-actions { width: auto; flex: 1 1 auto; min-width: 0; justify-content: flex-end; }
+#residentName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -206,3 +206,9 @@ def log_in(page, base_url: str, username: str, password: str = PASSWORD, mail: M
 
 def confirm_dialog(page) -> None:
     page.locator(".app-confirm-dialog .app-confirm-button").click()
+
+
+def open_resident_view(page, view: str) -> None:
+    """Resident pages keep their menu behind the ☰ button."""
+    page.click("#menuToggle")
+    page.click(f"[data-resident-view={view}]")
