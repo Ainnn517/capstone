@@ -595,6 +595,8 @@ class ReportAuthorizationTest extends TestCase
             'username' => 'new-resident',
             'email' => 'new-resident@example.test',
             'password' => 'A-secure-test-password1!',
+            'locationId' => $this->addressLocationId(),
+            'addressDetails' => 'Blk 1 Lot 2, near the chapel',
             'privacyConsent' => true,
             'role' => 'admin',
             'user_id' => 1,
@@ -626,6 +628,8 @@ class ReportAuthorizationTest extends TestCase
             'username' => 'consent-resident',
             'email' => 'consent-resident@example.test',
             'password' => 'A-secure-test-password1!',
+            'locationId' => $this->addressLocationId(),
+            'addressDetails' => 'Blk 1 Lot 2, near the chapel',
             'privacyConsent' => false,
         ])->assertUnprocessable();
 
@@ -665,6 +669,8 @@ class ReportAuthorizationTest extends TestCase
             'username' => $username,
             'email' => $email,
             'password' => 'A-secure-test-password1!',
+            'locationId' => $this->addressLocationId(),
+            'addressDetails' => 'Blk 1 Lot 2, near the chapel',
             'privacyConsent' => true,
         ];
 
@@ -689,6 +695,8 @@ class ReportAuthorizationTest extends TestCase
             'username' => 'new-resident',
             'email' => 'new-resident@example.test',
             'password' => 'A-secure-test-password1!',
+            'locationId' => $this->addressLocationId(),
+            'addressDetails' => 'Blk 1 Lot 2, near the chapel',
             'privacyConsent' => true,
         ];
         $expect = fn (array $changes, string $message) => $this->postJson('/api/register', array_merge($base, $changes))
@@ -814,6 +822,8 @@ class ReportAuthorizationTest extends TestCase
             'username' => 'resident-9001',
             'email' => 'resident-9001@example.test',
             'password' => 'A-secure-test-password1!',
+            'locationId' => $this->addressLocationId(),
+            'addressDetails' => 'Blk 1 Lot 2, near the chapel',
             'privacyConsent' => true,
         ])
             ->assertForbidden()
@@ -887,5 +897,11 @@ class ReportAuthorizationTest extends TestCase
             'location_id' => $location->location_id,
             'status' => 'Submitted',
         ]);
+    }
+
+    // An active street for the sign-up address step.
+    private function addressLocationId(): int
+    {
+        return (int) Location::firstOrCreate(['name' => 'Main Street', 'area_name' => 'Barangay One'])->location_id;
     }
 }

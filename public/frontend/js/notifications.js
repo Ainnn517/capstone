@@ -46,7 +46,7 @@ window.confirmAction = message => new Promise(resolve => {
 
 // Themed replacement for window.prompt: asks for a short text and resolves with the trimmed
 // text, or null when cancelled. With `required`, an empty answer shows an inline message.
-window.promptAction = (message, { placeholder = '', maxLength = 255, required = true, confirmLabel = 'OK' } = {}) => new Promise(resolve => {
+window.promptAction = (message, { placeholder = '', maxLength = 255, required = true, confirmLabel = 'OK', suggestions = [] } = {}) => new Promise(resolve => {
   const dialog = document.createElement('dialog');
   dialog.className = 'app-confirm-dialog app-prompt-dialog';
   dialog.setAttribute('aria-label', String(message));
@@ -63,6 +63,22 @@ window.promptAction = (message, { placeholder = '', maxLength = 255, required = 
   input.maxLength = maxLength;
   input.placeholder = placeholder;
   label.appendChild(input);
+  // Optional ready-made answers: clicking one fills the text box, which can still be edited.
+  const suggestionList = document.createElement('div');
+  suggestionList.className = 'app-prompt-suggestions';
+  suggestionList.hidden = suggestions.length === 0;
+  suggestions.forEach(text => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'app-prompt-suggestion';
+    chip.textContent = text;
+    chip.addEventListener('click', () => {
+      input.value = text.slice(0, maxLength);
+      error.hidden = true;
+      input.focus();
+    });
+    suggestionList.appendChild(chip);
+  });
   const error = document.createElement('p');
   error.className = 'app-prompt-error';
   error.setAttribute('role', 'alert');
@@ -78,7 +94,7 @@ window.promptAction = (message, { placeholder = '', maxLength = 255, required = 
   confirm.className = 'app-confirm-button';
   confirm.textContent = confirmLabel;
   actions.append(cancel, confirm);
-  form.append(label, error, actions);
+  form.append(label, suggestionList, error, actions);
   dialog.appendChild(form);
 
   form.addEventListener('submit', event => {

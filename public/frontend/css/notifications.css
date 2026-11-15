@@ -96,3 +96,12 @@
 @media (max-width: 480px) {
   .app-prompt-dialog > form > div { flex-direction: column-reverse; }
 }
+
+/* Ready-made answers under a prompt (for example common rejection reasons). */
+.app-prompt-suggestions { display: flex; flex-direction: column; gap: 0.4rem; }
+.app-prompt-suggestions[hidden] { display: none; }
+.app-prompt-suggestion {
+  padding: 0.45rem 0.7rem; border: 1px solid rgba(255, 255, 255, .3); border-radius: 8px;
+  background: rgba(255, 255, 255, .08); color: #fff; font: inherit; font-size: .85rem; text-align: left; cursor: pointer;
+}
+.app-prompt-suggestion:hover, .app-prompt-suggestion:focus-visible { background: rgba(255, 255, 255, .18); }

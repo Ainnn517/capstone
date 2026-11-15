@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Auth\MustVerifyEmail;
 use Illuminate\Contracts\Auth\MustVerifyEmail as MustVerifyEmailContract;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -27,6 +28,8 @@ class User extends Authenticatable implements MustVerifyEmailContract
         'email',
         'password_hash',
         'contact_number',
+        'address_location_id',
+        'address_details',
         'privacy_consent_at',
         'privacy_notice_version',
         'email_verified_at',
@@ -39,6 +42,24 @@ class User extends Authenticatable implements MustVerifyEmailContract
         return [
             'email_verified_at' => 'datetime',
         ];
+    }
+
+    // The street and area of the resident's home address.
+    public function addressLocation(): BelongsTo
+    {
+        return $this->belongsTo(Location::class, 'address_location_id', 'location_id');
+    }
+
+    // Home address as one line, for administrators checking residency.
+    public function addressLine(): ?string
+    {
+        $parts = array_filter([
+            $this->address_details,
+            $this->addressLocation && $this->addressLocation->name !== 'Area-wide' ? $this->addressLocation->name : null,
+            $this->addressLocation?->area_name,
+        ]);
+
+        return $parts === [] ? null : implode(', ', $parts);
     }
 
     // Tell Laravel which column stores this user's password hash.

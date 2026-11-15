@@ -19,6 +19,7 @@ Route::view('/privacy', 'pages.privacy')->name('privacy');
 
 // Handle login, registration, and session requests.
 Route::get('/api/csrf-token', [AuthController::class, 'csrfToken'])->middleware('throttle:30,1');
+Route::get('/api/locations', [AuthController::class, 'locations'])->middleware('throttle:30,1');
 Route::post('/api/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
 Route::post('/api/login/verify', [AuthController::class, 'verifyLogin'])->middleware('throttle:10,1');
 Route::post('/api/register', [AuthController::class, 'register'])->middleware('throttle:5,1');

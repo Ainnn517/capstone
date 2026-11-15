@@ -212,3 +212,13 @@ def open_resident_view(page, view: str) -> None:
     """Resident pages keep their menu behind the ☰ button."""
     page.click("#menuToggle")
     page.click(f"[data-resident-view={view}]")
+
+
+def fill_signup_address(page, details: str = "Blk 4 Lot 12, beside the chapel") -> None:
+    """Create account step 2: choose the first village and street, then the house details."""
+    page.click("#registerNext")
+    page.select_option("#registerArea", index=1)
+    # Areas without separate streets offer a single, preselected "Whole area" choice.
+    if page.locator("#registerStreet option").count() > 1:
+        page.select_option("#registerStreet", index=1)
+    page.fill("#registerAddress", details)

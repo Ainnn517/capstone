@@ -66,7 +66,8 @@
             </form>
 
             <form id="registerForm" hidden>
-                <div class="register-fields">
+                <p id="registerStepLabel" class="register-step-label">Step 1 of 2 · Account details</p>
+                <div id="registerStep1" class="register-fields">
                     <div class="field">
                         <label for="registerName">Full name:</label>
                         <div class="input-wrap">
@@ -109,6 +110,40 @@
                             </button>
                         </div>
                     </div>
+                    <button type="button" id="registerNext" class="login-button field-wide">Next: your address</button>
+                </div>
+
+                <div id="registerStep2" hidden>
+                <p class="register-help">Your home address lets the barangay confirm that you live here before approving your account.</p>
+                <div class="register-fields">
+                    <div class="field">
+                        <label for="registerArea">Village / Phase:</label>
+                        <div class="input-wrap">
+                            <select id="registerArea" required>
+                                <option value="">Choose village / phase</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label for="registerStreet">Street:</label>
+                        <div class="input-wrap">
+                            <select id="registerStreet" required disabled>
+                                <option value="">Choose village / phase first</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="field field-wide">
+                        <label for="registerAddress">House no., building, or landmark:</label>
+                        <div class="input-wrap">
+                            <input type="text" id="registerAddress" autocomplete="address-line1" maxlength="150" placeholder="e.g. Blk 4 Lot 12, beside the chapel" required>
+                        </div>
+                    </div>
+                    <div class="field field-wide">
+                        <label for="registerMobile">Mobile number (optional):</label>
+                        <div class="input-wrap">
+                            <input type="tel" id="registerMobile" autocomplete="tel" inputmode="tel" maxlength="20" placeholder="e.g. 0917 123 4567">
+                        </div>
+                    </div>
                 </div>
 
                 <label class="privacy-consent">
@@ -118,6 +153,8 @@
                 </label>
 
                 <button type="submit" class="login-button">Create account</button>
+                <button type="button" id="registerBack" class="form-switch register-back">Back to account details</button>
+                </div>
                 <p id="registerMessage" class="form-message" aria-live="polite"></p>
             </form>
 

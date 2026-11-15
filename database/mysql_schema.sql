@@ -37,11 +37,14 @@ CREATE TABLE IF NOT EXISTS USERS (
   privacy_notice_version VARCHAR(50) NULL,
   email_verified_at DATETIME NULL,
   contact_number VARCHAR(30) NULL,
+  address_location_id INT UNSIGNED NULL,
+  address_details VARCHAR(150) NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (user_id),
   UNIQUE KEY uq_users_username (username),
   UNIQUE KEY uq_users_email (email),
   KEY idx_users_role_status (role, account_status),
+  KEY idx_users_address_location (address_location_id),
   CONSTRAINT chk_users_username_length CHECK (CHAR_LENGTH(username) >= 3),
   CONSTRAINT chk_users_consent_pair CHECK ((privacy_consent_at IS NULL) = (privacy_notice_version IS NULL))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -221,6 +224,13 @@ CREATE TABLE IF NOT EXISTS ADMIN_AUDIT_LOG (
   CONSTRAINT fk_admin_audit_actor FOREIGN KEY (actor_user_id) REFERENCES USERS (user_id)
     ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Resident home address (added after LOCATION exists).
+SET @fk := (SELECT COUNT(*) FROM information_schema.table_constraints WHERE table_schema = DATABASE() AND table_name = 'USERS' AND constraint_name = 'fk_users_address_location');
+SET @sql := IF(@fk = 0, 'ALTER TABLE USERS ADD CONSTRAINT fk_users_address_location FOREIGN KEY (address_location_id) REFERENCES LOCATION (location_id) ON UPDATE CASCADE ON DELETE SET NULL', 'DO 0');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- ===== SEED DATA (safe to re-run; the Laravel seeder also maintains these rows) =====
 

@@ -20,6 +20,7 @@ class ResidentController extends ApiController
     public function index(): JsonResponse
     {
         $residents = User::query()
+            ->with('addressLocation')
             ->where('role', 'resident')
             ->withCount('reports')
             ->orderByRaw("CASE account_status WHEN 'pending' THEN 0 WHEN 'rejected' THEN 1 WHEN 'suspended' THEN 2 ELSE 3 END")
@@ -31,6 +32,8 @@ class ResidentController extends ApiController
                 'username' => $resident->username,
                 'fullName' => $resident->full_name,
                 'email' => $resident->email,
+                'address' => $resident->addressLine(),
+                'mobile' => $resident->contact_number,
                 'accountStatus' => $resident->account_status,
                 // A fake or mistyped address can never be verified, so approval waits for it.
                 'emailVerified' => ! config('auth.require_email_verification') || $resident->hasVerifiedEmail(),

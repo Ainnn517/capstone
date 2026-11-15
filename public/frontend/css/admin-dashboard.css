@@ -1006,3 +1006,5 @@ td .badge-soft { white-space: nowrap; }
 
 /* Approve is disabled until the resident verifies their email. */
 .resident-card .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.resident-address { margin-top: 0.25rem; }
+.resident-card a[href^="tel:"] { color: inherit; }

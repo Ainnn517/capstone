@@ -3,7 +3,7 @@
 from playwright.sync_api import expect
 import re
 
-from conftest import confirm_dialog, log_in, open_resident_view
+from conftest import confirm_dialog, fill_signup_address, log_in, open_resident_view
 
 NEW_PASSWORD = "Juan-delacruz123!"
 
@@ -16,6 +16,8 @@ def register_and_verify(app, page, mail) -> None:
     page.fill("#registerUsername", "juandc")
     page.fill("#registerPassword", NEW_PASSWORD)
     page.fill("#confirmPassword", NEW_PASSWORD)
+    fill_signup_address(page)
+    page.fill("#registerMobile", "0917 123 4567")
     page.click(".privacy-consent .check-box")
     mail.mark()
     page.click("#registerForm button[type=submit]")
@@ -41,6 +43,9 @@ def test_report_goes_from_sign_up_to_resolved(app, new_page, mail):
     log_in(admin, app, "e2eadmin", mail=mail)
     admin.click("[data-admin-view=pendingApprovals]")
     card = admin.locator("#pendingApprovalList .resident-card", has_text="Juan Dela Cruz")
+    # The address and mobile number from sign-up help the admin confirm residency.
+    expect(card.locator(".resident-address")).to_contain_text("Blk 4 Lot 12, beside the chapel")
+    expect(card).to_contain_text("09171234567")
     card.locator("[data-resident-approval=approved]").click()
     confirm_dialog(admin)
     expect(admin.locator('#pendingApprovalList')).not_to_contain_text('Juan Dela Cruz')

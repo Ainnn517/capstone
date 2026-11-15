@@ -252,5 +252,10 @@ SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE NOTIFICATION ADD KEY idx_notif
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
+-- ===================== USERS: resident address =====================
+SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE USERS ADD COLUMN address_location_id INT UNSIGNED NULL AFTER contact_number, ADD COLUMN address_details VARCHAR(150) NULL AFTER address_location_id, ADD KEY idx_users_address_location (address_location_id), ADD CONSTRAINT fk_users_address_location FOREIGN KEY (address_location_id) REFERENCES LOCATION (location_id) ON UPDATE CASCADE ON DELETE SET NULL', 'DO 0') FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'USERS' AND column_name = 'address_location_id');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 -- ============================== Done ==============================
 SELECT 'Upgrade to schema v2 finished.' AS result;

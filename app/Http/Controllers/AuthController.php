@@ -6,6 +6,7 @@ use App\Http\Middleware\RequireAuthenticatedUser;
 use App\Mail\AccountUpdateMail;
 use App\Mail\LoginCodeMail;
 use App\Mail\PasswordChangeCodeMail;
+use App\Models\Location;
 use App\Models\User;
 use App\Services\AccountNotificationService;
 use Carbon\Carbon;
@@ -22,6 +23,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password as PasswordBroker;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use RuntimeException;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
@@ -43,6 +45,9 @@ class AuthController extends ApiController
             'username' => ['required', 'string', 'min:3', 'max:50', 'regex:/\A[A-Za-z0-9._-]+\z/'],
             'email' => ['required', 'string', 'email', 'max:120'],
             'password' => ['required', 'string', Password::min(12)->mixedCase()->numbers()->symbols()],
+            'locationId' => ['required', 'integer', Rule::exists('LOCATION', 'location_id')->where('is_active', true)],
+            'addressDetails' => ['required', 'string', 'min:2', 'max:150'],
+            'mobile' => ['nullable', 'string', 'max:20'],
             'privacyConsent' => ['required', 'accepted'],
         ], [
             'fullName.required' => 'Enter your full name.',
@@ -52,6 +57,12 @@ class AuthController extends ApiController
             'email.required' => 'Enter your email address.',
             'email.email' => 'Enter a valid email address.',
             'password.required' => 'Choose a password.',
+            'locationId.required' => 'Choose your village / phase and street.',
+            'locationId.integer' => 'Choose your village / phase and street.',
+            'locationId.exists' => 'Choose your village / phase and street from the list.',
+            'addressDetails.required' => 'Enter your house number, building, or a nearby landmark.',
+            'addressDetails.min' => 'Enter your house number, building, or a nearby landmark.',
+            'addressDetails.max' => 'Keep the house number or landmark under 150 characters.',
             'privacyConsent.required' => 'Please agree to the privacy notice to continue.',
             'privacyConsent.accepted' => 'Please agree to the privacy notice to continue.',
         ], [
@@ -66,6 +77,15 @@ class AuthController extends ApiController
 
         $data = $validator->validated();
         $email = trim($data['email']);
+        // Optional Philippine mobile number, stored as 09XXXXXXXXX.
+        $mobile = null;
+        if (trim((string) ($data['mobile'] ?? '')) !== '') {
+            $digits = preg_replace('/[\s().-]/', '', (string) $data['mobile']);
+            if (! preg_match('/\A(?:\+?63|0)?(9\d{9})\z/', $digits, $match)) {
+                return $this->registrationError('Enter a valid mobile number, for example 0917 123 4567, or leave it blank.', 422, 'not_sent');
+            }
+            $mobile = '0'.$match[1];
+        }
         $emailStatus = config('mail.default') === 'log' ? 'not_configured' : 'sent';
         $received = [
             'success' => true,
@@ -75,7 +95,7 @@ class AuthController extends ApiController
         ];
 
         try {
-            $result = DB::transaction(function () use ($data, $email): User|string {
+            $result = DB::transaction(function () use ($data, $email, $mobile): User|string {
                 $capacityLock = DB::table('REGISTRATION_CAPACITY_LOCK')
                     ->where('id', 1)
                     ->lockForUpdate()
@@ -98,6 +118,9 @@ class AuthController extends ApiController
                     'username' => trim($data['username']),
                     'full_name' => trim($data['fullName']),
                     'email' => $email,
+                    'address_location_id' => (int) $data['locationId'],
+                    'address_details' => trim($data['addressDetails']),
+                    'contact_number' => $mobile,
                     'password_hash' => Hash::make($data['password']),
                     'privacy_consent_at' => now(),
                     'privacy_notice_version' => config('security.registration_consent_version'),
@@ -329,6 +352,16 @@ class AuthController extends ApiController
         }
 
         return 0;
+    }
+
+    // Villages / phases and streets for the sign-up form's address step (public, active only).
+    public function locations(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'locations' => Location::query()->where('is_active', true)
+                ->orderBy('area_name')->orderBy('name')->get(['location_id', 'name', 'area_name']),
+        ]);
     }
 
     public function session(): JsonResponse

@@ -25,6 +25,7 @@
     <h2>Information collected</h2>
     <ul>
       <li>Account details: your full name, username, email address, and password (stored only in scrambled, hashed form that no one can read).</li>
+      <li>Your home address (village or phase, street, and house number or landmark) and, if you choose to give it, your mobile number. Barangay staff use these only to confirm that you live in the barangay and to contact you about your account or reports.</li>
       <li>Report details: issue category, description, selected area or street, optional landmark, optional GPS location, and optional photos.</li>
       <li>Report history: when a report was submitted, edited, withdrawn, reviewed, assigned to a team, and resolved.</li>
       <li>Your consent to this notice and the date you gave it.</li>
@@ -40,7 +41,7 @@
     <p>Your information is not sold, and it is not used for advertising.</p>
 
     <h2>Who can see your information</h2>
-    <p>Authorized barangay administrators can see resident account details, reports, and attached photos in order to handle them. Residents can see only their own reports. New resident accounts stay pending and cannot sign in until an administrator approves them.</p>
+    <p>Authorized barangay administrators can see resident account details (including your address and mobile number), reports, and attached photos in order to handle them. Residents can see only their own reports. New resident accounts stay pending and cannot sign in until an administrator approves them.</p>
 
     <h2>Service providers</h2>
     <p>The system relies on a few outside services to work:</p>

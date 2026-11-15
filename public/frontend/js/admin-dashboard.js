@@ -549,6 +549,7 @@ function initAdminDashboardPage() {
           <div>
             <h2>${escapeHTML(resident.fullName)}</h2>
             <div class="small text-secondary">@${escapeHTML(resident.username)} · ${escapeHTML(resident.email)}</div>
+            ${residentContact(resident)}
           </div>
           <div class="d-flex flex-column align-items-end gap-2">${badge}${emailBadge(resident)}</div>
         </div>
@@ -807,6 +808,7 @@ function initAdminDashboardPage() {
             <div>
               <h2>${escapeHTML(resident.fullName)}</h2>
               <div class="small text-secondary">@${escapeHTML(resident.username)} · ${escapeHTML(resident.email)}</div>
+            ${residentContact(resident)}
             </div>
             <div class="d-flex flex-column align-items-end gap-2">
               ${statusBadge}
@@ -825,6 +827,17 @@ function initAdminDashboardPage() {
 
   // Email verification status: a fake or mistyped address can never be verified, so the
   // account cannot be approved until the resident opens the link sent to them.
+  // Home address and optional mobile number given at sign-up, for checking residency.
+  function residentContact(resident) {
+    const address = resident.address
+      ? `<div class="small resident-address"><strong>Address:</strong> ${escapeHTML(resident.address)}</div>`
+      : '<div class="small text-secondary resident-address">No address on file</div>';
+    const mobile = resident.mobile
+      ? `<div class="small"><strong>Mobile:</strong> <a href="tel:${escapeHTML(resident.mobile)}">${escapeHTML(resident.mobile)}</a></div>`
+      : '';
+    return address + mobile;
+  }
+
   function emailBadge(resident) {
     return resident.emailVerified
       ? '<span class="badge-soft soft-green">Email verified</span>'
@@ -1111,6 +1124,13 @@ function initAdminDashboardPage() {
           : 'Enter the reason for suspending this account. The resident will be signed out and the reason emailed to them.',
         {
           placeholder: status === 'rejected' ? 'For example: not a resident of this barangay' : 'For example: repeated false reports',
+          suggestions: status === 'rejected'
+            ? [
+                'Please visit the barangay hall with a valid ID to verify your residency.',
+                'The address you gave is not within this barangay.',
+                'We could not confirm your residency in barangay records.'
+              ]
+            : [],
           confirmLabel: status === 'rejected' ? 'Reject account' : 'Suspend account'
         }
       );

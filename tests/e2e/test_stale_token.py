@@ -4,7 +4,7 @@ import re
 
 from playwright.sync_api import expect
 
-from conftest import confirm_dialog, log_in, open_resident_view
+from conftest import confirm_dialog, fill_signup_address, log_in, open_resident_view
 
 PASSWORD = "Maria-santos123!"
 
@@ -29,6 +29,7 @@ def test_sign_up_after_logging_out_in_another_tab(app, new_page):
     signup.fill("#registerUsername", "mariasantos")
     signup.fill("#registerPassword", PASSWORD)
     signup.fill("#confirmPassword", PASSWORD)
+    fill_signup_address(signup)
     signup.click(".privacy-consent .check-box")
     signup.click("#registerForm button[type=submit]")
     expect(signup.locator("#formMessage")).to_contain_text("Registration received")

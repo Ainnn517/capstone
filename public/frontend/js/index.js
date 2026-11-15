@@ -146,6 +146,85 @@ formSwitch.addEventListener("click", () => {
     formSwitch.setAttribute("aria-controls", showingRegistration ? "loginForm" : "registerForm");
     formMessage.textContent = "";
     registerMessage.textContent = "";
+    showRegisterStep(1);
+    if (showingRegistration) loadAddressOptions();
+});
+
+// ---- Create account, step 2: home address ----
+const registerStep1 = document.getElementById("registerStep1");
+const registerStep2 = document.getElementById("registerStep2");
+const registerStepLabel = document.getElementById("registerStepLabel");
+const registerArea = document.getElementById("registerArea");
+const registerStreet = document.getElementById("registerStreet");
+let addressAreas = null;
+
+function showRegisterStep(step) {
+    registerStep1.hidden = step !== 1;
+    registerStep2.hidden = step !== 2;
+    registerStepLabel.textContent = step === 1 ? "Step 1 of 2 · Account details" : "Step 2 of 2 · Your address";
+}
+
+// Villages / phases and their streets, loaded once from the server.
+async function loadAddressOptions() {
+    if (addressAreas) return;
+    try {
+        const response = await fetch("/api/locations", { headers: { Accept: "application/json" } });
+        const data = await response.json();
+        addressAreas = {};
+        (data.locations || []).forEach(location => {
+            (addressAreas[location.area_name] ||= []).push(location);
+        });
+        Object.keys(addressAreas).forEach(area => registerArea.add(new Option(area, area)));
+    } catch {
+        addressAreas = null;
+        registerMessage.textContent = "Could not load the list of streets. Please refresh the page.";
+    }
+}
+
+registerArea.addEventListener("change", () => {
+    const streets = (addressAreas && addressAreas[registerArea.value]) || [];
+    registerStreet.length = 0;
+    if (!registerArea.value) {
+        registerStreet.add(new Option("Choose village / phase first", ""));
+        registerStreet.disabled = true;
+    } else if (streets.length === 1 && streets[0].name === "Area-wide") {
+        // Areas without separate streets have a single "Area-wide" entry.
+        registerStreet.add(new Option("Whole area", streets[0].location_id));
+        registerStreet.disabled = false;
+    } else {
+        registerStreet.add(new Option("Choose street", ""));
+        streets.filter(street => street.name !== "Area-wide")
+            .forEach(street => registerStreet.add(new Option(street.name, street.location_id)));
+        registerStreet.disabled = false;
+    }
+});
+
+function goToAddressStep() {
+    const fields = registerStep1.querySelectorAll("input");
+    for (const field of fields) {
+        if (!field.reportValidity()) return;
+    }
+    if (registerPasswordInput.value !== confirmPasswordInput.value) {
+        registerMessage.textContent = "Passwords do not match.";
+        confirmPasswordInput.focus();
+        return;
+    }
+    registerMessage.textContent = "";
+    showRegisterStep(2);
+    loadAddressOptions();
+    registerArea.focus();
+}
+document.getElementById("registerNext").addEventListener("click", goToAddressStep);
+// Pressing Enter in step 1 moves to step 2 instead of submitting.
+registerStep1.addEventListener("keydown", event => {
+    if (event.key === "Enter" && event.target.tagName === "INPUT") {
+        event.preventDefault();
+        goToAddressStep();
+    }
+});
+document.getElementById("registerBack").addEventListener("click", () => {
+    registerMessage.textContent = "";
+    showRegisterStep(1);
 });
 
 forgotPasswordButton.addEventListener("click", () => {
@@ -208,9 +287,14 @@ registerForm.addEventListener("submit", async (event) => {
             email: document.getElementById("registerEmail").value.trim(),
             username,
             password,
+            locationId: Number(registerStreet.value) || null,
+            addressDetails: document.getElementById("registerAddress").value.trim(),
+            mobile: document.getElementById("registerMobile").value.trim(),
             privacyConsent: document.getElementById("privacyConsent").checked
         });
         registerForm.reset();
+        registerArea.dispatchEvent(new Event("change"));
+        showRegisterStep(1);
         loginForm.hidden = false;
         registerForm.hidden = true;
         formTitle.textContent = "Log in";
