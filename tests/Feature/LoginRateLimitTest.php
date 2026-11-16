@@ -45,6 +45,31 @@ class LoginRateLimitTest extends TestCase
         ])->assertOk();
     }
 
+    public function test_guesses_spread_over_many_ip_addresses_are_limited_per_account(): void
+    {
+        $user = User::factory()->create([
+            'username' => 'targeted-resident',
+            'password_hash' => Hash::make('correct-password'),
+        ]);
+
+        foreach (range(1, 20) as $attempt) {
+            $this->withServerVariables(['REMOTE_ADDR' => "198.51.100.{$attempt}"])
+                ->postJson('/api/login', ['username' => $user->username, 'password' => 'incorrect-password'])
+                ->assertUnauthorized();
+        }
+
+        // A fresh address with the right password still waits: the account is cooling down.
+        $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.99'])
+            ->postJson('/api/login', ['username' => $user->username, 'password' => 'correct-password'])
+            ->assertStatus(429)
+            ->assertHeader('Retry-After');
+
+        $this->travel(61)->minutes();
+        $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.99'])
+            ->postJson('/api/login', ['username' => $user->username, 'password' => 'correct-password'])
+            ->assertOk();
+    }
+
     public function test_successful_login_clears_failed_attempts_for_the_account(): void
     {
         $user = User::factory()->create([

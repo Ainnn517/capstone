@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\Turnstile;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -14,10 +15,13 @@ class AddSecurityHeaders
         app()->instance('csp.nonce', $nonce);
 
         $response = $next($request);
+        // The Turnstile bot check loads a script and an iframe from Cloudflare, only when enabled.
+        $turnstile = Turnstile::enabled() ? ' '.Turnstile::SCRIPT_ORIGIN : '';
         $response->headers->set(
             'Content-Security-Policy',
             "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; "
-                ."script-src 'self' 'nonce-{$nonce}'; "
+                ."script-src 'self' 'nonce-{$nonce}'{$turnstile}; "
+                .($turnstile !== '' ? "frame-src{$turnstile}; " : '')
                 ."style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
                 ."font-src 'self' data: https://fonts.gstatic.com; "
                 // Map tiles come from OpenStreetMap; Leaflet itself is served from this site.

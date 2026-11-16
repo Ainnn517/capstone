@@ -66,6 +66,42 @@ class AdminTwoFactorLoginTest extends TestCase
             ->assertUnprocessable()->assertJsonPath('message', 'This code has expired. Please sign in again.');
     }
 
+    public function test_signing_in_again_does_not_give_unlimited_code_guesses(): void
+    {
+        $admin = User::factory()->admin()->create(['password_hash' => Hash::make(self::PASSWORD)]);
+        $login = fn () => $this->postJson('/api/login', ['username' => $admin->username, 'password' => self::PASSWORD]);
+
+        $challenge = $login()->json('challenge');
+        $wrong = $this->sentCode($admin) === '000000' ? '111111' : '000000';
+        $guessFiveTimes = function (string $challenge) use ($wrong): void {
+            foreach (range(1, 5) as $_) {
+                $this->postJson('/api/login/verify', ['challenge' => $challenge, 'code' => $wrong]);
+            }
+        };
+        $guessFiveTimes($challenge);
+
+        // The used-up code is not replaced straight away.
+        $login()->assertStatus(429)->assertHeader('Retry-After');
+        Mail::assertSent(LoginCodeMail::class, 1);
+
+        // After the cooldown a new code arrives, but the hourly total still applies.
+        $this->travel(6)->minutes();
+        $challenge = $login()->assertOk()->json('challenge');
+        foreach (range(1, 4) as $_) {
+            $this->postJson('/api/login/verify', ['challenge' => $challenge, 'code' => $wrong])->assertUnprocessable();
+        }
+        $this->postJson('/api/login/verify', ['challenge' => $challenge, 'code' => $wrong])
+            ->assertStatus(429)
+            ->assertJsonPath('success', false);
+
+        $this->travel(6)->minutes();
+        $login()->assertStatus(429);
+        Mail::assertSent(LoginCodeMail::class, 2);
+
+        $this->travel(61)->minutes();
+        $login()->assertOk()->assertJsonPath('twoFactorRequired', true);
+    }
+
     public function test_repeated_sign_in_within_five_minutes_reuses_the_code_without_a_second_email(): void
     {
         $admin = User::factory()->admin()->create(['password_hash' => Hash::make(self::PASSWORD)]);

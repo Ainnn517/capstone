@@ -152,6 +152,9 @@
                     <span class="check-text">I have read and agree to the privacy notice and consent to the processing of my report and account information.</span>
                 </label>
 
+                @if (\App\Support\Turnstile::enabled())
+                    <div class="cf-turnstile" data-sitekey="{{ \App\Support\Turnstile::siteKey() }}"></div>
+                @endif
                 <button type="submit" class="login-button">Create account</button>
                 <button type="button" id="registerBack" class="form-switch register-back">Back to account details</button>
                 </div>
@@ -163,6 +166,9 @@
                 <div class="input-wrap">
                     <input type="email" id="forgotEmail" autocomplete="email" required>
                 </div>
+                @if (\App\Support\Turnstile::enabled())
+                    <div class="cf-turnstile" data-sitekey="{{ \App\Support\Turnstile::siteKey() }}"></div>
+                @endif
                 <button type="submit" class="login-button">Send reset link</button>
                 <p id="forgotPasswordMessage" class="form-message" aria-live="polite"></p>
                 <button type="button" class="form-switch" id="returnToLoginButton">Back to log in</button>
@@ -184,5 +190,8 @@
     <script src="{{ \App\Support\Asset::url('/frontend/js/notifications.js') }}" nonce="{{ app('csp.nonce') }}"></script>
     <script src="{{ \App\Support\Asset::url('/frontend/js/password-toggle.js') }}" nonce="{{ app('csp.nonce') }}"></script>
     <script src="{{ \App\Support\Asset::url('/frontend/js/index.js') }}" nonce="{{ app('csp.nonce') }}"></script>
+    @if (\App\Support\Turnstile::enabled())
+        <script src="{{ \App\Support\Turnstile::SCRIPT_ORIGIN }}/turnstile/v0/api.js" async defer nonce="{{ app('csp.nonce') }}"></script>
+    @endif
 </body>
 </html>

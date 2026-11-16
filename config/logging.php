@@ -62,6 +62,8 @@ return [
             'driver' => 'single',
             'path' => storage_path('logs/laravel.log'),
             'level' => env('LOG_LEVEL', 'debug'),
+            // Logs can contain email addresses: readable by the app's account only.
+            'permission' => 0640,
             'replace_placeholders' => true,
         ],
 
@@ -70,6 +72,7 @@ return [
             'path' => storage_path('logs/laravel.log'),
             'level' => env('LOG_LEVEL', 'debug'),
             'days' => env('LOG_DAILY_DAYS', 14),
+            'permission' => 0640,
             'replace_placeholders' => true,
         ],
 

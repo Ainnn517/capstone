@@ -4,8 +4,12 @@ namespace App\Providers;
 
 use App\Services\Triage\AnthropicTriageModel;
 use App\Services\Triage\TriageModel;
+use App\Support\ProxyTrust;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Http\Middleware\TrustProxies;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -26,11 +30,23 @@ class AppServiceProvider extends ServiceProvider
     {
         Model::preventSilentlyDiscardingAttributes(! app()->isProduction());
 
-        // Behind a hosting proxy or load balancer, trust its forwarded headers so generated
-        // links (email verification, password reset) use https and the real host.
-        $trustedProxies = config('security.trusted_proxies', []);
-        if ($trustedProxies !== []) {
-            TrustProxies::at(count($trustedProxies) === 1 ? $trustedProxies[0] : array_values($trustedProxies));
+        // AI category suggestions while a resident types: a short burst limit and a daily cap
+        // per resident, so one account cannot run up the AI bill or tie up the server.
+        RateLimiter::for('triage', fn (Request $request): array => [
+            Limit::perMinute(20)->by('triage-minute:'.$request->user()?->getAuthIdentifier()),
+            Limit::perDay((int) config('triage.daily_suggestions_per_resident'))->by('triage-day:'.$request->user()?->getAuthIdentifier()),
+        ]);
+
+        // Behind the tunnel, trust its client-IP and https headers (never its host header).
+        ProxyTrust::apply(config('security.trusted_proxies', []));
+
+        // Every generated link (password reset, email verification, unsubscribe) uses
+        // APP_URL in production, whatever Host the request arrived with.
+        if (app()->isProduction() && filled(config('app.url'))) {
+            URL::forceRootUrl(rtrim((string) config('app.url'), '/'));
+            if (str_starts_with((string) config('app.url'), 'https://')) {
+                URL::forceScheme('https');
+            }
         }
     }
 }

@@ -17,8 +17,13 @@ class ResidentController extends ApiController
     public function __construct(private readonly AccountNotificationService $accountNotifications) {}
 
     // List residents for administrator accounts.
+    // Viewer-level administrators only read reports and statistics, so they see a resident's
+    // name and area but not the email address, house details, or mobile number (RA 10173:
+    // personal data limited to what each role needs). Staff and super admins see everything
+    // they need to check residency and approve accounts.
     public function index(): JsonResponse
     {
+        $fullDetails = $this->currentUser()->hasAnyRole(['staff']);
         $residents = User::query()
             ->with('addressLocation')
             ->where('role', 'resident')
@@ -31,9 +36,9 @@ class ResidentController extends ApiController
                 'id' => (string) $resident->user_id,
                 'username' => $resident->username,
                 'fullName' => $resident->full_name,
-                'email' => $resident->email,
-                'address' => $resident->addressLine(),
-                'mobile' => $resident->contact_number,
+                'email' => $fullDetails ? $resident->email : $this->maskEmail((string) $resident->email),
+                'address' => $fullDetails ? $resident->addressLine() : $resident->addressLocation?->area_name,
+                'mobile' => $fullDetails ? $resident->contact_number : null,
                 'accountStatus' => $resident->account_status,
                 // A fake or mistyped address can never be verified, so approval waits for it.
                 'emailVerified' => ! config('auth.require_email_verification') || $resident->hasVerifiedEmail(),
@@ -42,6 +47,13 @@ class ResidentController extends ApiController
             ]);
 
         return response()->json(['success' => true, 'residents' => $residents]);
+    }
+
+    private function maskEmail(string $email): string
+    {
+        [$name, $domain] = array_pad(explode('@', $email, 2), 2, '');
+
+        return mb_substr($name, 0, 1).'***@'.$domain;
     }
 
     // Approve, reject, or suspend a resident account.

@@ -57,6 +57,23 @@ class AdminRolesTest extends TestCase
         $this->assertSame('Submitted', $this->report->fresh()->status);
     }
 
+    public function test_viewers_do_not_see_resident_contact_details(): void
+    {
+        $resident = User::factory()->create(['email' => 'juana@example.test', 'contact_number' => '09171234567']);
+
+        $forViewer = collect($this->actingAs($this->viewer)->getJson('/api/residents')->assertOk()->json('residents'))
+            ->firstWhere('id', (string) $resident->user_id);
+        $this->assertSame('j***@example.test', $forViewer['email']);
+        $this->assertNull($forViewer['mobile']);
+        $this->assertSame($resident->full_name, $forViewer['fullName']);
+
+        $staff = User::factory()->admin('staff')->create();
+        $forStaff = collect($this->actingAs($staff)->getJson('/api/residents')->assertOk()->json('residents'))
+            ->firstWhere('id', (string) $resident->user_id);
+        $this->assertSame('juana@example.test', $forStaff['email']);
+        $this->assertSame('09171234567', $forStaff['mobile']);
+    }
+
     public function test_staff_handle_reports_but_not_settings_or_deletions(): void
     {
         $this->actingAs($this->staff)->postJson('/api/reports/update', $this->validation())->assertOk();

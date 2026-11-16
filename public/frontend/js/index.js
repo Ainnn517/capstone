@@ -244,6 +244,18 @@ returnToLoginButton.addEventListener("click", () => {
     formTitle.textContent = "Log in";
 });
 
+// Cloudflare Turnstile (only present when the server enables it). Each token works once,
+// so the widget is reset after every attempt.
+function botCheckToken(form) {
+    const field = form.querySelector('[name="cf-turnstile-response"]');
+    return field ? field.value : undefined;
+}
+
+function resetBotCheck(form) {
+    const widget = form.querySelector(".cf-turnstile");
+    if (widget && window.turnstile) window.turnstile.reset(widget);
+}
+
 forgotPasswordForm.addEventListener("submit", async event => {
     event.preventDefault();
     const message = document.getElementById("forgotPasswordMessage");
@@ -257,13 +269,18 @@ forgotPasswordForm.addEventListener("submit", async event => {
                 "Content-Type": "application/json",
                 "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content
             },
-            body: JSON.stringify({ email: document.getElementById("forgotEmail").value.trim() })
+            body: JSON.stringify({
+                email: document.getElementById("forgotEmail").value.trim(),
+                "cf-turnstile-response": botCheckToken(forgotPasswordForm)
+            })
         });
         const result = await response.json();
         if (!response.ok || !result.success) throw new Error(result.message || "The request could not be completed.");
         message.textContent = result.message;
     } catch (error) {
         message.textContent = error.message || "The request could not be completed.";
+    } finally {
+        resetBotCheck(forgotPasswordForm);
     }
 });
 
@@ -290,7 +307,8 @@ registerForm.addEventListener("submit", async (event) => {
             locationId: Number(registerStreet.value) || null,
             addressDetails: document.getElementById("registerAddress").value.trim(),
             mobile: document.getElementById("registerMobile").value.trim(),
-            privacyConsent: document.getElementById("privacyConsent").checked
+            privacyConsent: document.getElementById("privacyConsent").checked,
+            "cf-turnstile-response": botCheckToken(registerForm)
         });
         registerForm.reset();
         registerArea.dispatchEvent(new Event("change"));
@@ -304,6 +322,8 @@ registerForm.addEventListener("submit", async (event) => {
         formMessage.textContent = result.message + emailDeliveryNotice(result.emailStatus);
     } catch (error) {
         registerMessage.textContent = error.message + emailDeliveryNotice(error.emailStatus);
+    } finally {
+        resetBotCheck(registerForm);
     }
 });
 
