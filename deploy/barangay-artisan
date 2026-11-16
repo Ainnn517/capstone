@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Run an artisan command against the LIVE site, as the app's own user.
+#
+#   sudo barangay-artisan admin:create
+#   sudo barangay-artisan backup:run
+#   sudo barangay-artisan migrate --database=mysql_admin --force
+#
+# Plain `php artisan ...` in the project folder works on the development (demo) database.
+set -euo pipefail
+[ "$(id -u)" -eq 0 ] || exec sudo "$0" "$@"
+set -a; . /srv/barangay/owner.env; set +a
+cd /srv/barangay/app
+exec runuser -u barangay -- /usr/bin/php artisan "$@"

@@ -8,7 +8,7 @@ The application requires PHP 8.2+ with `pdo_mysql`, `fileinfo`, `mbstring`, and 
    - **Existing database already on the current schema:** back it up, then run `php artisan migrate`. It recognises the existing tables and only records them as done.
    - **Older database from before these changes:** back it up, run `mysql -u user -p your_database < database/upgrade_existing_database.sql`, then `php artisan migrate`.
    - **Changing the schema later:** add a new migration (`php artisan make:migration ...`) and update `database/mysql_schema.sql` to match; the test suite fails until both agree.
-2. Copy `.env.example` to `.env`. Configure `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, and `DB_PASSWORD`. Set a Google Maps JavaScript API key if the map picker is needed.
+2. Copy `.env.example` to `.env`. Configure `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, and `DB_PASSWORD`. The map picker needs no API key.
 3. Install dependencies, generate an application key, and seed the reference data (categories, teams, locations). Outside production the seeder also creates the pilot accounts from `.env`; it never changes an account that already exists:
 
    ```sh
@@ -39,7 +39,7 @@ After schema setup or upgrade, run `php artisan db:seed` to add or refresh defau
 
 The example `.env` uses Laravel's `log` mailer and does not send inbox email. Email verification is required by default; configure a mail provider before deployment, or set `EMAIL_VERIFICATION_REQUIRED=false` if the installation intentionally does not use inbox verification. With verification disabled, administrators can approve accounts without residents needing to receive an email. To verify an account manually, run `php artisan accounts:verify {username}`. To enable account/approval mail, configure a provider privately via `.env` or the hosting secret manager. For Gmail SMTP, use an App Password—not the normal account password—and set the SMTP host, port, username, password, and sender address. Never commit or share credentials.
 
-The location picker requires the Google Maps JavaScript API, billing, and an API key restricted to the required API and allowed referrers. This map integration still requires network access. The charts and Uicons used by the operations/resident pages are hosted locally.
+The location picker uses Leaflet (bundled in `public/frontend/vendor/leaflet`) with OpenStreetMap tiles, so it needs no API key or billing. Loading the map tiles still requires network access. The charts and Uicons used by the operations/resident pages are hosted locally.
 
 ## Administrator sign-in codes
 

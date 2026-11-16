@@ -1,0 +1,18 @@
+[Unit]
+Description=Barangay Reporting System scheduled tasks (backups, clean-up)
+
+[Service]
+Type=oneshot
+User=barangay
+Group=barangay
+WorkingDirectory=/srv/barangay/app
+# Database owner account for backups; readable by root only, passed in by systemd.
+EnvironmentFile=/srv/barangay/owner.env
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/php artisan schedule:run
+UMask=0077
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/srv/barangay/app/storage /srv/barangay/app/bootstrap/cache
