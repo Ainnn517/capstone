@@ -47,7 +47,10 @@ class BackupDatabase extends Command
 
                 return self::FAILURE;
             }
-            $compressed = $this->gzip($dump);
+            $compressed = $this->encrypt($this->gzip($dump));
+            if ($compressed === null) {
+                return self::FAILURE;
+            }
             $this->info('Database: '.$compressed.' ('.$this->size($compressed).')');
 
             $photos = storage_path('app/private');
@@ -58,6 +61,10 @@ class BackupDatabase extends Command
                 if (! $process->isSuccessful()) {
                     $this->error('Photo archive failed: '.trim($process->getErrorOutput()));
 
+                    return self::FAILURE;
+                }
+                $archive = $this->encrypt($archive);
+                if ($archive === null) {
                     return self::FAILURE;
                 }
                 $this->info('Photos: '.$archive.' ('.$this->size($archive).')');
@@ -86,6 +93,33 @@ class BackupDatabase extends Command
         return $target;
     }
 
+    // With BACKUP_AGE_RECIPIENT set, replace the file with an age-encrypted copy (.age) and
+    // delete the readable one. Returns the path to keep, or null when encryption failed
+    // (the unencrypted file is then left in place so the backup itself is not lost).
+    private function encrypt(string $path): ?string
+    {
+        $recipient = trim((string) config('backup.age_recipient'));
+        if ($recipient === '') {
+            return $path;
+        }
+
+        $target = $path.'.age';
+        $process = new Process([(string) config('backup.age_binary'), '--encrypt', '--recipient', $recipient, '--output', $target, $path]);
+        $process->setTimeout(3600)->run();
+        if (! $process->isSuccessful() || ! is_file($target) || filesize($target) === 0) {
+            @unlink($target);
+            $this->error('Encrypting '.basename($path).' failed (is age installed and BACKUP_AGE_RECIPIENT a valid age1... public key?): '
+                .trim($process->getErrorOutput() ?: $process->getOutput()));
+            $this->warn('The unencrypted backup was kept: '.$path);
+
+            return null;
+        }
+        chmod($target, 0600);
+        unlink($path);
+
+        return $target;
+    }
+
     private function prune(string $directory): void
     {
         $days = (int) config('backup.keep_days');
@@ -93,7 +127,9 @@ class BackupDatabase extends Command
             return;
         }
         $cutoff = now()->subDays($days)->getTimestamp();
-        foreach (array_merge(glob("{$directory}/*.sql.gz") ?: [], glob("{$directory}/attachments-*.tar.gz") ?: []) as $file) {
+        $patterns = ['*.sql.gz', 'attachments-*.tar.gz', '*.sql.gz.age', 'attachments-*.tar.gz.age'];
+        $files = array_merge(...array_map(fn (string $pattern): array => glob("{$directory}/{$pattern}") ?: [], $patterns));
+        foreach ($files as $file) {
             if (filemtime($file) < $cutoff) {
                 unlink($file);
                 $this->line('Pruned '.basename($file));

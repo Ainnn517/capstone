@@ -13,4 +13,10 @@ return [
 
     // Also archive uploaded report photos (storage/app/private).
     'include_attachments' => (bool) env('BACKUP_INCLUDE_ATTACHMENTS', true),
+
+    // Encrypt every backup file with age (https://age-encryption.org) for this PUBLIC key
+    // ("age1..."). Keep the matching private key OFF this computer: then a stolen disk or
+    // copied backup folder reveals nothing. Empty = backups are not encrypted.
+    'age_recipient' => env('BACKUP_AGE_RECIPIENT'),
+    'age_binary' => env('BACKUP_AGE_BINARY', 'age'),
 ];

@@ -99,6 +99,36 @@ class ReportMediaTest extends TestCase
         $this->assertSame(0, Attachment::count());
     }
 
+    public function test_video_metadata_is_removed_when_ffmpeg_is_available(): void
+    {
+        // A stand-in for ffmpeg that records its arguments and writes a "cleaned" file.
+        $dir = sys_get_temp_dir().'/ffmpeg-test-'.bin2hex(random_bytes(4));
+        mkdir($dir);
+        $fake = $dir.'/ffmpeg';
+        file_put_contents($fake, "#!/bin/sh\necho \"\$@\" > \"{$dir}/args\"\nfor last; do :; done\nprintf 'CLEANED-VIDEO' > \"\$last\"\n");
+        chmod($fake, 0700);
+        config(['security.uploads.video_ffmpeg' => $fake]);
+
+        try {
+            $this->submit(['video' => $this->mp4()])->assertCreated();
+
+            $video = Attachment::query()->where('mime_type', 'video/mp4')->latest('attachment_id')->firstOrFail();
+            $this->assertSame('CLEANED-VIDEO', Storage::disk('local')->get($video->file_path));
+            $args = file_get_contents($dir.'/args');
+            $this->assertStringContainsString('-map_metadata -1', $args);
+            $this->assertStringContainsString('-c copy', $args);
+
+            // A file ffmpeg cannot read is refused rather than stored with its metadata.
+            file_put_contents($fake, "#!/bin/sh\nexit 1\n");
+            $this->submit(['video' => $this->mp4()])
+                ->assertStatus(422)
+                ->assertJsonPath('message', 'The video could not be processed. Try a different video, or attach photos instead.');
+        } finally {
+            array_map('unlink', glob($dir.'/*'));
+            rmdir($dir);
+        }
+    }
+
     private function submit(array $files)
     {
         return $this->actingAs($this->resident)->post('/api/reports', [

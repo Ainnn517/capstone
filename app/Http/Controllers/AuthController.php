@@ -6,9 +6,11 @@ use App\Http\Middleware\RequireAuthenticatedUser;
 use App\Mail\AccountUpdateMail;
 use App\Mail\LoginCodeMail;
 use App\Mail\PasswordChangeCodeMail;
+use App\Models\AdminAuditLog;
 use App\Models\Location;
 use App\Models\User;
 use App\Services\AccountNotificationService;
+use App\Support\Turnstile;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -31,6 +33,8 @@ use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 class AuthController extends ApiController
 {
     private const VERIFICATION_EMAIL_COOLDOWN_SECONDS = 300;
+
+    private const BOT_CHECK_MESSAGE = 'Please complete the security check and try again.';
 
     // Create a resident account that requires administrator approval.
     //
@@ -73,6 +77,9 @@ class AuthController extends ApiController
         ]);
         if ($validator->fails()) {
             return $this->registrationError($validator->errors()->first(), 422, 'not_sent');
+        }
+        if (! Turnstile::passes($request->input(Turnstile::RESPONSE_FIELD), $request->ip())) {
+            return $this->registrationError(self::BOT_CHECK_MESSAGE, 422, 'not_sent');
         }
 
         $data = $validator->validated();
@@ -186,8 +193,15 @@ class AuthController extends ApiController
 
         $username = trim($usernameInput);
         $rateLimitKey = 'login:'.hash('sha256', mb_strtolower($username).'|'.$request->ip());
-        if (RateLimiter::tooManyAttempts($rateLimitKey, 3)) {
-            $retryAfter = RateLimiter::availableIn($rateLimitKey);
+        // A second limit per account, whatever the IP, so guesses cannot be spread over
+        // many addresses. It expires on its own, so it never locks an account for good.
+        $accountKey = 'login-account:'.hash('sha256', mb_strtolower($username));
+        if (RateLimiter::tooManyAttempts($rateLimitKey, 3)
+            || RateLimiter::tooManyAttempts($accountKey, self::ACCOUNT_LOGIN_FAILURES_PER_HOUR)) {
+            $retryAfter = max(
+                RateLimiter::tooManyAttempts($rateLimitKey, 3) ? RateLimiter::availableIn($rateLimitKey) : 0,
+                RateLimiter::tooManyAttempts($accountKey, self::ACCOUNT_LOGIN_FAILURES_PER_HOUR) ? RateLimiter::availableIn($accountKey) : 0,
+            );
 
             return $this->error("Too many login attempts. Please try again in {$retryAfter} seconds.", 429)
                 ->header('Retry-After', (string) $retryAfter);
@@ -200,12 +214,19 @@ class AuthController extends ApiController
             : Hash::check($password, config('auth.dummy_password_hash'));
         if (! $user || ! $passwordMatches) {
             RateLimiter::hit($rateLimitKey, 60);
+            RateLimiter::hit($accountKey, 3600);
+            AdminAuditLog::recordAuth('login_failed', $user?->user_id, [
+                'username_hash' => AdminAuditLog::usernameFingerprint($username),
+                'known_account' => $user !== null,
+            ]);
 
             return $this->error('Incorrect username or password.', 401);
         }
 
         RateLimiter::clear($rateLimitKey);
+        RateLimiter::clear($accountKey);
         if ($user->account_status !== 'approved') {
+            AdminAuditLog::recordAuth('login_refused', $user->user_id, ['account_status' => $user->account_status]);
             $message = match ($user->account_status) {
                 'pending' => 'Your account is awaiting administrator approval.',
                 'suspended' => 'Your account has been suspended. Contact the barangay office for assistance.',
@@ -246,6 +267,20 @@ class AuthController extends ApiController
         }
 
         if (! hash_equals($pending['code'], $this->hashPasswordCode($code))) {
+            // Wrong codes also count per account across every code sent, so signing in
+            // again for a fresh code does not give unlimited guesses.
+            $failKey = $this->twoFactorFailKey($pending['user_id']);
+            RateLimiter::hit($failKey, 3600);
+            AdminAuditLog::recordAuth('two_factor_failed', (int) $pending['user_id']);
+            if (RateLimiter::tooManyAttempts($failKey, self::TWO_FACTOR_FAILURES_PER_HOUR)) {
+                Cache::forget($key);
+                Cache::forget('login-2fa-current:'.$pending['user_id']);
+                Log::warning('Administrator sign-in codes locked after repeated wrong codes.', ['user_id' => $pending['user_id']]);
+                AdminAuditLog::recordAuth('two_factor_locked', (int) $pending['user_id']);
+
+                return $this->twoFactorLockedError($failKey);
+            }
+
             $pending['attempts']++;
             if ($pending['attempts'] >= self::PASSWORD_CODE_MAX_ATTEMPTS) {
                 Cache::forget($key);
@@ -261,6 +296,7 @@ class AuthController extends ApiController
 
         Cache::forget($key);
         Cache::forget('login-2fa-current:'.$pending['user_id']);
+        RateLimiter::clear($this->twoFactorFailKey($pending['user_id']));
         $user = User::find($pending['user_id']);
         if (! $user || $user->account_status !== 'approved') {
             return $this->error('This account can no longer sign in. Contact the barangay office.', 403);
@@ -274,6 +310,7 @@ class AuthController extends ApiController
         Auth::login($user);
         $request->session()->regenerate();
         $request->session()->put(RequireAuthenticatedUser::PASSWORD_FINGERPRINT_KEY, $user->sessionPasswordFingerprint());
+        AdminAuditLog::recordAuth('login_success', $user->user_id, ['role' => $user->role]);
 
         return response()->json(['success' => true, 'user' => $this->userPayload($user)]);
     }
@@ -282,6 +319,11 @@ class AuthController extends ApiController
     // sign-in within the cooldown reuses the pending code instead of emailing again.
     private function startTwoFactor(User $user): JsonResponse
     {
+        $failKey = $this->twoFactorFailKey($user->user_id);
+        if (RateLimiter::tooManyAttempts($failKey, self::TWO_FACTOR_FAILURES_PER_HOUR)) {
+            return $this->twoFactorLockedError($failKey);
+        }
+
         $currentKey = 'login-2fa-current:'.$user->user_id;
         $cooldownKey = 'login-2fa-mail:'.$user->user_id;
         $existing = Cache::get($currentKey);
@@ -292,6 +334,14 @@ class AuthController extends ApiController
                 'challenge' => $existing,
                 'message' => 'We already sent a code to '.$this->maskEmail($user->email).' in the last 5 minutes. Enter it below to finish signing in.',
             ]);
+        }
+        // The last code was used up by wrong guesses: wait for the cooldown before another
+        // email, so a guesser cannot get a fresh code (and five more tries) every minute.
+        if (RateLimiter::tooManyAttempts($cooldownKey, 1)) {
+            $wait = max(1, (int) ceil(RateLimiter::availableIn($cooldownKey) / 60));
+
+            return $this->error("A sign-in code was sent recently. Please try again in {$wait} minute".($wait === 1 ? '' : 's').'.', 429)
+                ->header('Retry-After', (string) RateLimiter::availableIn($cooldownKey));
         }
 
         $challenge = bin2hex(random_bytes(32));
@@ -374,6 +424,7 @@ class AuthController extends ApiController
     // End the current session.
     public function logout(Request $request): JsonResponse
     {
+        AdminAuditLog::recordAuth('logout', $this->currentUser()->user_id);
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
@@ -396,6 +447,9 @@ class AuthController extends ApiController
         ]);
         if ($validator->fails()) {
             return $this->error('Enter a valid email address.', 422);
+        }
+        if (! Turnstile::passes($request->input(Turnstile::RESPONSE_FIELD), $request->ip())) {
+            return $this->error(self::BOT_CHECK_MESSAGE, 422);
         }
 
         $email = mb_strtolower(trim($validator->validated()['email']));
@@ -467,6 +521,7 @@ class AuthController extends ApiController
             ],
             function (User $user) use ($data): void {
                 $user->forceFill(['password_hash' => Hash::make($data['password'])])->save();
+                AdminAuditLog::recordAuth('password_reset', $user->user_id);
             },
         );
 
@@ -480,6 +535,25 @@ class AuthController extends ApiController
     private const PASSWORD_CODE_MINUTES = 5;
 
     private const PASSWORD_CODE_MAX_ATTEMPTS = 5;
+
+    // Wrong administrator sign-in codes allowed per account per hour, across all codes sent.
+    private const TWO_FACTOR_FAILURES_PER_HOUR = 10;
+
+    // Wrong passwords allowed per username per hour, from any number of IP addresses.
+    private const ACCOUNT_LOGIN_FAILURES_PER_HOUR = 20;
+
+    private function twoFactorFailKey(int|string $userId): string
+    {
+        return 'login-2fa-fail:'.$userId;
+    }
+
+    private function twoFactorLockedError(string $failKey): JsonResponse
+    {
+        $wait = max(1, (int) ceil(RateLimiter::availableIn($failKey) / 60));
+
+        return $this->error("Too many incorrect sign-in codes. Please try again in {$wait} minute".($wait === 1 ? '' : 's').'.', 429)
+            ->header('Retry-After', (string) RateLimiter::availableIn($failKey));
+    }
 
     // Step 1 of a password change: check the current password and the new one, then email a
     // one-time code. The password is NOT changed until the code is confirmed (step 2).
@@ -575,6 +649,7 @@ class AuthController extends ApiController
 
         Cache::forget($key);
         $user->forceFill(['password_hash' => $pending['password_hash']])->save();
+        AdminAuditLog::recordAuth('password_changed', $user->user_id);
 
         // Keep this session signed in; every other session fails the fingerprint check.
         $request->session()->regenerate();

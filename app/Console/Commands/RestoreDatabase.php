@@ -24,6 +24,15 @@ class RestoreDatabase extends Command
 
             return self::FAILURE;
         }
+        if (str_ends_with($file, '.age')) {
+            // The private key is deliberately not on this computer.
+            $plain = substr($file, 0, -4);
+            $this->error('This backup is encrypted. Decrypt it first with the private key you keep off this computer:');
+            $this->line("  age --decrypt --identity /path/to/barangay-backup.key --output \"{$plain}\" \"{$file}\"");
+            $this->line('Then run backup:restore on the decrypted file, and delete the decrypted copy afterwards.');
+
+            return self::FAILURE;
+        }
         $database = (string) config('database.connections.'.config('backup.connection').'.database');
 
         if (! $this->option('force')) {

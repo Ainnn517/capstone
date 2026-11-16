@@ -1,0 +1,20 @@
+# Not copied to the production copy (and never deleted there by deploy.sh).
+/.git/
+/.github/
+/.vscode/
+/.env
+/storage/
+/vendor/
+/bootstrap/cache/*.php
+/node_modules/
+/tests/
+/deploy/
+/database/uploads/
+/config.local.php
+/audit-fixes.patch
+/phpunit.xml
+/.phpunit.result.cache
+/.phpunit.cache/
+/.pytest_cache/
+/.venv-e2e/
+__pycache__/

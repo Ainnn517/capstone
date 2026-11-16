@@ -33,7 +33,9 @@ return [
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
-            'serve' => true,
+            // No public /storage/{path} routes: report photos are served only through
+            // /api/attachments/{id}, which checks who may see them.
+            'serve' => false,
             'throw' => false,
             'report' => false,
         ],

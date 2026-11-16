@@ -22,12 +22,16 @@
         <env name="ANTHROPIC_API_KEY" value="" force="true"/>
         <env name="TRIAGE_AI_ENABLED" value="false" force="true"/>
         <env name="ADMIN_TWO_FACTOR" value="false" force="true"/>
+        <!-- The test videos are not real recordings; tests that need ffmpeg set a stand-in. -->
+        <env name="VIDEO_FFMPEG_BINARY" value="" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
         <env name="DB_CONNECTION" value="mysql"/>
         <env name="DB_DATABASE" value="barangay_reporting_test"/>
+        <!-- Tests never use the production owner account; backups in tests use the test database's own account. -->
+        <env name="DB_ADMIN_USERNAME" value="" force="true"/>
         <env name="DB_URL" value=""/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>

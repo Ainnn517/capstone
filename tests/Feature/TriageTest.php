@@ -54,6 +54,25 @@ class TriageTest extends TestCase
             ->assertJsonPath('suggestion.source', 'rules');
     }
 
+    public function test_each_resident_has_a_daily_cap_on_suggestions(): void
+    {
+        config(['triage.daily_suggestions_per_resident' => 3]);
+        $resident = User::factory()->create();
+        $neighbour = User::factory()->create();
+        $ask = fn (User $user) => $this->actingAs($user)
+            ->postJson('/api/triage/category', ['description' => 'Barado ang kanal sa harap ng bahay namin.']);
+
+        foreach (range(1, 3) as $_) {
+            $ask($resident)->assertOk();
+            $this->travel(2)->minutes(); // stay under the per-minute limit
+        }
+        $ask($resident)->assertStatus(429);
+        $ask($neighbour)->assertOk(); // the cap is per resident
+
+        $this->travel(1)->days();
+        $ask($resident)->assertOk();
+    }
+
     public function test_resident_gets_an_ai_suggestion_when_the_ai_answers(): void
     {
         $this->fakeAi(['category' => 'Streetlights', 'duplicateIds' => [], 'confidence' => 'high', 'reason' => 'Mentions a dark street.']);

@@ -28,6 +28,8 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use InvalidArgumentException;
 use RuntimeException;
+use Symfony\Component\Process\ExecutableFinder;
+use Symfony\Component\Process\Process;
 use Throwable;
 
 class ReportController extends ApiController
@@ -655,10 +657,45 @@ class ReportController extends ApiController
             if ($bytes === false || ! array_key_exists((string) $mime, Attachment::VIDEO_TYPES) || ! $this->looksLikeVideo($bytes)) {
                 return $this->error('Upload the video as MP4, WebM, or MOV.', 422);
             }
+            $bytes = $this->stripVideoMetadata($bytes, Attachment::VIDEO_TYPES[$mime]);
+            if ($bytes === null) {
+                return $this->error('The video could not be processed. Try a different video, or attach photos instead.', 422);
+            }
             $media[] = ['bytes' => $bytes, 'mime' => $mime, 'path' => $this->newAttachmentPath(Attachment::VIDEO_TYPES[$mime])];
         }
 
         return $media;
+    }
+
+    // Copy the video and audio through ffmpeg without metadata or extra data tracks (phones
+    // store the GPS position and device there). The picture is not re-encoded. Returns the
+    // bytes unchanged when ffmpeg is not installed, and null when ffmpeg rejects the file.
+    private function stripVideoMetadata(string $bytes, string $extension): ?string
+    {
+        $configured = trim((string) config('security.uploads.video_ffmpeg'));
+        $ffmpeg = $configured === '' ? null : (is_executable($configured) ? $configured : (new ExecutableFinder)->find($configured));
+        if ($ffmpeg === null) {
+            return $bytes;
+        }
+
+        $format = ['mp4' => 'mp4', 'mov' => 'mov', 'webm' => 'webm'][$extension];
+        $input = tempnam(sys_get_temp_dir(), 'vid-in');
+        $output = tempnam(sys_get_temp_dir(), 'vid-out');
+        try {
+            file_put_contents($input, $bytes);
+            $process = new Process([
+                $ffmpeg, '-v', 'error', '-y', '-i', $input,
+                '-map', '0:v?', '-map', '0:a?', '-map_metadata', '-1', '-map_chapters', '-1',
+                '-c', 'copy', '-f', $format, $output,
+            ]);
+            $process->setTimeout(60)->run();
+            $clean = $process->isSuccessful() ? file_get_contents($output) : false;
+
+            return is_string($clean) && $clean !== '' ? $clean : null;
+        } finally {
+            @unlink($input);
+            @unlink($output);
+        }
     }
 
     // MP4 and MOV files carry "ftyp" at byte 4; WebM files start with the EBML marker.

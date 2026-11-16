@@ -102,7 +102,7 @@ Route::middleware('api.auth')->group(function (): void {
         ->whereNumber('id')
         ->middleware('role:super');
     Route::post('/api/triage/category', [TriageController::class, 'suggestCategory'])
-        ->middleware(['role:resident', 'throttle:20,1']);
+        ->middleware(['role:resident', 'throttle:triage']);
     Route::get('/api/reports/{id}/triage', [TriageController::class, 'review'])
         ->whereNumber('id')
         ->middleware(['role:admin', 'throttle:60,1']);

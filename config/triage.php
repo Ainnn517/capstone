@@ -32,6 +32,8 @@ return [
 
     // Identical inputs reuse a recent answer instead of calling the AI again.
     'cache_minutes' => 30,
+    // Category suggestions each resident may request per day (the form asks as they type).
+    'daily_suggestions_per_resident' => (int) env('TRIAGE_DAILY_SUGGESTIONS', 100),
 
     /*
     | Keyword rules (English, Tagalog, Bisaya/Cebuano), keyed by CATEGORY name.

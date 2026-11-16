@@ -225,9 +225,12 @@ CREATE TABLE IF NOT EXISTS ADMIN_AUDIT_LOG (
   actor_user_id INT UNSIGNED NULL,
   action VARCHAR(100) NOT NULL,
   details JSON NOT NULL,
+  ip_address VARCHAR(45) NULL,
+  user_agent VARCHAR(255) NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (audit_id),
   KEY idx_admin_audit_actor_time (actor_user_id, created_at),
+  KEY idx_admin_audit_action_time (action, created_at),
   CONSTRAINT fk_admin_audit_actor FOREIGN KEY (actor_user_id) REFERENCES USERS (user_id)
     ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

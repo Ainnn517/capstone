@@ -40,4 +40,10 @@ return [
         'key' => env('ANTHROPIC_API_KEY'),
     ],
 
+    // Cloudflare Turnstile bot check on sign-up and forgot password. Off while either is empty.
+    'turnstile' => [
+        'site_key' => env('TURNSTILE_SITE_KEY'),
+        'secret' => env('TURNSTILE_SECRET_KEY'),
+    ],
+
 ];

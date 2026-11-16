@@ -17,6 +17,10 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(AddSecurityHeaders::class);
+        // Outside local development, answer only for the APP_URL host (and its subdomains,
+        // such as www) plus localhost for checks on the server itself. Requests with any
+        // other Host header are refused.
+        $middleware->trustHosts(at: ['^localhost$', '^127\.0\.0\.1$'], subdomains: true);
         // Trusted proxies are applied in AppServiceProvider from config('security.trusted_proxies'),
         // so the setting also works after `php artisan config:cache`.
         $middleware->alias([
