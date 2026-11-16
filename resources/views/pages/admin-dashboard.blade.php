@@ -122,6 +122,33 @@
       </div>
     </div>
 
+    <!-- Hotspot map: reports with a GPS location (Leaflet + OpenStreetMap) -->
+    <div class="card p-4">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <h4 class="section-title mb-1">Hotspot Map <span id="hotspotMapArea" class="hotspot-map-area"></span></h4>
+          <p class="small text-secondary mb-0">Reports that residents pinned on the map. Only the barangay is shown; the dashed line is the area it serves. Red rings mark places with several open reports close together.</p>
+        </div>
+        <label class="hotspot-map-scope">
+          <span class="visually-hidden">Reports to show on the map</span>
+          <select id="hotspotMapScope" class="form-select form-select-sm">
+            <option value="open">Open reports</option>
+            <option value="all">All reports (including closed)</option>
+          </select>
+        </label>
+      </div>
+      <ul class="hotspot-map-legend" aria-label="Map legend">
+        <li><span class="legend-dot legend-critical"></span>Critical</li>
+        <li><span class="legend-dot legend-high"></span>High</li>
+        <li><span class="legend-dot legend-normal"></span>Normal</li>
+        <li><span class="legend-dot legend-closed"></span>Closed</li>
+        <li><span class="legend-ring"></span>Hotspot</li>
+        <li><span class="legend-boundary"></span>Barangay boundary</li>
+      </ul>
+      <div id="hotspotMap" class="hotspot-map mt-2" role="region" aria-label="Map of reported issues"></div>
+      <p id="hotspotMapNote" class="small text-secondary mt-2 mb-0" aria-live="polite"></p>
+    </div>
+
       </section>
 
       <section id="incidentsView" class="admin-view" hidden>
@@ -296,33 +323,6 @@
           <canvas id="lineChart" height="240"></canvas>
         </div>
       </div>
-    </div>
-
-    <!-- Hotspot map: reports with a GPS location (Leaflet + OpenStreetMap) -->
-    <div class="card p-4 mt-4">
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <div>
-          <h4 class="section-title mb-1">Hotspot Map <span id="hotspotMapArea" class="hotspot-map-area"></span></h4>
-          <p class="small text-secondary mb-0">Reports that residents pinned on the map. Only the barangay is shown; the dashed line is the area it serves. Red rings mark places with several open reports close together.</p>
-        </div>
-        <label class="hotspot-map-scope">
-          <span class="visually-hidden">Reports to show on the map</span>
-          <select id="hotspotMapScope" class="form-select form-select-sm">
-            <option value="open">Open reports</option>
-            <option value="all">All reports (including closed)</option>
-          </select>
-        </label>
-      </div>
-      <ul class="hotspot-map-legend" aria-label="Map legend">
-        <li><span class="legend-dot legend-critical"></span>Critical</li>
-        <li><span class="legend-dot legend-high"></span>High</li>
-        <li><span class="legend-dot legend-normal"></span>Normal</li>
-        <li><span class="legend-dot legend-closed"></span>Closed</li>
-        <li><span class="legend-ring"></span>Hotspot</li>
-        <li><span class="legend-boundary"></span>Barangay boundary</li>
-      </ul>
-      <div id="hotspotMap" class="hotspot-map mt-2" role="region" aria-label="Map of reported issues"></div>
-      <p id="hotspotMapNote" class="small text-secondary mt-2 mb-0" aria-live="polite"></p>
     </div>
 
     <!-- Hotspot Matrix Heatmap -->

@@ -208,6 +208,9 @@ function initAdminDashboardPage() {
     });
     renderDSSRecommendations(dss);
     renderDssHistory(dss.history || []);
+    if (!document.getElementById('dashboardView').hidden) {
+      renderHotspotMap();
+    }
     if (!document.getElementById('analyticsView').hidden) {
       renderAnalytics(summary.summary);
     }
@@ -305,13 +308,12 @@ function initAdminDashboardPage() {
     `).join('');
   }
 
-  // Refresh the analytics charts and hotspot grid.
+  // Refresh the analytics charts and hotspot grid. (The hotspot map is on the dashboard.)
   function renderAnalytics(summary) {
     renderCharts(summary);
     renderHotspotGrid(summary.hotspots || []);
     renderResolution(summary.resolution);
     renderConfirmation(summary.confirmation || {});
-    renderHotspotMap();
   }
 
   // ----- Hotspot map (Leaflet + OpenStreetMap) -----
@@ -335,7 +337,8 @@ function initAdminDashboardPage() {
       note.textContent = error.message || 'The map could not be loaded.';
       return;
     }
-    if (document.getElementById('analyticsView').hidden) return;
+    // Leaflet needs a visible container; the map is drawn when the dashboard is shown.
+    if (document.getElementById('dashboardView').hidden) return;
 
     if (!hotspotMap) {
       hotspotMap = L.map(container, { center: window.MAP_DEFAULT_CENTER, zoom: 15, scrollWheelZoom: false });
