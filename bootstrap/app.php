@@ -1,8 +1,8 @@
 <?php
 
 use App\Http\Middleware\AddSecurityHeaders;
-use App\Http\Middleware\RequireAuthenticatedUser;
 use App\Http\Middleware\RedirectSignedInUser;
+use App\Http\Middleware\RequireAuthenticatedUser;
 use App\Http\Middleware\RequirePageRole;
 use App\Http\Middleware\RequireRole;
 use Illuminate\Foundation\Application;
