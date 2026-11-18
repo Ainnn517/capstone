@@ -510,6 +510,29 @@ textarea.form-control {
   resize: vertical;
 }
 
+/* The report description grows with its text, so no manual resizing is needed. */
+#description {
+  resize: none;
+  overflow-y: hidden;
+  max-height: 420px;
+}
+
+.description-help {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.description-count {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, .75);
+}
+
+.description-count.near-limit { color: #ffd88a; }
+.description-count.at-limit { color: #ffb4b4; font-weight: 600; }
+
 .input-group {
   display: flex;
 }
@@ -925,6 +948,36 @@ body.menu-open { overflow: hidden; }
   gap: 0.5rem;
   margin-top: 0.6rem;
 }
+
+/* Each chosen photo or video has a remove button. */
+.media-item {
+  position: relative;
+  min-width: 0;
+}
+
+.media-item-video { grid-column: 1 / -1; }
+
+.media-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+  color: #fff;
+  background: rgba(20, 30, 24, .82);
+  border: 1px solid rgba(255, 255, 255, .6);
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.media-remove:hover,
+.media-remove:focus-visible { background: #b42318; outline: 2px solid #fff; outline-offset: 1px; }
 
 .media-preview img,
 .issue-media img {

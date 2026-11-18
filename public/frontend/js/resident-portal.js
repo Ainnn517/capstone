@@ -137,6 +137,20 @@ function initResidentPortalPage() {
   const suggestionBox = document.getElementById('categorySuggestion');
   let lastSuggestedText = '';
 
+  // Live character count (a line break counts as one, the same as the server) and a box
+  // that grows with the text.
+  const descriptionCount = document.getElementById('descriptionCount');
+  function updateDescriptionField() {
+    const length = descriptionInput.value.length;
+    descriptionCount.textContent = `${length} / 500`;
+    descriptionCount.classList.toggle('near-limit', length >= 450 && length < 500);
+    descriptionCount.classList.toggle('at-limit', length >= 500);
+    descriptionInput.style.height = 'auto';
+    descriptionInput.style.height = `${descriptionInput.scrollHeight + 2}px`;
+    descriptionInput.style.overflowY = descriptionInput.scrollHeight > 420 ? 'auto' : 'hidden';
+  }
+  descriptionInput.addEventListener('input', updateDescriptionField);
+
   function hideCategorySuggestion() {
     suggestionBox.hidden = true;
     suggestionBox.innerHTML = '';
@@ -519,26 +533,58 @@ function initResidentPortalPage() {
     previewUrls = [];
     mediaPreview.innerHTML = '';
     mediaError.textContent = mediaProblem();
-    [...imageInput.files].slice(0, MEDIA_LIMITS.photos).forEach(file => {
+    const removeButton = (label, data) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'media-remove';
+      button.textContent = '×';
+      button.setAttribute('aria-label', label);
+      button.title = label;
+      Object.assign(button.dataset, data);
+      return button;
+    };
+    [...imageInput.files].forEach((file, index) => {
       const url = URL.createObjectURL(file);
       previewUrls.push(url);
+      const item = document.createElement('div');
+      item.className = 'media-item';
       const img = document.createElement('img');
       img.src = url;
       img.alt = `Selected photo ${file.name}`;
-      mediaPreview.appendChild(img);
+      item.append(img, removeButton(`Remove photo ${file.name}`, { removePhoto: String(index) }));
+      mediaPreview.appendChild(item);
     });
     const video = videoInput.files[0];
     if (video) {
       const url = URL.createObjectURL(video);
       previewUrls.push(url);
+      const item = document.createElement('div');
+      item.className = 'media-item media-item-video';
       const player = document.createElement('video');
       player.src = url;
       player.muted = true;
       player.controls = true;
       player.setAttribute('aria-label', `Selected video ${video.name}`);
-      mediaPreview.appendChild(player);
+      item.append(player, removeButton(`Remove video ${video.name}`, { removeVideo: '1' }));
+      mediaPreview.appendChild(item);
     }
   }
+
+  // Remove one chosen photo (the file list is rebuilt without it) or the chosen video.
+  mediaPreview.addEventListener('click', event => {
+    const button = event.target.closest('.media-remove');
+    if (!button) return;
+    if (button.dataset.removeVideo) {
+      videoInput.value = '';
+    } else {
+      const skip = Number(button.dataset.removePhoto);
+      const remaining = new DataTransfer();
+      [...imageInput.files].forEach((file, index) => { if (index !== skip) remaining.items.add(file); });
+      imageInput.files = remaining.files;
+    }
+    renderMediaPreview();
+    (mediaPreview.querySelector('.media-remove') || (button.dataset.removeVideo ? videoInput : imageInput)).focus();
+  });
   imageInput.addEventListener('change', renderMediaPreview);
   videoInput.addEventListener('change', renderMediaPreview);
 
@@ -735,19 +781,27 @@ function initResidentPortalPage() {
       }
       this.classList.remove('was-validated');
       renderMediaPreview();
+      updateDescriptionField();
       geoMsg.textContent = '';
 
       document.getElementById('submitAlert').innerHTML = `
         <div class="alert alert-success alert-dismissible fade show" role="alert">
           <strong>Report Submitted!</strong> Your tracking ID is <strong>${escapeHTML(result.tracking)}</strong>.
           <button type="button" class="btn btn-sm btn-light ms-2" data-go-view="reports">View in My Reports</button>
-          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          <button type="button" class="btn-close" data-close-alert aria-label="Close"></button>
         </div>
       `;
 
       await render();
     } catch (error) {
       document.getElementById('submitAlert').innerHTML = `<div class="alert alert-danger" role="alert">${escapeHTML(error.message)}</div>`;
+    }
+  });
+
+  // The success message's close button (Bootstrap's JS is not loaded, so handle it here).
+  document.getElementById('submitAlert').addEventListener('click', event => {
+    if (event.target.closest('[data-close-alert]')) {
+      document.getElementById('submitAlert').innerHTML = '';
     }
   });
 

@@ -1,3 +1,8 @@
+// A redirect from a portal page (e.g. /resident#report) keeps its #view; the login page has no views, so drop it.
+if (window.location.hash) {
+  history.replaceState(null, "", window.location.pathname + window.location.search);
+}
+
 
 const passwordInput = document.getElementById("password");
 const registerPasswordInput = document.getElementById("registerPassword");
@@ -43,6 +48,7 @@ async function apiRequest(action, payload) {
     if (!response.ok || !data.success) {
         const error = new Error(data.message || "Request failed.");
         error.emailStatus = data.emailStatus;
+        error.errors = Array.isArray(data.errors) ? data.errors : null;
         throw error;
     }
     return data;
@@ -199,17 +205,121 @@ registerArea.addEventListener("change", () => {
     }
 });
 
-function goToAddressStep() {
-    const fields = registerStep1.querySelectorAll("input");
-    for (const field of fields) {
-        if (!field.reportValidity()) return;
+// ---- Registration checks: every problem is listed at once, using the same rules as the server ----
+const registerFieldIds = ["registerName", "registerEmail", "registerUsername", "registerPassword", "confirmPassword",
+    "registerArea", "registerStreet", "registerAddress", "registerMobile", "privacyConsent"];
+
+function clearRegisterErrors() {
+    registerMessage.textContent = "";
+    registerMessage.classList.remove("form-message-list");
+    registerFieldIds.forEach(id => document.getElementById(id).removeAttribute("aria-invalid"));
+}
+
+// problems: [{ field: element or null, message }]
+function showRegisterErrors(problems) {
+    clearRegisterErrors();
+    if (!problems.length) return;
+    if (problems.length === 1) {
+        registerMessage.textContent = problems[0].message;
+    } else {
+        registerMessage.classList.add("form-message-list");
+        const intro = document.createElement("p");
+        intro.textContent = `Please fix these ${problems.length} things:`;
+        const list = document.createElement("ul");
+        problems.forEach(problem => {
+            const item = document.createElement("li");
+            item.textContent = problem.message;
+            list.appendChild(item);
+        });
+        registerMessage.append(intro, list);
     }
-    if (registerPasswordInput.value !== confirmPasswordInput.value) {
-        registerMessage.textContent = "Passwords do not match.";
-        confirmPasswordInput.focus();
+    problems.forEach(problem => problem.field && problem.field.setAttribute("aria-invalid", "true"));
+    const first = problems.find(problem => problem.field);
+    if (first) first.field.focus();
+}
+
+function passwordProblems(password) {
+    const missing = [];
+    if (password.length < 12) missing.push("at least 12 characters");
+    if (!/\p{Lu}/u.test(password) || !/\p{Ll}/u.test(password)) missing.push("an uppercase and a lowercase letter");
+    if (!/\p{N}/u.test(password)) missing.push("a number");
+    if (!/[\p{P}\p{S}\p{Z}]/u.test(password)) missing.push("a symbol (for example ! @ # ?)");
+    return missing;
+}
+
+// The password checklist under the password fields is always shown and ticks off each
+// requirement as the resident types.
+const passwordRuleTests = {
+    length: password => password.length >= 12,
+    case: password => /\p{Lu}/u.test(password) && /\p{Ll}/u.test(password),
+    number: password => /\p{N}/u.test(password),
+    symbol: password => /[\p{P}\p{S}\p{Z}]/u.test(password),
+    match: password => password !== "" && password === confirmPasswordInput.value
+};
+function updatePasswordRules() {
+    const password = registerPasswordInput.value;
+    document.querySelectorAll("#passwordRules [data-rule]").forEach(item => {
+        item.classList.toggle("met", passwordRuleTests[item.dataset.rule](password));
+    });
+}
+registerPasswordInput.addEventListener("input", updatePasswordRules);
+confirmPasswordInput.addEventListener("input", updatePasswordRules);
+
+function step1Problems() {
+    const problems = [];
+    const add = (id, message) => problems.push({ field: document.getElementById(id), message });
+    const name = document.getElementById("registerName").value.trim();
+    const emailInput = document.getElementById("registerEmail");
+    const email = emailInput.value.trim();
+    const username = document.getElementById("registerUsername").value.trim();
+    const password = registerPasswordInput.value;
+
+    if (!name) add("registerName", "Enter your full name.");
+    else if (name.length > 100) add("registerName", "Keep your full name under 100 characters.");
+
+    if (!email) add("registerEmail", "Enter your email address.");
+    else if (emailInput.validity.typeMismatch || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) add("registerEmail", "Enter a valid email address.");
+    else if (email.length > 120) add("registerEmail", "Keep your email address under 120 characters.");
+
+    if (!username) add("registerUsername", "Choose a username.");
+    else if (username.length < 3 || username.length > 50) add("registerUsername", "The username must be 3 to 50 characters.");
+    else if (!/^[A-Za-z0-9._-]+$/.test(username)) add("registerUsername", "The username may only contain letters, numbers, dots, dashes, and underscores.");
+
+    if (!password) {
+        add("registerPassword", "Choose a password.");
+    } else {
+        const missing = passwordProblems(password);
+        if (missing.length) add("registerPassword", `The password needs ${missing.join(", ")}.`);
+    }
+
+    if (!confirmPasswordInput.value) add("confirmPassword", "Type your password again to confirm it.");
+    else if (password !== confirmPasswordInput.value) add("confirmPassword", "Passwords do not match.");
+    return problems;
+}
+
+function step2Problems() {
+    const problems = [];
+    const add = (id, message) => problems.push({ field: document.getElementById(id), message });
+    if (!registerArea.value) add("registerArea", "Choose your village / phase.");
+    else if (!registerStreet.value) add("registerStreet", "Choose your street.");
+    const address = document.getElementById("registerAddress").value.trim();
+    if (address.length < 2) add("registerAddress", "Enter your house number, building, or a nearby landmark.");
+    else if (address.length > 150) add("registerAddress", "Keep the house number or landmark under 150 characters.");
+    const mobile = document.getElementById("registerMobile").value.trim();
+    if (mobile && !/^(?:\+?63|0)?9\d{9}$/.test(mobile.replace(/[\s().-]/g, ""))) {
+        add("registerMobile", "Enter a valid mobile number, for example 0917 123 4567, or leave it blank.");
+    }
+    if (!document.getElementById("privacyConsent").checked) add("privacyConsent", "Please agree to the privacy notice to continue.");
+    return problems;
+}
+
+function goToAddressStep() {
+    const problems = step1Problems();
+    if (problems.length) {
+        showRegisterErrors(problems);
         return;
     }
-    registerMessage.textContent = "";
+    clearRegisterErrors();
     showRegisterStep(2);
     loadAddressOptions();
     registerArea.focus();
@@ -223,8 +333,15 @@ registerStep1.addEventListener("keydown", event => {
     }
 });
 document.getElementById("registerBack").addEventListener("click", () => {
-    registerMessage.textContent = "";
+    clearRegisterErrors();
     showRegisterStep(1);
+});
+// Clear a field's error highlight as soon as the resident edits it.
+registerFieldIds.forEach(id => {
+    const field = document.getElementById(id);
+    const clear = () => field.removeAttribute("aria-invalid");
+    field.addEventListener("input", clear);
+    field.addEventListener("change", clear);
 });
 
 forgotPasswordButton.addEventListener("click", () => {
@@ -289,13 +406,21 @@ registerForm.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const password = document.getElementById("registerPassword").value;
-    const confirmPassword = document.getElementById("confirmPassword").value;
 
-    if (password !== confirmPassword) {
-        registerMessage.textContent = "Passwords do not match.";
+    // Step 1 is checked again in case it was changed; its problems send the resident back there.
+    const accountProblems = step1Problems();
+    if (accountProblems.length) {
+        showRegisterStep(1);
+        showRegisterErrors(accountProblems);
+        return;
+    }
+    const addressProblems = step2Problems();
+    if (addressProblems.length) {
+        showRegisterErrors(addressProblems);
         return;
     }
 
+    clearRegisterErrors();
     registerMessage.textContent = "Creating your account...";
     try {
         const username = document.getElementById("registerUsername").value.trim();
@@ -311,6 +436,7 @@ registerForm.addEventListener("submit", async (event) => {
             "cf-turnstile-response": botCheckToken(registerForm)
         });
         registerForm.reset();
+        updatePasswordRules();
         registerArea.dispatchEvent(new Event("change"));
         showRegisterStep(1);
         loginForm.hidden = false;
@@ -321,7 +447,11 @@ registerForm.addEventListener("submit", async (event) => {
         document.getElementById("username").value = username;
         formMessage.textContent = result.message + emailDeliveryNotice(result.emailStatus);
     } catch (error) {
-        registerMessage.textContent = error.message + emailDeliveryNotice(error.emailStatus);
+        if (error.errors && error.errors.length > 1) {
+            showRegisterErrors(error.errors.map(message => ({ field: null, message })));
+        } else {
+            registerMessage.textContent = error.message + emailDeliveryNotice(error.emailStatus);
+        }
     } finally {
         resetBotCheck(registerForm);
     }

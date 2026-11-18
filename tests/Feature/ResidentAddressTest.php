@@ -59,6 +59,49 @@ class ResidentAddressTest extends TestCase
         $this->assertNull(User::where('username', 'mariasantos')->value('contact_number'));
     }
 
+    public function test_sign_up_reports_every_problem_at_once(): void
+    {
+        $response = $this->register([
+            'password' => 'short',
+            'addressDetails' => '',
+            'mobile' => '12345',
+            'privacyConsent' => false,
+        ])->assertUnprocessable();
+
+        $errors = $response->json('errors');
+        $this->assertGreaterThanOrEqual(4, count($errors));
+        $this->assertSame($errors[0], $response->json('message'));
+        $this->assertContains('Enter your house number, building, or a nearby landmark.', $errors);
+        $this->assertContains('Please agree to the privacy notice to continue.', $errors);
+        $this->assertTrue(collect($errors)->contains(fn (string $error): bool => str_contains($error, 'valid mobile number')));
+        $this->assertTrue(collect($errors)->contains(fn (string $error): bool => str_contains($error, 'password')));
+        $this->assertDatabaseMissing('USERS', ['username' => 'mariasantos']);
+    }
+
+    public function test_a_rejected_application_frees_its_username_and_email(): void
+    {
+        $this->register()->assertAccepted();
+        $old = User::where('username', 'mariasantos')->firstOrFail();
+        $old->forceFill(['account_status' => 'rejected'])->save();
+
+        $this->register(['fullName' => 'Maria S. Santos'])->assertAccepted();
+
+        $this->assertDatabaseMissing('USERS', ['user_id' => $old->user_id]);
+        $new = User::where('username', 'mariasantos')->firstOrFail();
+        $this->assertSame('pending', $new->account_status);
+        $this->assertSame('Maria S. Santos', $new->full_name);
+        $this->assertDatabaseHas('ADMIN_AUDIT_LOG', ['action' => 'replace_rejected_application']);
+    }
+
+    public function test_a_suspended_or_pending_account_still_holds_its_username(): void
+    {
+        $this->register()->assertAccepted();
+        User::where('username', 'mariasantos')->firstOrFail()->forceFill(['account_status' => 'suspended'])->save();
+
+        $this->register(['email' => 'other@example.test'])->assertUnprocessable()
+            ->assertJsonPath('message', 'That username is already taken. Please choose another.');
+    }
+
     public function test_admin_sees_the_address_and_mobile_number(): void
     {
         $this->register()->assertAccepted();

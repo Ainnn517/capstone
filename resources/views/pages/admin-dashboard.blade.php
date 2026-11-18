@@ -122,6 +122,43 @@
       </div>
     </div>
 
+    <!-- Hotspot map: reports with a GPS location (Leaflet + OpenStreetMap) -->
+    <div class="card p-4">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <h4 class="section-title mb-1">Hotspot Map <span id="hotspotMapArea" class="hotspot-map-area"></span></h4>
+          <p class="small text-secondary mb-0">Reports that residents pinned on the map. Only the barangay is shown; the dashed line is the area it serves. Red rings mark places with several open reports close together.</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+        <label class="hotspot-map-scope">
+          <span class="visually-hidden">Reports to show on the map</span>
+          <select id="hotspotMapScope" class="form-select form-select-sm">
+            <option value="open">Open reports</option>
+            <option value="all">All reports (including closed)</option>
+          </select>
+        </label>
+        <label class="hotspot-map-scope">
+          <span class="visually-hidden">Time period to show on the map</span>
+          <select id="hotspotMapPeriod" class="form-select form-select-sm">
+            <option value="present">This month</option>
+            <option value="past">Past month</option>
+            <option value="any" selected>All time</option>
+          </select>
+        </label>
+        </div>
+      </div>
+      <ul class="hotspot-map-legend" aria-label="Map legend">
+        <li><span class="legend-dot legend-critical"></span>Critical</li>
+        <li><span class="legend-dot legend-high"></span>High</li>
+        <li><span class="legend-dot legend-normal"></span>Normal</li>
+        <li><span class="legend-dot legend-closed"></span>Closed</li>
+        <li><span class="legend-ring"></span>Hotspot</li>
+        <li><span class="legend-boundary"></span>Barangay boundary</li>
+      </ul>
+      <div id="hotspotMap" class="hotspot-map mt-2" role="region" aria-label="Map of reported issues"></div>
+      <p id="hotspotMapNote" class="small text-secondary mt-2 mb-0" aria-live="polite"></p>
+    </div>
+
       </section>
 
       <section id="incidentsView" class="admin-view" hidden>
@@ -298,33 +335,6 @@
       </div>
     </div>
 
-    <!-- Hotspot map: reports with a GPS location (Leaflet + OpenStreetMap) -->
-    <div class="card p-4 mt-4">
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <div>
-          <h4 class="section-title mb-1">Hotspot Map <span id="hotspotMapArea" class="hotspot-map-area"></span></h4>
-          <p class="small text-secondary mb-0">Reports that residents pinned on the map. Only the barangay is shown; the dashed line is the area it serves. Red rings mark places with several open reports close together.</p>
-        </div>
-        <label class="hotspot-map-scope">
-          <span class="visually-hidden">Reports to show on the map</span>
-          <select id="hotspotMapScope" class="form-select form-select-sm">
-            <option value="open">Open reports</option>
-            <option value="all">All reports (including closed)</option>
-          </select>
-        </label>
-      </div>
-      <ul class="hotspot-map-legend" aria-label="Map legend">
-        <li><span class="legend-dot legend-critical"></span>Critical</li>
-        <li><span class="legend-dot legend-high"></span>High</li>
-        <li><span class="legend-dot legend-normal"></span>Normal</li>
-        <li><span class="legend-dot legend-closed"></span>Closed</li>
-        <li><span class="legend-ring"></span>Hotspot</li>
-        <li><span class="legend-boundary"></span>Barangay boundary</li>
-      </ul>
-      <div id="hotspotMap" class="hotspot-map mt-2" role="region" aria-label="Map of reported issues"></div>
-      <p id="hotspotMapNote" class="small text-secondary mt-2 mb-0" aria-live="polite"></p>
-    </div>
-
     <!-- Hotspot Matrix Heatmap -->
     <div class="card p-4 mt-4">
       <div class="d-flex justify-content-between align-items-center">
@@ -373,10 +383,24 @@
             <h1 class="section-title mb-1">Registered Residents</h1>
             <p class="text-secondary mb-0">Review account requests, manage resident access, and view complaint history.</p>
           </div>
-          <label class="resident-search">
-            <span class="visually-hidden">Search residents or complaints</span>
-            <input id="residentSearch" class="form-control" type="search" placeholder="Search residents or complaints" aria-label="Search residents">
-          </label>
+          <div class="resident-tools">
+            <label class="resident-filter">
+              <span class="visually-hidden">Show residents by status</span>
+              <select id="residentFilter" class="form-select">
+                <option value="all">All residents</option>
+                <option value="approved">Active</option>
+                <option value="suspended">Suspended</option>
+                <option value="verified">Email verified</option>
+                <option value="unverified">Email not verified</option>
+                <option value="with-reports">With complaints</option>
+                <option value="no-reports">No complaints</option>
+              </select>
+            </label>
+            <label class="resident-search">
+              <span class="visually-hidden">Search residents or complaints</span>
+              <input id="residentSearch" class="form-control" type="search" placeholder="Search residents or complaints" aria-label="Search residents">
+            </label>
+          </div>
         </div>
         <div id="residentsSummary" class="resident-summary"></div>
         <div id="residentsList" class="resident-list" aria-live="polite">

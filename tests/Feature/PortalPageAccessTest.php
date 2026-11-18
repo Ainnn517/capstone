@@ -42,4 +42,17 @@ class PortalPageAccessTest extends TestCase
             $this->actingAs($user)->get(self::RESIDENT_PAGE)->assertRedirect(self::LOGIN_PAGE);
         }
     }
+
+    public function test_the_login_page_sends_signed_in_users_to_their_portal(): void
+    {
+        $this->get(self::LOGIN_PAGE)->assertOk()->assertHeader('Cache-Control', 'no-store, private');
+
+        $this->actingAs(User::factory()->admin()->create())->get(self::LOGIN_PAGE)->assertRedirect(self::ADMIN_PAGE);
+        $this->actingAs(User::factory()->create())->get(self::LOGIN_PAGE)->assertRedirect(self::RESIDENT_PAGE);
+
+        // An account that cannot open a portal still sees the login page (no redirect loop).
+        $pending = User::factory()->create();
+        $pending->forceFill(['account_status' => 'pending'])->save();
+        $this->actingAs($pending)->get(self::LOGIN_PAGE)->assertOk();
+    }
 }

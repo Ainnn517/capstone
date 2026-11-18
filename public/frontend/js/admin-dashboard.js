@@ -208,6 +208,9 @@ function initAdminDashboardPage() {
     });
     renderDSSRecommendations(dss);
     renderDssHistory(dss.history || []);
+    if (!document.getElementById('dashboardView').hidden) {
+      renderHotspotMap();
+    }
     if (!document.getElementById('analyticsView').hidden) {
       renderAnalytics(summary.summary);
     }
@@ -305,13 +308,12 @@ function initAdminDashboardPage() {
     `).join('');
   }
 
-  // Refresh the analytics charts and hotspot grid.
+  // Refresh the analytics charts and hotspot grid. (The hotspot map is on the dashboard.)
   function renderAnalytics(summary) {
     renderCharts(summary);
     renderHotspotGrid(summary.hotspots || []);
     renderResolution(summary.resolution);
     renderConfirmation(summary.confirmation || {});
-    renderHotspotMap();
   }
 
   // ----- Hotspot map (Leaflet + OpenStreetMap) -----
@@ -335,7 +337,8 @@ function initAdminDashboardPage() {
       note.textContent = error.message || 'The map could not be loaded.';
       return;
     }
-    if (document.getElementById('analyticsView').hidden) return;
+    // Leaflet needs a visible container; the map is drawn when the dashboard is shown.
+    if (document.getElementById('dashboardView').hidden) return;
 
     if (!hotspotMap) {
       hotspotMap = L.map(container, { center: window.MAP_DEFAULT_CENTER, zoom: 15, scrollWheelZoom: false });
@@ -351,7 +354,20 @@ function initAdminDashboardPage() {
     hotspotMap.invalidateSize();
     hotspotLayer.clearLayers();
 
-    const points = data.points || [];
+    // Time period: this calendar month, last calendar month, or everything.
+    const period = document.getElementById('hotspotMapPeriod').value;
+    const now = new Date();
+    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const inPeriod = point => {
+      if (period === 'any') return true;
+      const created = new Date(point.created);
+      if (Number.isNaN(created.getTime())) return false;
+      return period === 'present'
+        ? created >= thisMonthStart
+        : created >= lastMonthStart && created < thisMonthStart;
+    };
+    const points = (data.points || []).filter(inPeriod);
     const hotspots = findHotspots(L, points.filter(point => !CLOSED_STATUSES.includes(point.status)),
       data.hotspotThreshold || 3, data.hotspotRadiusMeters || 150);
 
@@ -388,7 +404,10 @@ function initAdminDashboardPage() {
 
 
     const noun = points.length === 1 ? 'report' : 'reports';
-    const parts = [`${points.length} ${scope === 'all' ? noun : `open ${noun}`} on the map`];
+    const monthName = date => date.toLocaleString(undefined, { month: 'long', year: 'numeric' });
+    const periodLabel = period === 'present' ? ` from ${monthName(thisMonthStart)}`
+      : period === 'past' ? ` from ${monthName(lastMonthStart)}` : '';
+    const parts = [`${points.length} ${scope === 'all' ? noun : `open ${noun}`}${periodLabel} on the map`];
     if (hotspots.length) parts.push(`${hotspots.length} hotspot${hotspots.length === 1 ? '' : 's'}`);
     if (data.withoutLocation) {
       parts.push(`${data.withoutLocation} ${data.withoutLocation === 1 ? 'report has' : 'reports have'} no map pin (shown in the grid below only)`);
@@ -438,6 +457,9 @@ function initAdminDashboardPage() {
   exportMonth.addEventListener('change', updateExportLinks);
 
   document.getElementById('hotspotMapScope').addEventListener('change', () => {
+    renderHotspotMap();
+  });
+  document.getElementById('hotspotMapPeriod').addEventListener('change', () => {
     renderHotspotMap();
   });
 
@@ -1005,7 +1027,27 @@ function initAdminDashboardPage() {
     // Only actual residents (approved or suspended). Pending and rejected applications are
     // shown under Pending Approvals instead.
     const listedResidents = residents.filter(resident => ['approved', 'suspended'].includes(resident.accountStatus));
+    // Status filter; each option shows how many residents it matches.
+    const filterSelect = document.getElementById('residentFilter');
+    const filterTests = {
+      all: () => true,
+      approved: resident => resident.accountStatus === 'approved',
+      suspended: resident => resident.accountStatus === 'suspended',
+      verified: resident => Boolean(resident.emailVerified),
+      unverified: resident => !resident.emailVerified,
+      'with-reports': resident => Number(resident.reportCount || 0) > 0,
+      'no-reports': resident => Number(resident.reportCount || 0) === 0
+    };
+    const filterLabels = {
+      all: 'All residents', approved: 'Active', suspended: 'Suspended', verified: 'Email verified',
+      unverified: 'Email not verified', 'with-reports': 'With complaints', 'no-reports': 'No complaints'
+    };
+    [...filterSelect.options].forEach(option => {
+      option.textContent = `${filterLabels[option.value]} (${listedResidents.filter(filterTests[option.value]).length})`;
+    });
+    const filterTest = filterTests[filterSelect.value] || filterTests.all;
     const matchingResidents = listedResidents.filter(resident =>
+      filterTest(resident) &&
       `${resident.fullName} ${resident.username} ${resident.email}`.toLowerCase().includes(search)
     );
     const complaintCount = listedResidents.reduce((total, resident) => total + Number(resident.reportCount || 0), 0);
@@ -1025,7 +1067,7 @@ function initAdminDashboardPage() {
 
     if (matchingResidents.length === 0) {
       document.getElementById('residentsList').innerHTML =
-        '<div class="card p-4 text-secondary">No residents match your search.</div>';
+        `<div class="card p-4 text-secondary">${search ? 'No residents match your search' : 'No residents match this filter'}${filterSelect.value !== 'all' ? ` (showing: ${escapeHTML(filterLabels[filterSelect.value])})` : ''}.</div>`;
       return;
     }
 
@@ -1349,6 +1391,7 @@ function initAdminDashboardPage() {
     render();
   });
   document.getElementById('residentSearch').addEventListener('input', renderResidents);
+  document.getElementById('residentFilter').addEventListener('change', renderResidents);
 
   // Report search boxes: wait until typing pauses, then reload from page 1.
   function onSearch(inputId, run) {

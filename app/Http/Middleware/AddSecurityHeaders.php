@@ -26,6 +26,8 @@ class AddSecurityHeaders
                 ."font-src 'self' data: https://fonts.gstatic.com; "
                 // Map tiles come from OpenStreetMap; Leaflet itself is served from this site.
                 ."img-src 'self' data: blob: https://tile.openstreetmap.org; "
+                // Videos play from this site; blob: lets the report form preview a chosen video.
+                ."media-src 'self' blob:; "
                 ."connect-src 'self'; "
                 .'worker-src blob:;',
         );

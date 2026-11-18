@@ -13,7 +13,7 @@ class RequirePageRole
 {
     private const LOGIN_PAGE = '/';
 
-    private const PORTAL = [
+    public const PORTAL = [
         'admin' => '/admin',
         'resident' => '/resident',
     ];
@@ -21,11 +21,7 @@ class RequirePageRole
     public function handle(Request $request, Closure $next, string ...$roles): Response
     {
         $user = $request->user();
-        $signedIn = $user instanceof User
-            && $user->account_status === 'approved'
-            && (! config('auth.require_email_verification') || $user->hasVerifiedEmail());
-
-        if (! $signedIn) {
+        if (! self::isSignedIn($user)) {
             return redirect(self::LOGIN_PAGE);
         }
         if (! in_array($user->role, $roles, true)) {
@@ -38,5 +34,13 @@ class RequirePageRole
         $response->headers->set('Cache-Control', 'no-store, private');
 
         return $response;
+    }
+
+    // An approved account (with a verified email when that is required) counts as signed in.
+    public static function isSignedIn(mixed $user): bool
+    {
+        return $user instanceof User
+            && $user->account_status === 'approved'
+            && (! config('auth.require_email_verification') || $user->hasVerifiedEmail());
     }
 }

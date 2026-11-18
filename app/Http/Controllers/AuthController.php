@@ -75,8 +75,21 @@ class AuthController extends ApiController
             'email' => 'email address',
             'password' => 'password',
         ]);
-        if ($validator->fails()) {
-            return $this->registrationError($validator->errors()->first(), 422, 'not_sent');
+        // Collect every problem at once so the resident can fix them all in one go.
+        $errors = $validator->errors()->all();
+        // Optional Philippine mobile number, stored as 09XXXXXXXXX.
+        $mobile = null;
+        $mobileInput = $request->input('mobile');
+        if (is_string($mobileInput) && trim($mobileInput) !== '') {
+            $digits = preg_replace('/[\s().-]/', '', $mobileInput);
+            if (preg_match('/\A(?:\+?63|0)?(9\d{9})\z/', $digits, $match)) {
+                $mobile = '0'.$match[1];
+            } else {
+                $errors[] = 'Enter a valid mobile number, for example 0917 123 4567, or leave it blank.';
+            }
+        }
+        if ($errors) {
+            return $this->registrationError($errors[0], 422, 'not_sent', $errors);
         }
         if (! Turnstile::passes($request->input(Turnstile::RESPONSE_FIELD), $request->ip())) {
             return $this->registrationError(self::BOT_CHECK_MESSAGE, 422, 'not_sent');
@@ -84,15 +97,6 @@ class AuthController extends ApiController
 
         $data = $validator->validated();
         $email = trim($data['email']);
-        // Optional Philippine mobile number, stored as 09XXXXXXXXX.
-        $mobile = null;
-        if (trim((string) ($data['mobile'] ?? '')) !== '') {
-            $digits = preg_replace('/[\s().-]/', '', (string) $data['mobile']);
-            if (! preg_match('/\A(?:\+?63|0)?(9\d{9})\z/', $digits, $match)) {
-                return $this->registrationError('Enter a valid mobile number, for example 0917 123 4567, or leave it blank.', 422, 'not_sent');
-            }
-            $mobile = '0'.$match[1];
-        }
         $emailStatus = config('mail.default') === 'log' ? 'not_configured' : 'sent';
         $received = [
             'success' => true,
@@ -109,6 +113,30 @@ class AuthController extends ApiController
                     ->first();
                 if (! $capacityLock) {
                     throw new RuntimeException('The registration capacity lock is missing. Run the database migrations.');
+                }
+
+                // A rejected application does not hold on to its username or email: it is
+                // removed here (same transaction) so the person can apply again. Only rejected
+                // residents without reports qualify, matching what an admin may delete by hand.
+                $username = trim($data['username']);
+                $rejected = User::query()
+                    ->where('role', 'resident')
+                    ->where('account_status', 'rejected')
+                    ->whereDoesntHave('reports')
+                    ->where(fn ($query) => $query
+                        ->whereRaw('LOWER(email) = ?', [mb_strtolower($email)])
+                        ->orWhereRaw('LOWER(username) = ?', [mb_strtolower($username)]))
+                    ->lockForUpdate()
+                    ->get();
+                foreach ($rejected as $old) {
+                    // Notifications are removed by the database (ON DELETE CASCADE).
+                    DB::table('PASSWORD_RESET_TOKENS')->where('email', $old->email)->delete();
+                    AdminAuditLog::create([
+                        'actor_user_id' => null,
+                        'action' => 'replace_rejected_application',
+                        'details' => ['resident_user_id' => $old->user_id, 'username' => $old->username],
+                    ]);
+                    $old->delete();
                 }
 
                 if (User::query()->whereRaw('LOWER(email) = ?', [mb_strtolower($email)])->exists()) {
@@ -173,11 +201,12 @@ class AuthController extends ApiController
         return response()->json($received, 202);
     }
 
-    private function registrationError(string $message, int $status, string $emailStatus): JsonResponse
+    private function registrationError(string $message, int $status, string $emailStatus, array $errors = []): JsonResponse
     {
         return response()->json([
             'success' => false,
             'message' => $message,
+            'errors' => $errors ?: [$message],
             'emailStatus' => $emailStatus,
         ], $status);
     }

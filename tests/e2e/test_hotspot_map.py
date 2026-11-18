@@ -37,7 +37,8 @@ def test_new_pinned_report_appears_live_and_on_the_hotspot_map(app, new_page, ma
     expect(admin.locator("#toastContainer")).to_contain_text("1 new report received.")
     expect(admin.locator("#mTotal")).to_have_text("1")
 
-    admin.click("[data-admin-view=analytics]")
+    # The hotspot map is on the Operations Dashboard, the page admins land on.
+    expect(admin.locator("#dashboardView #hotspotMap")).to_be_visible()
     expect(admin.locator("#hotspotMapNote")).to_have_text("1 open report on the map.")
     expect(admin.locator("#hotspotMap path.leaflet-interactive")).to_have_count(1)
     admin.locator("#hotspotMap path.leaflet-interactive").click()
