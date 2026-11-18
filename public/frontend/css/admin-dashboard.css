@@ -343,10 +343,24 @@ h1, h2, h3, h4, h5, h6 { margin-top: 0; }
 }
 
 /* Resident list and search styles. */
-.resident-search {
-  width: min(360px, 100%);
+.resident-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: min(580px, 100%);
 }
 
+.resident-filter {
+  flex: 0 1 210px;
+  min-width: 0;
+}
+
+.resident-search {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.resident-filter .form-select,
 .resident-search .form-control {
   color: #fff;
   background: rgba(39, 63, 48, .72);

@@ -101,6 +101,19 @@ body { font-family: "Archivo", Arial, sans-serif; color: #fff; }
   background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .45); border-radius: 6px; outline: none;
 }
 .input-wrap input:focus { border-color: #fff; background: rgba(255, 255, 255, .14); }
+/* Edge adds its own show-password eye; hide it so only ours appears. */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear { display: none; }
+/* Password checklist: always visible, each rule turns green once met. */
+.password-rules {
+  list-style: none; margin: 0 0 12px; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 3px 14px;
+  font-size: .78rem; line-height: 1.35; color: rgba(255, 255, 255, .78);
+}
+.password-rules li { display: flex; align-items: baseline; gap: 6px; }
+.password-rules li::before { content: "○"; flex: none; width: 1em; text-align: center; }
+.password-rules li.met { color: #b8f5cf; }
+.password-rules li.met::before { content: "✓"; font-weight: 700; }
 .toggle-password {
   position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
   width: 26px; height: 26px; background: none; border: 0; cursor: pointer;
@@ -117,6 +130,16 @@ body { font-family: "Archivo", Arial, sans-serif; color: #fff; }
 .login-card #registerForm .login-button { margin-top: 8px; }
 .login-button:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0, 0, 0, .25); }
 .form-message { min-height: 1.2em; margin-top: 10px; font-size: .85rem; text-align: center; color: #ffd9d9; }
+/* Several registration problems are listed together. */
+.form-message.form-message-list {
+  text-align: left; padding: 10px 12px; line-height: 1.45;
+  background: rgba(180, 35, 24, .22); border: 1px solid rgba(255, 180, 180, .45); border-radius: 6px;
+}
+.form-message-list p { margin: 0 0 4px; font-weight: 600; }
+.form-message-list ul { margin: 0; padding-left: 18px; }
+.input-wrap input[aria-invalid="true"],
+.input-wrap select[aria-invalid="true"] { border-color: #ff9b9b; box-shadow: 0 0 0 1px #ff9b9b; }
+.privacy-consent:has(input[aria-invalid="true"]) .check-text { color: #ffd9d9; }
 .form-switch {
   display: block; margin: 14px auto 0; padding: 4px; color: #fff; font: inherit;
   background: none; border: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px;

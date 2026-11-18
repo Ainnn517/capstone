@@ -15,7 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // Show the login and portal pages.
-Route::view('/', 'pages.index')->name('home');
+Route::view('/', 'pages.index')->middleware('guest.page')->name('home');
 Route::view('/resident', 'pages.resident-portal')->middleware('page.role:resident')->name('resident');
 Route::view('/admin', 'pages.admin-dashboard')->middleware('page.role:admin')->name('admin');
 Route::get('/admin/summary', [ReportExportController::class, 'summary'])->middleware('page.role:admin')->name('admin.summary');

@@ -81,3 +81,7 @@
   flex-shrink: 0;
   accent-color: #35b779;
 }
+
+/* Edge adds its own show-password eye; hide it so only ours appears. */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear { display: none; }

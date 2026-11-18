@@ -507,6 +507,7 @@ class ReportController extends ApiController
             return $this->error('You have submitted reports too frequently. Please try again later.', 429);
         }
 
+        $this->normaliseLineBreaks($request, 'description');
         $validator = Validator::make($request->all(), [
             'category' => ['required', 'string', 'max:100'],
             'location_id' => ['required', 'integer', Rule::exists('LOCATION', 'location_id')->where('is_active', true)],
@@ -601,6 +602,17 @@ class ReportController extends ApiController
             'id' => (string) $report->report_id,
             'tracking' => $trackingCode,
         ], 201);
+    }
+
+    // Browsers send each line break in a form as two characters (\r\n) but count it as one
+    // in the text box. Store and count it as one (\n) so the 500-character limit matches
+    // what the resident sees.
+    private function normaliseLineBreaks(Request $request, string $field): void
+    {
+        $value = $request->input($field);
+        if (is_string($value)) {
+            $request->merge([$field => str_replace(["\r\n", "\r"], "\n", $value)]);
+        }
     }
 
     /**
@@ -713,6 +725,7 @@ class ReportController extends ApiController
     public function residentUpdate(Request $request, int $id): JsonResponse
     {
         $user = $this->currentUser();
+        $this->normaliseLineBreaks($request, 'description');
         $validator = Validator::make($request->all(), [
             'category' => ['required', 'string', 'max:100'],
             'description' => ['required', 'string', 'max:500'],

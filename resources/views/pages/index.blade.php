@@ -65,7 +65,7 @@
                 <button type="button" class="form-switch" id="twoFactorBack">Back to log in</button>
             </form>
 
-            <form id="registerForm" hidden>
+            <form id="registerForm" hidden novalidate>
                 <p id="registerStepLabel" class="register-step-label">Step 1 of 2 · Account details</p>
                 <div id="registerStep1" class="register-fields">
                     <div class="field">
@@ -75,21 +75,21 @@
                         </div>
                     </div>
                     <div class="field">
-                        <label for="registerEmail">Email:</label>
+                        <label for="registerUsername">Username:</label>
                         <div class="input-wrap">
-                            <input type="email" id="registerEmail" autocomplete="email" required>
+                            <input type="text" id="registerUsername" autocomplete="username" maxlength="50" required>
                         </div>
                     </div>
                     <div class="field field-wide">
-                        <label for="registerUsername">Username:</label>
+                        <label for="registerEmail">Email:</label>
                         <div class="input-wrap">
-                            <input type="text" id="registerUsername" autocomplete="username" required>
+                            <input type="email" id="registerEmail" autocomplete="email" maxlength="120" required>
                         </div>
                     </div>
                     <div class="field">
                         <label for="registerPassword">Password:</label>
                         <div class="input-wrap">
-                            <input type="password" id="registerPassword" autocomplete="new-password" minlength="12" required>
+                            <input type="password" id="registerPassword" autocomplete="new-password" minlength="12" required aria-describedby="passwordRules">
                             <button type="button" class="toggle-password" id="toggleRegisterPassword" aria-label="Show password">
                                 <svg viewBox="0 0 24 24" aria-hidden="true">
                                     <path d="M2.5 12s3.3-6 9.5-6 9.5 6 9.5 6-3.3 6-9.5 6-9.5-6-9.5-6z"></path>
@@ -110,7 +110,14 @@
                             </button>
                         </div>
                     </div>
-                    <button type="button" id="registerNext" class="login-button field-wide">Next: your address</button>
+                    <ul id="passwordRules" class="password-rules field-wide" aria-label="Password requirements">
+                        <li data-rule="length">At least 12 characters</li>
+                        <li data-rule="case">Uppercase and lowercase letters</li>
+                        <li data-rule="number">At least one number</li>
+                        <li data-rule="symbol">At least one symbol (e.g. ! @ # ?)</li>
+                        <li data-rule="match">Both passwords match</li>
+                    </ul>
+                    <button type="button" id="registerNext" class="login-button field-wide">Next</button>
                 </div>
 
                 <div id="registerStep2" hidden>

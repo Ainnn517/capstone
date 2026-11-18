@@ -99,7 +99,10 @@
               <div class="col-12">
                 <label class="form-label fw-medium" for="description">Detailed Description</label>
                 <textarea id="description" class="form-control" rows="4" minlength="1" maxlength="500" required placeholder="Describe the incident in 1 to 500 characters."></textarea>
-                <small class="form-text text-secondary">Include enough detail for a response team to understand the issue (up to 500 characters).</small>
+                <div class="description-help">
+                  <small class="form-text text-secondary">Include enough detail for a response team to understand the issue (up to 500 characters).</small>
+                  <small id="descriptionCount" class="description-count" aria-live="polite">0 / 500</small>
+                </div>
                 <div id="categorySuggestion" class="category-suggestion" aria-live="polite" hidden></div>
               </div>
 

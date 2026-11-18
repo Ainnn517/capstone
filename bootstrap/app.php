@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\AddSecurityHeaders;
 use App\Http\Middleware\RequireAuthenticatedUser;
+use App\Http\Middleware\RedirectSignedInUser;
 use App\Http\Middleware\RequirePageRole;
 use App\Http\Middleware\RequireRole;
 use Illuminate\Foundation\Application;
@@ -27,6 +28,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'api.auth' => RequireAuthenticatedUser::class,
             'role' => RequireRole::class,
             'page.role' => RequirePageRole::class,
+            'guest.page' => RedirectSignedInUser::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
