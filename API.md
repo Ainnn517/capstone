@@ -64,7 +64,8 @@ Both return suggestions only and never change data. `source` is `ai` when the AI
 
 | Method | Route | Access |
 |---|---|---|
-| GET | `/api/notifications` | Resident; returns latest 10, unread count, and pagination. Optional `view`: `current` (reports in progress), `past` (resolved, rejected, or archived), or `all` (default) |
+| GET | `/api/reports/similar?category=&location_id=` | Resident; heads-up while writing a report. Returns `count` of open reports of that category on that street, `mine` (how many are the resident's own), `teamWorking`, `latestSubmitted`, and `street`. Counts only: never the reporter, text, or tracking codes. Categories in `STREET_UPDATES_EXCLUDED_CATEGORIES` always return 0. Never blocks submitting |
+| GET | `/api/notifications` | Resident (the **Updates** page); returns latest 10, `unreadCount`, `unreadByTab` (`mine`, `street`), the resident's `street`, and pagination. Optional `tab`: `mine` (default, updates about the resident's own reports) or `street` (a problem on the resident's saved street was dispatched or fixed; shows only category, street and status, never the reporter, report text or tracking code; Public Safety and demo reports are excluded, see `config/updates.php`; never emailed). Optional `view` (only for `mine`): `current`, `past`, or `all` (default) |
 | POST | `/api/notifications/{id}/read` | Resident; only the notification owner |
 
 ## Reference data

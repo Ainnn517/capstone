@@ -2,7 +2,12 @@
 
 namespace App\Providers;
 
+use App\Services\Assistant\AnthropicAssistantModel;
+use App\Services\Assistant\AssistantModel;
+use App\Services\Assistant\GeminiAssistantModel;
 use App\Services\Triage\AnthropicTriageModel;
+use App\Services\Triage\GeminiTriageModel;
+use App\Services\Triage\OllamaTriageModel;
 use App\Services\Triage\TriageModel;
 use App\Support\ProxyTrust;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -19,8 +24,17 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // The AI used for triage. Tests swap in a fake so they never call a real service.
-        $this->app->bind(TriageModel::class, AnthropicTriageModel::class);
+        // The AI used for triage: Claude or Gemini (cloud), or a local Ollama model. Tests swap
+        // in a fake so they never call a real service.
+        $this->app->bind(TriageModel::class, fn ($app): TriageModel => match (config('triage.provider')) {
+            'gemini' => $app->make(GeminiTriageModel::class),
+            'ollama' => $app->make(OllamaTriageModel::class),
+            default => $app->make(AnthropicTriageModel::class),
+        });
+        // "Ask the data" uses the same cloud provider as triage (no local option).
+        $this->app->bind(AssistantModel::class, fn ($app): AssistantModel => config('triage.provider') === 'gemini'
+            ? $app->make(GeminiAssistantModel::class)
+            : $app->make(AnthropicAssistantModel::class));
     }
 
     /**
@@ -35,6 +49,14 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('triage', fn (Request $request): array => [
             Limit::perMinute(20)->by('triage-minute:'.$request->user()?->getAuthIdentifier()),
             Limit::perDay((int) config('triage.daily_suggestions_per_resident'))->by('triage-day:'.$request->user()?->getAuthIdentifier()),
+        ]);
+
+        // "Ask the data": a small share of the AI quota per administrator.
+        RateLimiter::for('data-assistant', fn (Request $request): array => [
+            Limit::perMinute((int) config('assistant.per_minute_per_admin'))->by('assistant-minute:'.$request->user()?->getAuthIdentifier())
+                ->response(fn () => response()->json(['success' => false, 'message' => 'Too many questions in a minute. Please wait a moment and ask again.'], 429)),
+            Limit::perDay((int) config('assistant.per_day_per_admin'))->by('assistant-day:'.$request->user()?->getAuthIdentifier())
+                ->response(fn () => response()->json(['success' => false, 'message' => 'You have reached today\'s limit for AI questions. It resets tomorrow.'], 429)),
         ]);
 
         // Behind the tunnel, trust its client-IP and https headers (never its host header).

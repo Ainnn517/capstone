@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminAccountController;
 use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DataAssistantController;
 use App\Http\Controllers\DssController;
 use App\Http\Controllers\EmailAlertController;
 use App\Http\Controllers\NotificationController;
@@ -70,10 +71,12 @@ Route::middleware('api.auth')->group(function (): void {
     Route::get('/api/analytics/map', [ReportController::class, 'mapPoints'])->middleware('role:admin');
     Route::get('/api/reports/export', [ReportExportController::class, 'csv'])->middleware(['role:admin', 'throttle:10,1']);
     Route::get('/api/analytics/dss', [DssController::class, 'index'])->middleware('role:admin');
+    Route::post('/api/analytics/ask', [DataAssistantController::class, 'ask'])->middleware(['role:admin', 'throttle:data-assistant']);
     Route::post('/api/analytics/dss/snapshots', [DssController::class, 'store'])->middleware('role:staff');
     Route::delete('/api/analytics/dss/snapshots', [DssController::class, 'destroyAll'])->middleware('role:super');
     Route::get('/api/reports', [ReportController::class, 'index'])->middleware('role:resident,admin');
     Route::get('/api/reports/archived', [ReportController::class, 'archived'])->middleware('role:admin');
+    Route::get('/api/reports/similar', [ReportController::class, 'similar'])->middleware(['role:resident', 'throttle:60,1']);
     Route::post('/api/reports/{id}/archive', [ReportController::class, 'archive'])
         ->whereNumber('id')
         ->middleware('role:staff');

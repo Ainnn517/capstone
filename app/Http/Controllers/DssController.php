@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AdminAuditLog;
 use App\Models\DssAnalyticsRecord;
+use App\Services\Assistant\DataAssistant;
 use App\Services\DssRecommendationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -11,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 
 class DssController extends ApiController
 {
-    public function index(DssRecommendationService $recommendations): JsonResponse
+    public function index(DssRecommendationService $recommendations, DataAssistant $assistant): JsonResponse
     {
         $result = $recommendations->recommendations();
 
@@ -19,6 +20,8 @@ class DssController extends ApiController
             'success' => true,
             ...$result,
             'history' => $this->history(),
+            // Whether the "Ask the data" box can be shown.
+            'assistantAvailable' => $assistant->available(),
         ]);
     }
 

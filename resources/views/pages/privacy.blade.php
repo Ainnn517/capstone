@@ -42,7 +42,7 @@
     <p>Your information is not sold, and it is not used for advertising.</p>
 
     <h2>Who can see your information</h2>
-    <p>Barangay administrators who review accounts and handle reports can see resident account details (including your address and mobile number), reports, and attached photos. Administrators with read-only access see reports and residents' names, but not email addresses, house details, or mobile numbers. Residents can see only their own reports. New resident accounts stay pending and cannot sign in until an administrator approves them.</p>
+    <p>Barangay administrators who review accounts and handle reports can see resident account details (including your address and mobile number), reports, and attached photos. Residents can see only their own reports. New resident accounts stay pending and cannot sign in until an administrator approves them.</p>
 
     <h2>Cookies</h2>
     <p>The system uses only two cookies, both needed for it to work: one keeps you signed in, and one protects forms from being submitted by other websites. Both are sent only over encrypted connections, expire after two hours without activity, and contain no personal details. The system uses no advertising or tracking cookies. Cloudflare may add its own short-lived security cookie to tell people from automated attacks.</p>
@@ -60,7 +60,12 @@
 
     <h2>Automated suggestions (AI-assisted triage)</h2>
     <p>To help route reports faster, the system can suggest an issue category while you write a report, point out to administrators when several open reports at the same location may describe the same problem, and suggest which team to send based on how quickly past reports were resolved. These are suggestions only: you choose your report's category, and barangay administrators make every decision about status, priority, and assignment.</p>
-    <p>When the AI feature is enabled, the text of report descriptions is sent to an artificial intelligence service provided by Anthropic to produce these suggestions. Your name, username, email address, GPS location, and photos are not sent, and email addresses and phone numbers written inside a description are masked before sending. When the feature is turned off, suggestions are produced on the barangay's own system using keyword rules, and no report text leaves the system.</p>
+    @if (config('triage.provider') === 'gemini')
+    <p>When the AI feature is on, the text of report descriptions is sent to Gemini, an artificial intelligence service provided by Google, to produce these suggestions. Your name, username, email address, GPS location, and photos are not sent, and email addresses and phone numbers written inside a description are masked before sending. On Google's free tier, Google may use the text it receives to improve its products. When the feature is turned off, suggestions are produced on the barangay's own system using keyword rules, and no report text leaves the system.</p>
+    @else
+    <p>When the AI feature uses the cloud service, the text of report descriptions is sent to an artificial intelligence service provided by Anthropic to produce these suggestions. Your name, username, email address, GPS location, and photos are not sent, and email addresses and phone numbers written inside a description are masked before sending. When the AI runs on the barangay's own computer, or the feature is turned off (keyword rules), suggestions are produced on the barangay's own system and no report text leaves the system.</p>
+    @endif
+    <p>Barangay administrators can also ask the AI questions about report statistics (for example, which street had the most reports this month). For these questions only counts, categories, street and area names, dates, and priority scores are shared with the AI service. Residents' names, accounts, contact details, report text, photos, and locations are never included.</p>
 
     <h2>How your information is protected</h2>
     <p>All connections use HTTPS encryption. Passwords are stored only in hashed form. Administrator sign-in requires an emailed one-time code, repeated sign-in attempts are limited, and changing your password signs out your other devices. Location and device details hidden inside photos and videos are removed when they are uploaded. The database can be reached only from the barangay's own server, the web application cannot alter its structure, and backups are encrypted.</p>

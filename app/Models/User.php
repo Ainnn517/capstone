@@ -49,7 +49,9 @@ class User extends Authenticatable implements MustVerifyEmailContract
         ];
     }
 
-    public const ADMIN_LEVELS = ['super', 'staff', 'viewer'];
+    // Two administrator levels: super (everything, including admin accounts) and staff
+    // (shown as "Admin": works on reports and sign-ups). Both see the whole dashboard.
+    public const ADMIN_LEVELS = ['super', 'staff'];
 
     // Does this account pass a route's role list? "resident" and "admin" are the account
     // roles; "staff" means an administrator who can make changes (super or staff level);
@@ -74,8 +76,7 @@ class User extends Authenticatable implements MustVerifyEmailContract
     {
         return match ($this->admin_level) {
             'super' => 'Super admin',
-            'staff' => 'Staff',
-            'viewer' => 'Viewer',
+            'staff' => 'Admin',
             default => null,
         };
     }

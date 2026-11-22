@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Services\AttachmentFileRemover;
 use App\Services\InsightService;
 use App\Services\ReportAlertService;
+use App\Services\StreetUpdateService;
 use App\Services\UploadedImageSanitizer;
 use App\Support\BarangayArea;
 use Carbon\Carbon;
@@ -41,6 +42,50 @@ class ReportController extends ApiController
     public function __construct(private readonly UploadedImageSanitizer $imageSanitizer) {}
 
     // List reports visible to the signed-in user.
+    // Heads-up while a resident writes a report: are there already open reports of this
+    // category on this street? Returns counts only (never who reported, the text, or the
+    // tracking codes), so it is safe to show to any resident. It never blocks submitting.
+    public function similar(Request $request): JsonResponse
+    {
+        $data = Validator::make($request->query(), [
+            'category' => ['required', 'string', 'max:100'],
+            'location_id' => ['required', 'integer'],
+        ])->validate();
+
+        $category = Category::query()->where('name', $data['category'])->first(['category_id', 'name']);
+        $location = Location::query()->find($data['location_id'], ['location_id', 'name', 'area_name']);
+        $street = $location === null ? null : ($location->name === 'Area-wide' ? $location->area_name : $location->name);
+        $none = ['success' => true, 'count' => 0, 'mine' => 0, 'teamWorking' => false, 'latestSubmitted' => null, 'street' => $street];
+        // Categories kept private on the street (config/updates.php) are not announced here either.
+        if ($category === null || $location === null || in_array($category->name, (array) config('updates.excluded_categories'), true)) {
+            return response()->json($none);
+        }
+
+        $open = IssueReport::query()
+            ->where('category_id', $category->category_id)
+            ->where('location_id', $location->location_id)
+            ->whereNull('archived_at')
+            ->whereNotIn('status', IssueReport::CLOSED_STATUSES)
+            ->selectRaw('COUNT(*) as total')
+            ->selectRaw('SUM(user_id = ?) as mine', [$this->currentUser()->user_id])
+            ->selectRaw("SUM(status = 'Dispatched') as dispatched")
+            ->selectRaw('MAX(date_submitted) as latest')
+            ->first();
+
+        if ((int) $open->total === 0) {
+            return response()->json($none);
+        }
+
+        return response()->json([
+            'success' => true,
+            'count' => (int) $open->total,
+            'mine' => (int) $open->mine,
+            'teamWorking' => (int) $open->dispatched > 0,
+            'latestSubmitted' => Carbon::parse($open->latest, config('app.timezone'))->toIso8601String(),
+            'street' => $street,
+        ]);
+    }
+
     public function index(Request $request): JsonResponse
     {
         $user = $this->currentUser();
@@ -198,13 +243,47 @@ class ReportController extends ApiController
             ->whereNotIn('report.status', IssueReport::CLOSED_STATUSES)
             ->groupBy('location.name', 'location.area_name', 'category.name')
             ->selectRaw(
-                "CONCAT(location.name, ', ', location.area_name) as location, category.name as category, COUNT(*) as report_count",
+                "CONCAT(location.name, ', ', location.area_name) as location, location.name as street, location.area_name as area, category.name as category, COUNT(*) as report_count",
             )
             ->get()
             ->map(fn ($row): array => [
                 'location' => $row->location,
+                'street' => $row->street,
+                'area' => $row->area,
                 'category' => $row->category,
                 'count' => (int) $row->report_count,
+            ]);
+        // Report counts per street and category, open or closed, for the "Most Reported
+        // Locations" chart. Each row carries a count per period so the page can switch periods
+        // without another request. Rejected reports are left out (they were not real issues).
+        $thisMonth = now()->startOfMonth();
+        $lastMonth = now()->subMonthNoOverflow()->startOfMonth();
+        $thisYear = now()->startOfYear();
+        $locationCounts = DB::table('ISSUE_REPORT as report')
+            ->join('CATEGORY as category', 'category.category_id', '=', 'report.category_id')
+            ->join('LOCATION as location', 'location.location_id', '=', 'report.location_id')
+            ->whereNull('report.archived_at')
+            ->where('report.status', '!=', 'Rejected')
+            ->groupBy('location.name', 'location.area_name', 'category.name')
+            ->select('location.name as street', 'location.area_name as area', 'category.name as category')
+            ->selectRaw('SUM(CASE WHEN report.date_submitted >= ? THEN 1 ELSE 0 END) as this_month', [$thisMonth])
+            ->selectRaw(
+                'SUM(CASE WHEN report.date_submitted >= ? AND report.date_submitted < ? THEN 1 ELSE 0 END) as last_month',
+                [$lastMonth, $thisMonth],
+            )
+            ->selectRaw('SUM(CASE WHEN report.date_submitted >= ? THEN 1 ELSE 0 END) as this_year', [$thisYear])
+            ->selectRaw('COUNT(*) as all_time')
+            ->get()
+            ->map(fn ($row): array => [
+                'street' => $row->street,
+                'area' => $row->area,
+                'category' => $row->category,
+                'counts' => [
+                    'thisMonth' => (int) $row->this_month,
+                    'lastMonth' => (int) $row->last_month,
+                    'thisYear' => (int) $row->this_year,
+                    'all' => (int) $row->all_time,
+                ],
             ]);
         $hotspotThreshold = (int) config('dss.hotspot_report_threshold');
         // Open incidents (not resolved, rejected, or archived) by priority, for the
@@ -231,6 +310,7 @@ class ReportController extends ApiController
                 'dispatches' => $dispatches,
                 'resolutionRate' => $total === 0 ? 0 : (int) round(($resolved / $total) * 100),
                 'hotspotCount' => $hotspotCount,
+                'hotspotThreshold' => $hotspotThreshold,
                 'resolution' => app(InsightService::class)->resolutionStats(),
                 'confirmation' => [
                     'confirmed' => (clone $reports)->where('status', 'Resolved')->whereNotNull('resident_confirmed_at')->count(),
@@ -245,6 +325,7 @@ class ReportController extends ApiController
                 'categories' => $categories,
                 'monthly' => array_values($monthly),
                 'hotspots' => $hotspots,
+                'locationCounts' => $locationCounts,
             ],
         ]);
     }
@@ -1000,6 +1081,8 @@ class ReportController extends ApiController
         // Email only after the change is committed, so a rollback never sends a false alert.
         if ($result === null && $changedReport !== null) {
             app(ReportAlertService::class)->statusChanged($changedReport->fresh(['team']), $dispatchNote);
+            // "My Street" updates for neighbours (in-portal only, never emailed).
+            app(StreetUpdateService::class)->statusChanged($changedReport, (string) $data['status']);
         }
 
         return $result ?? response()->json(['success' => true]);

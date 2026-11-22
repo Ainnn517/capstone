@@ -54,6 +54,40 @@ class DssRecommendationTest extends TestCase
         $this->assertSame('High', $recommendation['urgency']);
     }
 
+    public function test_a_new_critical_report_outranks_an_old_minor_one_because_age_points_are_capped(): void
+    {
+        config([
+            'dss.weights' => ['report_count' => 3, 'average_age_days' => 1, 'severity_weight' => 4],
+            'dss.max_age_days' => 7,
+            'dss.high_urgency_threshold' => 20,
+        ]);
+        $resident = User::factory()->create();
+        $critical = Category::create(['name' => 'Public Safety', 'severity_weight' => 5]);
+        $high = Category::create(['name' => 'Road Damage', 'severity_weight' => 3]);
+        $minor = Category::create(['name' => 'Others', 'severity_weight' => 1]);
+        $report = function (Category $category, string $street, int $daysOld) use ($resident): void {
+            IssueReport::create([
+                'tracking_code' => 'BR-'.strtoupper(bin2hex(random_bytes(6))),
+                'user_id' => $resident->user_id,
+                'category_id' => $category->category_id,
+                'description' => 'Test report.',
+                'location_id' => Location::create(['name' => $street, 'area_name' => 'Phase 1'])->location_id,
+                'status' => 'Submitted',
+                'date_submitted' => now()->subDays($daysOld),
+            ]);
+        };
+        $report($minor, 'Old Request Street', 60);   // 3 + 7 (capped, not 60) + 4 = 14
+        $report($high, 'Old Pothole Street', 30);    // 3 + 7 + 12 = 22
+        $report($critical, 'Manhole Street', 0);     // 3 + 0 + 20 = 23
+
+        $ranking = app(DssRecommendationService::class)->recommendations()['recommendations'];
+
+        $this->assertSame(['Manhole Street, Phase 1', 'Old Pothole Street, Phase 1', 'Old Request Street, Phase 1'], array_column($ranking, 'location'));
+        $this->assertEquals(7, $ranking[2]['scoreBreakdown']['averageAgeDays'], 'Age points stop at max_age_days.');
+        $this->assertGreaterThan(50, $ranking[2]['averageAgeDays'], 'The real age is still reported.');
+        $this->assertSame(['High', 'High', 'Moderate'], array_column($ranking, 'urgency'));
+    }
+
     public function test_dss_excludes_closed_and_archived_reports(): void
     {
         $resident = User::factory()->create();

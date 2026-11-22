@@ -72,7 +72,8 @@ class DssRecommendationService
             $count = count($group['ages']);
             $averageAgeDays = array_sum($group['ages']) / $count;
             $countScore = $count * $weights['report_count'];
-            $ageScore = $averageAgeDays * $weights['average_age_days'];
+            // Age adds points only up to max_age_days, so an old minor report cannot outrank a critical one.
+            $ageScore = min($averageAgeDays, (float) config('dss.max_age_days', 7)) * $weights['average_age_days'];
             $severityScore = $group['severityTotal'] * $weights['severity_weight'];
             $score = $countScore + $ageScore + $severityScore;
 

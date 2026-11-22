@@ -44,8 +44,8 @@
       </button>
       <button class="sidebar-link" type="button" data-resident-view="notifications">
         <i class="fi fi-rr-bell sidebar-icon" aria-hidden="true"></i>
-        Notifications
-        <span class="sidebar-count" id="notifNavCount" aria-label="Unread notifications">0</span>
+        Updates
+        <span class="sidebar-count" id="notifNavCount" aria-label="Unread updates">0</span>
       </button>
       <button class="sidebar-link" type="button" data-resident-view="account">
         <i class="fi fi-rr-user sidebar-icon" aria-hidden="true"></i>
@@ -96,13 +96,19 @@
                 </select>
               </div>
 
+              <!-- Heads-up: an open report of this category already exists on this street (never blocks submitting) -->
+              <div class="col-12">
+                <div id="similarReports" class="similar-reports" aria-live="polite" hidden></div>
+              </div>
+
               <div class="col-12">
                 <label class="form-label fw-medium" for="description">Detailed Description</label>
-                <textarea id="description" class="form-control" rows="4" minlength="1" maxlength="500" required placeholder="Describe the incident in 1 to 500 characters."></textarea>
+                <textarea id="description" class="form-control" aria-describedby="descriptionPrivacyHint" rows="4" minlength="1" maxlength="500" required placeholder="Describe the incident in 1 to 500 characters."></textarea>
                 <div class="description-help">
                   <small class="form-text text-secondary">Include enough detail for a response team to understand the issue (up to 500 characters).</small>
                   <small id="descriptionCount" class="description-count" aria-live="polite">0 / 500</small>
                 </div>
+                <small id="descriptionPrivacyHint" class="form-text text-secondary d-block description-privacy-hint">Please don't write your name, address, or phone number here. The barangay already has your contact details from your account.</small>
                 <div id="categorySuggestion" class="category-suggestion" aria-live="polite" hidden></div>
               </div>
 
@@ -181,18 +187,27 @@
       <!-- Notifications -->
       <section id="notificationsView" class="resident-view" aria-labelledby="notificationsTitle" hidden>
         <div class="mb-4">
-          <h1 id="notificationsTitle" class="section-title mb-1">Notifications</h1>
-          <p class="text-secondary mb-0">Updates from the barangay about your reports.</p>
+          <h1 id="notificationsTitle" class="section-title mb-1">Updates</h1>
+          <p class="text-secondary mb-0">News from the barangay about your reports and your street.</p>
         </div>
         <div class="card p-4">
-          <div class="reports-header notifications-header mb-3">
-            <div class="report-filters" role="group" aria-label="Filter notifications">
+          <div class="updates-tabs mb-3" role="tablist" aria-label="Updates">
+            <button id="updatesTabMine" class="updates-tab active" type="button" role="tab" aria-selected="true" aria-controls="notifications" data-updates-tab="mine">
+              My Reports <span class="updates-tab-count" data-updates-count="mine" hidden></span>
+            </button>
+            <button id="updatesTabStreet" class="updates-tab" type="button" role="tab" aria-selected="false" aria-controls="notifications" data-updates-tab="street">
+              My Street <span class="updates-tab-count" data-updates-count="street" hidden></span>
+            </button>
+          </div>
+          <div id="updatesMineFilters" class="reports-header notifications-header mb-3">
+            <div class="report-filters" role="group" aria-label="Filter updates about your reports">
               <button class="report-filter" type="button" data-notif-filter="current" aria-pressed="false">Current</button>
               <button class="report-filter" type="button" data-notif-filter="past" aria-pressed="false">Past</button>
               <button class="report-filter active" type="button" data-notif-filter="all" aria-pressed="true">All</button>
             </div>
           </div>
-          <div id="notifications">
+          <p id="updatesStreetIntro" class="small text-secondary mb-3" hidden>When a team is working on, or has fixed, a problem on your street, you'll see it here. Only the type of problem and the street are shown, never who reported it.</p>
+          <div id="notifications" role="tabpanel">
             <div class="text-secondary small">No new updates available yet.</div>
           </div>
         </div>

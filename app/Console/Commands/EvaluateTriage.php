@@ -14,7 +14,8 @@ class EvaluateTriage extends Command
 {
     protected $signature = 'triage:evaluate
         {--file=database/triage/evaluation-set.csv : CSV with description,expected_category columns}
-        {--ai : Also evaluate the AI model (sends each description to the AI service; costs money)}';
+        {--ai : Also evaluate the AI model (sends each description to the AI service; costs money)}
+        {--pause=0 : Seconds to wait between AI calls, to stay under a free tier\'s per-minute limit (e.g. 5 for Gemini free)}';
 
     protected $description = 'Measure category-suggestion accuracy for the keyword rules and, optionally, the AI';
 
@@ -51,16 +52,33 @@ class EvaluateTriage extends Command
 
         if ($this->option('ai')) {
             if (! $model->available()) {
-                $this->error('The AI is not available: set ANTHROPIC_API_KEY and TRIAGE_AI_ENABLED=true.');
+                $this->error(match (config('triage.provider')) {
+                    'ollama' => 'The local AI is not available: check TRIAGE_AI_ENABLED, OLLAMA_URL and OLLAMA_MODEL.',
+                    'gemini' => 'Gemini is not available: set GEMINI_API_KEY and TRIAGE_AI_ENABLED=true.',
+                    default => 'The AI is not available: set ANTHROPIC_API_KEY and TRIAGE_AI_ENABLED=true.',
+                });
 
                 return self::FAILURE;
             }
-            if (! $this->confirm(sprintf('This sends %d descriptions to the AI service and costs money. Continue?', count($rows)))) {
+            $local = config('triage.provider') === 'ollama';
+            if (! $local && ! $this->confirm(sprintf('This sends %d descriptions to the AI service (%s) and may cost money. Continue?', count($rows), config('triage.provider')))) {
                 return self::SUCCESS;
             }
-            $this->report('AI ('.config('triage.model').')', $rows, function (string $text) use ($model, $categories): ?string {
+            $label = match (config('triage.provider')) {
+                'ollama' => 'Local AI (Ollama '.config('triage.ollama.model').')',
+                'gemini' => 'Gemini ('.config('triage.gemini.model').')',
+                default => 'AI ('.config('triage.model').')',
+            };
+            $pause = max(0.0, (float) $this->option('pause'));
+            $this->report($label, $rows, function (string $text) use ($model, $categories, $pause): ?string {
+                static $first = true;
+                if (! $first && $pause > 0) {
+                    usleep((int) ($pause * 1_000_000));
+                }
+                $first = false;
+
                 return $model->classify($text, $categories, [])['category'] ?? null;
-            });
+            }, $pause);
         }
 
         return self::SUCCESS;
@@ -70,7 +88,7 @@ class EvaluateTriage extends Command
      * @param  list<array<string, mixed>>  $rows
      * @param  callable(string): ?string  $predict
      */
-    private function report(string $label, array $rows, callable $predict): void
+    private function report(string $label, array $rows, callable $predict, float $pauseEach = 0.0): void
     {
         $correct = 0;
         $failed = 0;
@@ -87,7 +105,8 @@ class EvaluateTriage extends Command
                 $misses[] = [mb_strimwidth($row['description'], 0, 60, '…'), $row['expected'], $predicted ?? '(no answer)'];
             }
         }
-        $seconds = microtime(true) - $started;
+        // Time spent in --pause waits is not the model's time.
+        $seconds = max(0.0, microtime(true) - $started - $pauseEach * max(0, count($rows) - 1));
 
         $this->newLine();
         $this->line("<options=bold>{$label}</>");

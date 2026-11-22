@@ -15,8 +15,6 @@ class AdminRolesTest extends TestCase
 
     private User $staff;
 
-    private User $viewer;
-
     private IssueReport $report;
 
     protected function setUp(): void
@@ -24,7 +22,6 @@ class AdminRolesTest extends TestCase
         parent::setUp();
         $this->super = User::factory()->admin('super')->create();
         $this->staff = User::factory()->admin('staff')->create();
-        $this->viewer = User::factory()->admin('viewer')->create();
         $resident = User::factory()->create();
         $category = Category::create(['name' => 'Road Damage', 'severity_weight' => 3]);
         $location = Location::create(['name' => 'Main Street', 'area_name' => 'Barangay One']);
@@ -38,40 +35,39 @@ class AdminRolesTest extends TestCase
         ]);
     }
 
-    public function test_viewer_can_look_but_not_change_anything(): void
+    public function test_both_levels_see_the_whole_dashboard(): void
     {
-        $this->actingAs($this->viewer)->getJson('/api/session')
-            ->assertJsonPath('user.adminLevel', 'viewer')
-            ->assertJsonPath('user.adminLevelLabel', 'Viewer');
-        foreach (['/api/reports', '/api/analytics/summary', '/api/analytics/map', '/api/analytics/dss', '/api/residents', '/api/reports/archived'] as $url) {
-            $this->actingAs($this->viewer)->getJson($url)->assertOk();
+        $this->actingAs($this->staff)->getJson('/api/session')
+            ->assertJsonPath('user.adminLevel', 'staff')
+            ->assertJsonPath('user.adminLevelLabel', 'Admin');
+        $this->actingAs($this->super)->getJson('/api/session')
+            ->assertJsonPath('user.adminLevelLabel', 'Super admin');
+        foreach ([$this->staff, $this->super] as $admin) {
+            foreach (['/api/reports', '/api/analytics/summary', '/api/analytics/map', '/api/analytics/dss', '/api/residents', '/api/reports/archived'] as $url) {
+                $this->actingAs($admin)->getJson($url)->assertOk();
+            }
+            $this->actingAs($admin)->get('/admin')->assertOk();
+            $this->actingAs($admin)->get('/admin/summary')->assertOk();
         }
-        $this->actingAs($this->viewer)->get('/admin')->assertOk();
-        $this->actingAs($this->viewer)->get('/admin/summary')->assertOk();
-
-        $this->actingAs($this->viewer)->postJson('/api/reports/update', $this->validation())->assertForbidden();
-        $this->actingAs($this->viewer)->postJson("/api/reports/{$this->report->report_id}/archive")->assertForbidden();
-        $this->actingAs($this->viewer)->postJson('/api/analytics/dss/snapshots')->assertForbidden();
-        $this->actingAs($this->viewer)->postJson('/api/residents/1/approval', ['status' => 'approved'])->assertForbidden();
-        $this->actingAs($this->viewer)->getJson('/api/admins')->assertForbidden();
-        $this->assertSame('Submitted', $this->report->fresh()->status);
     }
 
-    public function test_viewers_do_not_see_resident_contact_details(): void
+    public function test_both_levels_see_resident_contact_details(): void
     {
         $resident = User::factory()->create(['email' => 'juana@example.test', 'contact_number' => '09171234567']);
 
-        $forViewer = collect($this->actingAs($this->viewer)->getJson('/api/residents')->assertOk()->json('residents'))
-            ->firstWhere('id', (string) $resident->user_id);
-        $this->assertSame('j***@example.test', $forViewer['email']);
-        $this->assertNull($forViewer['mobile']);
-        $this->assertSame($resident->full_name, $forViewer['fullName']);
+        foreach ([$this->staff, $this->super] as $admin) {
+            $row = collect($this->actingAs($admin)->getJson('/api/residents')->assertOk()->json('residents'))
+                ->firstWhere('id', (string) $resident->user_id);
+            $this->assertSame('juana@example.test', $row['email']);
+            $this->assertSame('09171234567', $row['mobile']);
+        }
+    }
 
-        $staff = User::factory()->admin('staff')->create();
-        $forStaff = collect($this->actingAs($staff)->getJson('/api/residents')->assertOk()->json('residents'))
-            ->firstWhere('id', (string) $resident->user_id);
-        $this->assertSame('juana@example.test', $forStaff['email']);
-        $this->assertSame('09171234567', $forStaff['mobile']);
+    public function test_the_viewer_level_no_longer_exists(): void
+    {
+        $this->actingAs($this->super)->postJson('/api/admins', $this->newAdmin(['level' => 'viewer']))->assertStatus(422);
+        $this->actingAs($this->super)->putJson("/api/admins/{$this->staff->user_id}", ['level' => 'viewer'])->assertStatus(422);
+        $this->assertSame('staff', $this->staff->fresh()->admin_level);
     }
 
     public function test_staff_handle_reports_but_not_settings_or_deletions(): void
@@ -88,7 +84,7 @@ class AdminRolesTest extends TestCase
 
     public function test_super_admin_adds_and_manages_administrators(): void
     {
-        $this->actingAs($this->super)->getJson('/api/admins')->assertOk()->assertJsonCount(3, 'admins');
+        $this->actingAs($this->super)->getJson('/api/admins')->assertOk()->assertJsonCount(2, 'admins');
 
         $this->actingAs($this->super)->postJson('/api/admins', $this->newAdmin(['password_confirmation' => 'Different-pass1!']))
             ->assertStatus(422)->assertJsonPath('message', 'The two passwords do not match.');
@@ -98,11 +94,11 @@ class AdminRolesTest extends TestCase
         $id = $this->actingAs($this->super)->postJson('/api/admins', $this->newAdmin())->assertCreated()->json('id');
         $captain = User::find($id);
         $this->assertSame('admin', $captain->role);
-        $this->assertSame('viewer', $captain->admin_level);
+        $this->assertSame('staff', $captain->admin_level);
         $this->assertSame('approved', $captain->account_status);
 
-        $this->actingAs($this->super)->putJson("/api/admins/{$id}", ['level' => 'staff'])->assertOk();
-        $this->assertSame('staff', $captain->fresh()->admin_level);
+        $this->actingAs($this->super)->putJson("/api/admins/{$id}", ['level' => 'super'])->assertOk();
+        $this->assertSame('super', $captain->fresh()->admin_level);
         $this->actingAs($this->super)->putJson("/api/admins/{$id}", ['active' => false])->assertOk();
         $this->assertSame('suspended', $captain->fresh()->account_status);
         // A disabled administrator's session stops working.
@@ -143,7 +139,7 @@ class AdminRolesTest extends TestCase
             'fullName' => 'Barangay Captain',
             'username' => 'captain',
             'email' => 'captain@example.test',
-            'level' => 'viewer',
+            'level' => 'staff',
             'password' => 'Captain-pass123!',
             'password_confirmation' => 'Captain-pass123!',
         ];

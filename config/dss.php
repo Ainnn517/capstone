@@ -1,12 +1,18 @@
 <?php
 
 return [
+    // score = report_count × 3 + min(average age in days, max_age_days) × 1 + total severity × 4
+    // (see docs/DSS-METHODOLOGY.md). With these values one Critical report (severity 5) always
+    // outranks one High or Normal report however old, and a single High report reaches the
+    // high-urgency threshold at 5 days, its resolution target.
     'weights' => [
         'report_count' => 3,
         'average_age_days' => 1,
-        'severity_weight' => 1,
+        'severity_weight' => 4,
     ],
-    'high_urgency_threshold' => 8,
+    // Age stops adding points after this many days, so waiting alone cannot outrank danger.
+    'max_age_days' => 7,
+    'high_urgency_threshold' => 20,
 
     // Target days to resolve an open report, by priority; older open reports are overdue.
     'resolution_target_days' => ['Critical' => 2, 'High' => 5, 'Normal' => 10],
