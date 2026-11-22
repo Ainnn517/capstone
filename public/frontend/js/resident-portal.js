@@ -4,6 +4,7 @@
 const API_ENDPOINTS = {
   getReferenceData: '/api/reference-data',
   getReports: '/api/reports',
+  similarReports: '/api/reports/similar',
   getNotifications: '/api/notifications',
   markNotificationRead: '/api/notifications/{id}/read',
   getReportHistory: '/api/reports/{id}/history',
@@ -77,6 +78,7 @@ function initResidentPortalPage() {
   let reportFilter = 'active';
   // Notifications default to All so a "resolved" update (which counts as Past) is never hidden.
   let notifFilter = 'all';
+  let updatesTab = 'mine'; // Updates page: 'mine' = My Reports, 'street' = My Street
   let reportPage = 1;
   let reportPagination = { currentPage: 1, lastPage: 1, total: 0 };
 
@@ -114,6 +116,57 @@ function initResidentPortalPage() {
   }
 
   phaseSel.addEventListener('change', updateStreets);
+
+  // Heads-up while writing: open reports of the same category on the same street.
+  const similarBox = document.getElementById('similarReports');
+  let similarRequest = 0;
+  function hideSimilar() {
+    similarRequest++;
+    similarBox.hidden = true;
+    similarBox.innerHTML = '';
+  }
+  function timeAgo(iso) {
+    const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+    if (Number.isNaN(days) || days <= 0) return t('today');
+    if (days === 1) return t('yesterday');
+    return t('{count} days ago', { count: days });
+  }
+  async function checkSimilarReports() {
+    const category = document.getElementById('category').value.trim();
+    const locationId = streetSel.value;
+    if (!category || !locationId) {
+      hideSimilar();
+      return;
+    }
+    const requestId = ++similarRequest;
+    let result;
+    try {
+      result = await apiRequest('similarReports', { category, location_id: locationId }, 'GET');
+    } catch {
+      return; // only a hint: never get in the resident's way
+    }
+    if (requestId !== similarRequest) return; // the choice changed while waiting
+    if (!result.count) {
+      hideSimilar();
+      return;
+    }
+    const values = { category, street: result.street, ago: timeAgo(result.latestSubmitted), count: result.count };
+    let message;
+    if (result.mine === result.count) {
+      message = t('You already have an open {category} report on {street}. You can follow it in My Reports instead of submitting it again.', values);
+    } else {
+      const reported = result.count === 1
+        ? t('There is already 1 open {category} report on {street} (reported {ago}).', values)
+        : t('There are already {count} open {category} reports on {street} (the latest reported {ago}).', values);
+      const progress = result.teamWorking ? t('A team is already working on it.') : t('The barangay has received it.');
+      message = `${reported} ${progress} ${t('If yours is a different problem, you can still submit.')}`;
+    }
+    similarBox.innerHTML = `<strong>${escapeHTML(t('Already reported?'))}</strong> <span>${escapeHTML(message)}</span>`;
+    similarBox.hidden = false;
+  }
+  document.getElementById('category').addEventListener('change', checkSimilarReports);
+  streetSel.addEventListener('change', checkSimilarReports);
+  phaseSel.addEventListener('change', checkSimilarReports);
 
   function applyReferenceData(referenceData) {
     LOCATIONS = (referenceData.locations || []).filter(location => location.is_active).reduce((groups, location) => {
@@ -201,6 +254,7 @@ function initResidentPortalPage() {
     const button = event.target.closest('[data-use-category]');
     if (!button) return;
     categoryInput.value = button.dataset.useCategory;
+    checkSimilarReports();
     hideCategorySuggestion();
   });
 
@@ -226,7 +280,7 @@ function initResidentPortalPage() {
 
     renderReports();
     try {
-      updateNotifications(await apiRequest('getNotifications', { view: notifFilter }, 'GET'));
+      updateNotifications(await apiRequest('getNotifications', { view: notifFilter, tab: updatesTab }, 'GET'));
     } catch (error) {
       const notifContainer = document.getElementById('notifications');
       notifContainer.textContent = t('Notifications unavailable: {message}', { message: error.message });
@@ -369,21 +423,28 @@ function initResidentPortalPage() {
     `;
   }
 
-  // Show the latest report updates and notification count.
+  // Show the latest updates (My Reports or My Street) and the unread counts.
   function updateNotifications(result) {
     const notifContainer = document.getElementById('notifications');
     const notifications = result.notifications || [];
     if (notifications.length === 0) {
-      const emptyMessage = {
-        current: 'No updates about reports that are still in progress.',
-        past: 'No updates about resolved or closed reports.',
-        all: 'No updates available yet.'
-      }[notifFilter];
+      let emptyMessage;
+      if (updatesTab === 'street') {
+        emptyMessage = result.street
+          ? t('No updates on {street} yet.', { street: result.street })
+          : t('Add your street in Account to get updates about your street.');
+      } else {
+        emptyMessage = t({
+          current: 'No updates about reports that are still in progress.',
+          past: 'No updates about resolved or closed reports.',
+          all: 'No updates available yet.'
+        }[notifFilter]);
+      }
       notifContainer.innerHTML = `<div class="text-secondary small">${escapeHTML(emptyMessage)}</div>`;
     } else {
       notifContainer.innerHTML = notifications.map(notification => `
-        <div class="notification mb-2 ${notification.isRead ? 'text-secondary' : ''}">
-          <strong>${escapeHTML(notification.tracking)}</strong>
+        <div class="notification mb-2 ${notification.isRead ? 'text-secondary' : ''} ${notification.kind === 'street' ? 'notification-street' : ''}">
+          <strong>${notification.kind === 'street' ? `<span class="notification-icon" aria-hidden="true">${notification.type === 'resolved' ? '✅' : '🔧'}</span>` : ''}${escapeHTML(notification.tracking)}</strong>
           <div class="small">${escapeHTML(notification.message)}</div>
           <div class="small text-secondary">${new Date(notification.timestamp).toLocaleString()}</div>
           ${notification.isRead ? '<span class="small">Read</span>' : `<button class="btn btn-sm btn-link p-0" type="button" data-mark-notification-read="${escapeHTML(notification.id)}">Mark as read</button>`}
@@ -391,6 +452,11 @@ function initResidentPortalPage() {
       `).join('');
     }
     document.getElementById('notifNavCount').textContent = result.unreadCount;
+    document.querySelectorAll('[data-updates-count]').forEach(badge => {
+      const count = Number(result.unreadByTab?.[badge.dataset.updatesCount] || 0);
+      badge.textContent = count;
+      badge.hidden = count === 0;
+    });
   }
 
   document.getElementById('notifications').addEventListener('click', async event => {
@@ -398,7 +464,7 @@ function initResidentPortalPage() {
     if (!button) return;
     try {
       await apiRequest('markNotificationRead', { id: button.dataset.markNotificationRead });
-      updateNotifications(await apiRequest('getNotifications', { view: notifFilter }, 'GET'));
+      updateNotifications(await apiRequest('getNotifications', { view: notifFilter, tab: updatesTab }, 'GET'));
     } catch (error) {
       window.showToast(error.message, 'error');
     }
@@ -770,6 +836,7 @@ function initResidentPortalPage() {
       const result = await apiRequest('createReport', payload);
 
       this.reset();
+      hideSimilar();
       delete locationInput.dataset.pinned;
       updateStreets();
       hideCategorySuggestion();
@@ -922,6 +989,22 @@ function initResidentPortalPage() {
     } catch (error) {
       message.textContent = error.message;
     }
+  });
+
+  // Updates page tabs: My Reports / My Street.
+  document.querySelectorAll('[data-updates-tab]').forEach(button => {
+    button.addEventListener('click', () => {
+      updatesTab = button.dataset.updatesTab;
+      document.querySelectorAll('[data-updates-tab]').forEach(tab => {
+        const isSelected = tab === button;
+        tab.classList.toggle('active', isSelected);
+        tab.setAttribute('aria-selected', String(isSelected));
+      });
+      document.getElementById('updatesMineFilters').hidden = updatesTab !== 'mine';
+      document.getElementById('updatesStreetIntro').hidden = updatesTab !== 'street';
+      document.getElementById('notifications').setAttribute('aria-labelledby', button.id);
+      render();
+    });
   });
 
   // Change which notification group is shown.

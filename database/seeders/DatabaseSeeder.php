@@ -14,16 +14,21 @@ class DatabaseSeeder extends Seeder
     // Add the default categories, teams, and optional pilot accounts.
     public function run(): void
     {
-        // Add or refresh the report categories and severity weights.
+        // Add or refresh the report categories and severity weights. Descriptions are shown to
+        // admins in Reference Data and help the AI choose a category; they are only filled in
+        // when empty, so wording an admin has changed is kept.
         foreach ([
-            ['Sanitation', 1],
-            ['Clogged Drainage', 3],
-            ['Streetlights', 1],
-            ['Road Damage', 3],
-            ['Public Safety', 5],
-            ['Others', 1],
-        ] as [$name, $severity]) {
-            Category::updateOrCreate(['name' => $name], ['severity_weight' => $severity]);
+            ['Sanitation', 1, 'Uncollected garbage, illegal dumping, littering, foul smells, and dead animals in public places.'],
+            ['Clogged Drainage', 3, 'Blocked or overflowing canals, drains, and esteros, and street flooding caused by poor drainage.'],
+            ['Streetlights', 1, 'Street lamps or lamp posts that are broken, flickering, or not lit, leaving streets dark at night.'],
+            ['Road Damage', 3, 'Potholes, cracks, sinkholes, and damaged roads or sidewalks.'],
+            ['Public Safety', 5, "Threats to people's safety: crime or theft, fights and disturbances, open manholes, exposed or fallen electrical wires, fires, and stray or aggressive animals."],
+            ['Others', 1, 'Concerns that do not fit any other category, such as noise complaints.'],
+        ] as [$name, $severity, $description]) {
+            $category = Category::updateOrCreate(['name' => $name], ['severity_weight' => $severity]);
+            if (blank($category->description)) {
+                $category->update(['description' => $description]);
+            }
         }
 
         // Add the response teams if they are not already present.

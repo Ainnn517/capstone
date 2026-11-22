@@ -6,7 +6,7 @@ window.fillAccountDetails = user => {
   set('accountFullName', user.fullName);
   set('accountUsername', user.username);
   set('accountEmail', user.email);
-  set('accountRole', user.role === 'admin' ? `Administrator (${user.adminLevelLabel || 'Super admin'})` : 'Resident');
+  set('accountRole', user.role === 'admin' ? (user.adminLevelLabel || 'Super admin') : 'Resident');
   const alertsToggle = document.getElementById('emailAlertsToggle');
   if (alertsToggle) alertsToggle.checked = Boolean(user.emailNotifications);
 };

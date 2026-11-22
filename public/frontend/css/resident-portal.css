@@ -622,6 +622,22 @@ textarea.form-control {
 
 .d-none { display: none !important; }
 
+/* Updates page tabs: My Reports / My Street. */
+.updates-tabs { display: flex; gap: 0.35rem; border-bottom: 1px solid rgba(255, 255, 255, .18); }
+.updates-tab {
+  display: inline-flex; align-items: center; gap: 0.4rem; margin-bottom: -1px;
+  padding: 0.55rem 0.95rem; border: 0; border-bottom: 3px solid transparent;
+  background: none; color: rgba(255, 255, 255, .75); font: inherit; font-weight: 700; cursor: pointer;
+}
+.updates-tab:hover { color: #fff; }
+.updates-tab.active { color: #fff; border-bottom-color: #69d39b; }
+.updates-tab-count {
+  min-width: 1.35rem; padding: 0 0.4rem; border-radius: 999px;
+  background: #dc3545; color: #fff; font-size: 0.72rem; line-height: 1.35rem; text-align: center;
+}
+.notification-icon { margin-right: 0.35rem; }
+.notification-street { border-left: 3px solid #69d39b; }
+
 .notification {
   border-left: 4px solid #35b779;
   background: rgba(255,255,255,.1);
@@ -763,6 +779,19 @@ textarea.form-control {
     gap: 0.55rem;
   }
 }
+
+/* Heads-up: this kind of problem is already reported on this street (a hint, never a block). */
+.similar-reports {
+  padding: 0.65rem 0.85rem;
+  border: 1px solid rgba(245, 158, 11, .45);
+  border-left: 4px solid #f59e0b;
+  border-radius: 8px;
+  background: rgba(245, 158, 11, .12);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+.similar-reports[hidden] { display: none; }
+.similar-reports strong { margin-right: 0.25rem; }
 
 /* Category suggestion under the description (a hint the resident can accept). */
 .category-suggestion {

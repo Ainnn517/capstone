@@ -6,11 +6,28 @@ For each group, the score is:
 
 ```text
 score = (report_count × 3)
-      + (average_unresolved_age_in_days × 1)
-      + (sum_of_category_severity_weights × 1)
+      + (min(average_unresolved_age_in_days, 7) × 1)
+      + (sum_of_category_severity_weights × 4)
 ```
 
-The coefficients and the high-urgency threshold are defined in `config/dss.php`. A score of 8 or greater is classified as High; a lower score is Moderate. Category weights come from `CATEGORY.severity_weight` (1–5). Reports with weight 5 are counted as critical for context, but do not earn a second score bonus. The interface displays each scored contribution and the separate informational critical count.
+The coefficients, the age cap (`max_age_days`) and the high-urgency threshold are defined in `config/dss.php`. A score of 20 or greater is classified as High ("needs attention first"); a lower score is Moderate ("can be scheduled"). Category weights come from `CATEGORY.severity_weight` (1–5: Critical 5, High 3, Normal 1). Reports with weight 5 are also counted as critical for context, but do not earn a second score bonus. The interface displays each scored contribution, the real average age, and the separate informational critical count.
+
+### Why these weights (revised 2026-11-22)
+
+The first version used `severity × 1` and uncapped age. Testing with six months of realistic data showed the flaw: age earned one point per day without limit while severity earned at most five, so a nine-day-old request to repaint a pedestrian lane (Normal) outranked an open manhole reported the day before (Critical). The revision fixes this with two changes:
+
+- **Age is capped at 7 days.** Old reports still rise, but waiting alone cannot outrank danger.
+- **Severity is weighted × 4.** One report scores 3 + 20 = 23 when Critical, 3 + 12 = 15 when High, 3 + 4 = 7 when Normal, before age.
+
+Properties of the revised score, for one report in a group:
+
+| Report | Fresh | Maximum (age capped) | Reaches High (20) |
+|---|---|---|---|
+| Critical | 23 | 30 | immediately |
+| High | 15 | 22 | at 5 days, its resolution target |
+| Normal | 7 | 14 | never alone; three in one place do (9 + 12 = 21) |
+
+So a single Critical report always outranks a single High or Normal report, however old, while several reports of the same problem in one place (a likely hotspot) still rise above isolated ones.
 
 Default category-to-team assignments and response actions are configured in `config/dss.php` and seeded into `CATEGORY.recommended_team_id`. Administrators can maintain the suggested team in Reference Data. These are suggestions only; an administrator still chooses the actual report assignment. If a category has no recommended team, the interface reports that no configured team is available.
 

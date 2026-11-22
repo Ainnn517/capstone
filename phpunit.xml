@@ -21,6 +21,7 @@
         <env name="APP_ENV" value="testing"/>
         <env name="ANTHROPIC_API_KEY" value="" force="true"/>
         <env name="TRIAGE_AI_ENABLED" value="false" force="true"/>
+        <env name="TRIAGE_AI_PROVIDER" value="anthropic" force="true"/>
         <env name="ADMIN_TWO_FACTOR" value="false" force="true"/>
         <!-- The test videos are not real recordings; tests that need ffmpeg set a stand-in. -->
         <env name="VIDEO_FFMPEG_BINARY" value="" force="true"/>

@@ -19,7 +19,6 @@
       <div class="d-flex gap-2 align-items-center">
         <span id="adminName" class="text-white-50 small">Welcome</span>
       </div>
-      <span id="viewOnlyBadge" class="view-only-badge small" hidden>View only</span>
       <span id="liveStatus" class="live-status small" title="The dashboard checks for new reports every 30 seconds">
         <span class="live-dot" aria-hidden="true"></span><span id="liveStatusText">Live</span>
       </span>
@@ -48,12 +47,10 @@
       <button class="sidebar-link" type="button" data-admin-view="resolved">
         <i class="fi fi-rr-check-circle sidebar-icon" aria-hidden="true"></i>
         Resolved Incidents
-        <span class="sidebar-count" id="resolvedNavCount">0</span>
       </button>
       <button class="sidebar-link" type="button" data-admin-view="archived">
         <i class="fi fi-rr-archive sidebar-icon" aria-hidden="true"></i>
         Archived Incidents
-        <span class="sidebar-count" id="archivedNavCount">0</span>
       </button>
 
       <p class="sidebar-label">Settings</p>
@@ -90,7 +87,7 @@
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
       <div>
         <h1 class="section-title mb-1">Operations Dashboard</h1>
-        <p class="text-secondary mb-0">A quick overview of reports and response activity.</p>
+        <p class="text-secondary mb-0">What needs attention now: key numbers, what to prioritise, and where the open problems are.</p>
       </div>
     </div>
 
@@ -120,6 +117,45 @@
           <div id="mHotspots" class="value">0</div>
         </div>
       </div>
+    </div>
+
+    <!-- DSS Recommendations + Ask the data: what to prioritise now -->
+    <div class="card p-4 mb-4 admin-panel dss-card">
+      <h4 class="section-title mb-1">DSS Recommendations</h4>
+      <p class="small text-secondary mb-3">A plain-language summary of what to prioritise, written from the DSS scores. Save a snapshot to keep a record of today's recommendations.</p>
+      <div class="dss-actions mb-3">
+        <button id="saveDssSnapshotBtn" class="btn btn-outline-primary btn-sm" type="button">Save DSS snapshot</button>
+        <button id="clearDssSnapshotsBtn" class="btn btn-outline-danger btn-sm" type="button" disabled>Clear snapshot history</button>
+      </div>
+      <div id="dssPanel" class="dss-panel">
+        <!-- Dynamic recommendation items -->
+      </div>
+
+      <h5 class="dss-history-title">Saved snapshots</h5>
+      <div id="dssHistory" aria-label="Saved DSS analytics history"></div>
+    </div>
+
+    <!-- Ask the data: AI answers from report statistics only (shown when the AI is switched on) -->
+    <div id="askData" class="card p-4 mb-4 admin-panel ask-data" hidden>
+      <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+        <div>
+          <h4 class="section-title mb-1">Ask the data <span class="ask-data-badge">AI</span></h4>
+          <p class="small text-secondary mb-0">Ask about report numbers, places, trends, and the DSS ranking. The AI sees report statistics only; residents' details and report text are never shared with it.</p>
+        </div>
+        <button id="askDataClear" class="btn btn-outline-light btn-sm" type="button" hidden>Clear</button>
+      </div>
+      <div id="askDataThread" class="ask-data-thread" aria-live="polite"></div>
+      <div class="ask-data-examples" aria-label="Example questions">
+        <button type="button" class="ask-data-example">What should we prioritise today, and why?</button>
+        <button type="button" class="ask-data-example">Which street has the most reports this month?</button>
+        <button type="button" class="ask-data-example">Are any categories resolved slower than their target?</button>
+        <button type="button" class="ask-data-example">Ilan ang open na reports bawat kategorya?</button>
+      </div>
+      <form id="askDataForm" class="ask-data-form">
+        <label class="visually-hidden" for="askDataQuestion">Your question</label>
+        <input id="askDataQuestion" class="form-control" type="text" minlength="5" maxlength="300" required placeholder="Type a question, e.g. Which street had the most drainage reports this month?" autocomplete="off">
+        <button id="askDataBtn" class="btn btn-primary" type="submit">Ask</button>
+      </form>
     </div>
 
     <!-- Hotspot map: reports with a GPS location (Leaflet + OpenStreetMap) -->
@@ -159,10 +195,24 @@
       <p id="hotspotMapNote" class="small text-secondary mt-2 mb-0" aria-live="polite"></p>
     </div>
 
+    <!-- Hotspot Grid: the same open problems as the map, as cards (includes reports without a pin) -->
+    <div class="card p-4 mt-4">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h4 class="section-title mb-1">Hotspot Grid</h4>
+          <p class="small text-secondary mb-0">Places with open reports, busiest first, including reports without a map pin. A place with <span id="hotspotThresholdText">3</span> or more open reports counts as a hotspot.</p>
+        </div>
+        <span id="hotspotGridBadge" class="badge-soft soft-green">No hotspots</span>
+      </div>
+      <div id="hotspotGrid" class="hotspot-grid mt-3">
+        <!-- Dynamic Hotspot Cells -->
+      </div>
+    </div>
+
       </section>
 
       <section id="incidentsView" class="admin-view" hidden>
-    <!-- Incident Table & DSS Panel -->
+    <!-- Incident Table -->
     <div class="row g-4">
       
       <!-- Incident Table -->
@@ -218,22 +268,6 @@
         </div>
       </div>
 
-      <!-- DSS Recommendation System -->
-      <div class="col-12">
-        <div class="card p-4 h-100 admin-panel dss-card">
-          <h4 class="section-title mb-1">DSS Recommendations</h4>
-          <p class="small text-secondary mb-3">A plain-language summary of what to prioritise, written from the DSS scores. Save a snapshot to keep a record of today's recommendations.</p>
-          <div class="dss-actions mb-3">
-            <button id="saveDssSnapshotBtn" class="btn btn-outline-primary btn-sm" type="button">Save DSS snapshot</button>
-            <button id="clearDssSnapshotsBtn" class="btn btn-outline-danger btn-sm" type="button" disabled>Clear snapshot history</button>
-          </div>
-          <div id="dssPanel" class="dss-panel">
-            <!-- Dynamic recommendation items -->
-          </div>
-          <h5 class="dss-history-title">Saved snapshots</h5>
-          <div id="dssHistory" aria-label="Saved DSS analytics history"></div>
-        </div>
-      </div>
 
     </div>
 
@@ -246,7 +280,10 @@
               <h1 class="section-title mb-1">Archived Incidents</h1>
               <small class="text-secondary">Archived records are hidden from active lists. Permanent deletion also removes related attachments and history.</small>
             </div>
-            <input id="archivedSearch" class="form-control form-control-sm report-search" type="search" maxlength="100" placeholder="Search code, resident, text" aria-label="Search archived incidents by tracking code, resident, description or landmark">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <input id="archivedSearch" class="form-control form-control-sm report-search" type="search" maxlength="100" placeholder="Search code, resident, text" aria-label="Search archived incidents by tracking code, resident, description or landmark">
+              <span id="archivedCount" class="badge-soft soft-blue">0 archived</span>
+            </div>
           </div>
           <div class="table-responsive">
             <table class="table align-middle">
@@ -303,7 +340,7 @@
       <section id="analyticsView" class="admin-view" hidden>
         <div class="mb-4">
           <h1 class="section-title mb-1">Analytics</h1>
-          <p class="text-secondary mb-0">Explore report categories, monthly trends, and active issue hotspots.</p>
+          <p class="text-secondary mb-0">How reports have changed over time: categories, monthly trends, locations, and resolution times.</p>
         </div>
         <div class="card p-4 export-card">
           <div>
@@ -335,18 +372,36 @@
       </div>
     </div>
 
-    <!-- Hotspot Matrix Heatmap -->
+    <!-- Most reported streets or areas, open and closed reports -->
     <div class="card p-4 mt-4">
-      <div class="d-flex justify-content-between align-items-center">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div>
-          <h4 class="section-title mb-1">Hotspot Grid</h4>
-          <p class="small text-secondary mb-0">Open reports by area and category, including reports without a map pin.</p>
+          <h4 class="section-title mb-1">Most Reported Locations</h4>
+          <p class="small text-secondary mb-0">The places with the most reports, open and resolved, split by category. Rejected and archived reports are not counted.</p>
         </div>
-        <span class="badge-soft soft-red">High Density Monitor</span>
+        <div class="d-flex flex-wrap gap-2">
+          <label class="hotspot-map-scope">
+            <span class="visually-hidden">Group reports by</span>
+            <select id="topLocationsGroup" class="form-select form-select-sm">
+              <option value="street">By street</option>
+              <option value="area">By area</option>
+            </select>
+          </label>
+          <label class="hotspot-map-scope">
+            <span class="visually-hidden">Time period</span>
+            <select id="topLocationsPeriod" class="form-select form-select-sm">
+              <option value="thisMonth">This month</option>
+              <option value="lastMonth">Last month</option>
+              <option value="thisYear">This year</option>
+              <option value="all" selected>All time</option>
+            </select>
+          </label>
+        </div>
       </div>
-      <div id="hotspotGrid" class="hotspot-grid mt-3">
-        <!-- Dynamic Hotspot Cells -->
+      <div class="top-locations-chart mt-3">
+        <canvas id="topLocationsChart" role="img" aria-label="Bar chart of the most reported locations"></canvas>
       </div>
+      <p id="topLocationsNote" class="small text-secondary mt-2 mb-0" aria-live="polite"></p>
     </div>
 
     <!-- Resolution times learned from resolved reports -->
@@ -426,7 +481,7 @@
           <div class="admin-panel-header">
             <div>
               <h1 class="section-title mb-1">Admin Accounts</h1>
-              <small class="text-secondary">Super admins manage everything, including these accounts. Staff handle reports and sign-ups. Viewers (for example the barangay captain) can look at everything but change nothing.</small>
+              <small class="text-secondary">Both levels see the whole dashboard. Admins handle reports and sign-ups. Super admins can also manage these accounts, reference data, and deletions.</small>
             </div>
           </div>
           <div class="table-responsive">
@@ -446,8 +501,7 @@
             <div><label class="form-label" for="newAdminEmail">Email</label><input id="newAdminEmail" class="form-control" type="email" maxlength="120" autocomplete="off" required></div>
             <div><label class="form-label" for="newAdminLevel">Level</label>
               <select id="newAdminLevel" class="form-select">
-                <option value="staff">Staff</option>
-                <option value="viewer">Viewer</option>
+                <option value="staff">Admin</option>
                 <option value="super">Super admin</option>
               </select>
             </div>

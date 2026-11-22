@@ -8,6 +8,7 @@ const API_ENDPOINTS = {
   getDssRecommendations: '/api/analytics/dss',
   getMapPoints: '/api/analytics/map',
   saveDssSnapshot: '/api/analytics/dss/snapshots',
+  askData: '/api/analytics/ask',
   clearDssSnapshots: '/api/analytics/dss/snapshots',
   getResidents: '/api/residents',
   getAdmins: '/api/admins',
@@ -97,6 +98,8 @@ function initAdminDashboardPage() {
 
   let pieChartInstance = null;
   let lineChartInstance = null;
+  let topLocationsChartInstance = null;
+  let latestLocationCounts = [];
   let currentReports = [];
   let residents = [];
   const residentReportPages = new Map();
@@ -192,7 +195,6 @@ function initAdminDashboardPage() {
       ? resolvedReports.map(item => createIncidentRowHTML(item, { readOnly: true })).join('')
       : `<tr><td colspan="7" class="admin-empty-state">${document.getElementById('resolvedSearch').value.trim() ? 'No resolved incidents match your search.' : 'No resolved incidents yet.'}</td></tr>`;
     document.getElementById('resolvedCount').textContent = `${summary.summary.resolved} resolved`;
-    document.getElementById('resolvedNavCount').textContent = summary.summary.resolved;
     renderPriorityCounts(summary.summary.openByPriority || {});
     document.getElementById('mTotal').textContent = summary.summary.total;
     document.getElementById('mDispatch').textContent = summary.summary.dispatches;
@@ -208,6 +210,9 @@ function initAdminDashboardPage() {
     });
     renderDSSRecommendations(dss);
     renderDssHistory(dss.history || []);
+    document.getElementById('askData').hidden = !dss.assistantAvailable;
+    // The hotspot grid sits on the dashboard under the map; it is plain HTML, so it is kept up to date on every refresh.
+    renderHotspotGrid(summary.summary.hotspots || [], Number(summary.summary.hotspotThreshold) || 3);
     if (!document.getElementById('dashboardView').hidden) {
       renderHotspotMap();
     }
@@ -308,10 +313,11 @@ function initAdminDashboardPage() {
     `).join('');
   }
 
-  // Refresh the analytics charts and hotspot grid. (The hotspot map is on the dashboard.)
+  // Refresh the analytics charts. (The DSS, hotspot map and hotspot grid are on the dashboard.)
   function renderAnalytics(summary) {
     renderCharts(summary);
-    renderHotspotGrid(summary.hotspots || []);
+    latestLocationCounts = summary.locationCounts || [];
+    renderTopLocations();
     renderResolution(summary.resolution);
     renderConfirmation(summary.confirmation || {});
   }
@@ -510,7 +516,7 @@ function initAdminDashboardPage() {
   function renderCharts(summary) {
     const categoryCounts = CATEGORIES.map(category => Number(summary.categories[category] || 0));
     // Enough distinct colours for categories added later in Reference Data (they repeat after 10).
-    const palette = ['#145da0', '#198754', '#f59e0b', '#dc3545', '#0ea5e9', '#64748b', '#8b5cf6', '#ec4899', '#14b8a6', '#eab308'];
+    const palette = ['#145da0', '#198754', '#f59e0b', '#dc3545', '#0ea5e9', '#84cc16', '#8b5cf6', '#ec4899', '#14b8a6', '#eab308'];
     const categoryColors = CATEGORIES.map((_, index) => palette[index % palette.length]);
 
     if (pieChartInstance) pieChartInstance.destroy();
@@ -536,7 +542,10 @@ function initAdminDashboardPage() {
     renderPieLegend(categoryCounts, categoryColors);
 
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const monthlyData = summary.monthly;
+    // Months that have not happened yet are left empty, so the line stops at this month
+    // instead of dropping to zero.
+    const currentMonth = new Date().getMonth();
+    const monthlyData = summary.monthly.map((count, index) => (index <= currentMonth ? count : null));
 
     if (lineChartInstance) lineChartInstance.destroy();
     const lineCtx = document.getElementById('lineChart').getContext('2d');
@@ -545,56 +554,183 @@ function initAdminDashboardPage() {
       data: {
         labels: months,
         datasets: [{
-          label: 'Total Incidents',
+          label: 'Reports',
           data: monthlyData,
-          borderColor: '#145da0',
-          backgroundColor: 'rgba(20, 93, 160, 0.1)',
-          tension: 0.35,
+          borderColor: '#4da3ff',
+          backgroundColor: 'rgba(77, 163, 255, 0.18)',
+          borderWidth: 2,
+          // Monotone curves pass through each month's value without overshooting, so the
+          // line never suggests reports in a month that had none.
+          cubicInterpolationMode: 'monotone',
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          pointBackgroundColor: '#4da3ff',
           fill: true
         }]
       },
       options: {
         responsive: true,
         animation: backgroundRefresh ? false : undefined,
-        plugins: { legend: { labels: { color: '#fff' } } },
+        // One series, so the card title is enough; the tooltip names the month and count.
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: { label: item => `${item.raw} report${item.raw === 1 ? '' : 's'}` }
+          }
+        },
         scales: {
           x: { ticks: { color: '#fff' } },
-          y: { beginAtZero: true, ticks: { precision: 0, color: '#fff' } }
+          y: { beginAtZero: true, grace: '10%', ticks: { precision: 0, color: '#fff' } }
         }
       }
     });
   }
 
-  // Show active report counts by area and category.
-  function renderHotspotGrid(hotspots) {
-    const countsByLocation = new Map();
-    hotspots.forEach(hotspot => {
-      if (!countsByLocation.has(hotspot.location)) countsByLocation.set(hotspot.location, new Map());
-      countsByLocation.get(hotspot.location).set(hotspot.category, hotspot.count);
-    });
-    const locations = [...countsByLocation.keys()].sort((first, second) => first.localeCompare(second));
+  // Rank streets (or areas) by how many reports they had in the chosen period, with each bar
+  // split by category. Uses the per-period counts from the summary, so no extra request.
+  const TOP_LOCATIONS_LIMIT = 10;
+  const PERIOD_LABELS = { thisMonth: 'this month', lastMonth: 'last month', thisYear: 'this year', all: 'in total' };
 
-    if (locations.length === 0) {
-      document.getElementById('hotspotGrid').innerHTML =
-        '<div class="text-secondary small">No active incidents to map.</div>';
+  function renderTopLocations() {
+    const group = document.getElementById('topLocationsGroup').value;
+    const period = document.getElementById('topLocationsPeriod').value;
+    const note = document.getElementById('topLocationsNote');
+    const container = document.querySelector('.top-locations-chart');
+
+    // place label -> Map(category -> count)
+    const byPlace = new Map();
+    latestLocationCounts.forEach(row => {
+      const count = Number(row.counts?.[period] || 0);
+      if (!count) return;
+      // A street name alone can repeat between areas, so street labels keep their area.
+      const label = group === 'area' ? row.area : `${row.street} (${row.area})`;
+      if (!byPlace.has(label)) byPlace.set(label, new Map());
+      const categories = byPlace.get(label);
+      categories.set(row.category, (categories.get(row.category) || 0) + count);
+    });
+
+    const totalOf = categories => [...categories.values()].reduce((sum, value) => sum + value, 0);
+    const ranked = [...byPlace.entries()]
+      .map(([label, categories]) => ({ label, categories, total: totalOf(categories) }))
+      .sort((first, second) => second.total - first.total || first.label.localeCompare(second.label));
+    const top = ranked.slice(0, TOP_LOCATIONS_LIMIT);
+
+    if (topLocationsChartInstance) {
+      topLocationsChartInstance.destroy();
+      topLocationsChartInstance = null;
+    }
+    if (top.length === 0) {
+      container.hidden = true;
+      note.textContent = `No reports ${PERIOD_LABELS[period]}.`;
+      return;
+    }
+    container.hidden = false;
+    container.style.height = `${Math.max(180, top.length * 34 + 70)}px`;
+
+    // Same colours as the category doughnut. Categories that no longer exist go last.
+    const palette = ['#145da0', '#198754', '#f59e0b', '#dc3545', '#0ea5e9', '#84cc16', '#8b5cf6', '#ec4899', '#14b8a6', '#eab308'];
+    const seen = new Set(top.flatMap(place => [...place.categories.keys()]));
+    const categories = [...CATEGORIES.filter(category => seen.has(category)),
+      ...[...seen].filter(category => !CATEGORIES.includes(category))];
+    const datasets = categories.map(category => {
+      const index = CATEGORIES.indexOf(category);
+      return {
+        label: category,
+        data: top.map(place => place.categories.get(category) || 0),
+        backgroundColor: index === -1 ? '#94a3b8' : palette[index % palette.length],
+        borderRadius: 3,
+        barPercentage: 0.6,
+        categoryPercentage: 0.9,
+        maxBarThickness: 18
+      };
+    });
+
+    const ctx = document.getElementById('topLocationsChart').getContext('2d');
+    topLocationsChartInstance = new Chart(ctx, {
+      type: 'bar',
+      data: { labels: top.map(place => place.label), datasets },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: backgroundRefresh ? false : undefined,
+        plugins: {
+          legend: { position: 'bottom', labels: { color: '#fff', boxWidth: 12 } },
+          tooltip: {
+            mode: 'index',
+            intersect: false,
+            // Skip categories with no reports for this place, and show its total at the bottom.
+            filter: item => item.raw > 0,
+            callbacks: { footer: items => `Total: ${top[items[0].dataIndex].total}` }
+          }
+        },
+        scales: {
+          x: { stacked: true, beginAtZero: true, ticks: { precision: 0, color: '#fff' } },
+          y: { stacked: true, ticks: { color: '#fff' } }
+        }
+      }
+    });
+
+    const shown = ranked.length > TOP_LOCATIONS_LIMIT
+      ? `Top ${TOP_LOCATIONS_LIMIT} of ${ranked.length} ${group === 'area' ? 'areas' : 'streets'}`
+      : `${ranked.length} ${group === 'area' ? 'area' : 'street'}${ranked.length === 1 ? '' : 's'}`;
+    note.textContent = `${shown} with reports ${PERIOD_LABELS[period]}. Most reported: ${top[0].label} (${top[0].total}).`;
+  }
+
+  document.getElementById('topLocationsGroup').addEventListener('change', renderTopLocations);
+  document.getElementById('topLocationsPeriod').addEventListener('change', renderTopLocations);
+
+  // One card per place with open reports, busiest first. Only categories that have open
+  // reports are listed. Colour: red at the hotspot threshold, amber one report below it.
+  function renderHotspotGrid(hotspots, threshold) {
+    const grid = document.getElementById('hotspotGrid');
+    const badge = document.getElementById('hotspotGridBadge');
+    document.getElementById('hotspotThresholdText').textContent = threshold;
+
+    const places = new Map();
+    hotspots.forEach(row => {
+      if (!places.has(row.location)) {
+        places.set(row.location, { street: row.street || row.location, area: row.area || '', total: 0, categories: [] });
+      }
+      const place = places.get(row.location);
+      place.total += row.count;
+      place.categories.push({ name: row.category, count: row.count });
+    });
+    const sorted = [...places.values()]
+      .sort((first, second) => second.total - first.total || first.street.localeCompare(second.street));
+
+    const hotCount = sorted.filter(place => place.total >= threshold).length;
+    badge.textContent = hotCount ? `${hotCount} hotspot${hotCount === 1 ? '' : 's'}` : 'No hotspots';
+    badge.className = `badge-soft ${hotCount ? 'soft-red' : 'soft-green'}`;
+
+    if (sorted.length === 0) {
+      grid.innerHTML = '<div class="text-secondary small">No open reports right now.</div>';
       return;
     }
 
-    const gridHTML = locations.map(location => CATEGORIES.map(category => {
-      const count = countsByLocation.get(location)?.get(category) || 0;
-      const heatLevel = Math.min(5, 1 + Math.floor(count / 2));
-      const shortCategory = category.replace('Clogged Drainage', 'Drainage').replace('Public Safety', 'Safety');
-
+    const categoryOrder = name => {
+      const index = CATEGORIES.indexOf(name);
+      return index === -1 ? CATEGORIES.length : index;
+    };
+    grid.innerHTML = sorted.map(place => {
+      const level = place.total >= threshold ? 'level-hot' : place.total >= threshold - 1 ? 'level-near' : '';
+      const tags = place.categories
+        .sort((first, second) => second.count - first.count || categoryOrder(first.name) - categoryOrder(second.name))
+        .map(category => `<li>${escapeHTML(category.name)} · ${category.count}</li>`)
+        .join('');
       return `
-        <div class="hotspot-cell heat-${heatLevel}">
-          <span>${escapeHTML(location)}</span>
-          <span>${escapeHTML(shortCategory)}</span>
-          <strong>${count} active</strong>
+        <div class="hotspot-cell ${level}">
+          <div class="hotspot-cell-head">
+            <div class="hotspot-cell-place">
+              <span class="hotspot-cell-street">${escapeHTML(place.street)}</span>
+              ${place.area ? `<span class="hotspot-cell-area">${escapeHTML(place.area)}</span>` : ''}
+            </div>
+            <span class="hotspot-cell-total" title="Open reports">${place.total}</span>
+          </div>
+          <ul class="hotspot-cell-tags" aria-label="Open reports by category">${tags}</ul>
         </div>
       `;
-    }).join('')).join('');
-
-    document.getElementById('hotspotGrid').innerHTML = gridHTML;
+    }).join('');
   }
 
   // DSS recommendations written as a message from a "DSS Assistant". The wording is built
@@ -712,6 +848,82 @@ function initAdminDashboardPage() {
     }
   });
 
+  // ----- Ask the data (AI answers from report statistics), shown as a short chat -----
+  const askForm = document.getElementById('askDataForm');
+  const askInput = document.getElementById('askDataQuestion');
+  const askButton = document.getElementById('askDataBtn');
+  const askThread = document.getElementById('askDataThread');
+  const askClear = document.getElementById('askDataClear');
+  const ASK_KEEP = 5; // exchanges kept on screen
+
+  // Plain text with "- " bullets from the AI, shown safely (escaped, never as HTML).
+  function formatAnswer(text) {
+    const lines = String(text).split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    let html = '';
+    let inList = false;
+    lines.forEach(line => {
+      const bullet = line.match(/^[-*•]\s+(.*)$/);
+      if (bullet && !inList) { html += '<ul>'; inList = true; }
+      if (!bullet && inList) { html += '</ul>'; inList = false; }
+      html += bullet ? `<li>${escapeHTML(bullet[1])}</li>` : `<p>${escapeHTML(line)}</p>`;
+    });
+    return html + (inList ? '</ul>' : '');
+  }
+
+  function addExchange(question) {
+    const exchange = document.createElement('div');
+    exchange.className = 'ask-exchange';
+    exchange.innerHTML = `
+      <div class="ask-question"><div class="ask-question-bubble">${escapeHTML(question)}</div></div>
+      <div class="dss-chat ask-answer">
+        <div class="dss-avatar ask-avatar" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 2l1.9 5.6L19.5 9.5l-5.6 1.9L12 17l-1.9-5.6L4.5 9.5l5.6-1.9z"/><path d="M19 14l.9 2.6 2.6.9-2.6.9L19 21l-.9-2.6-2.6-.9 2.6-.9z" opacity=".75"/></svg></div>
+        <div class="dss-bubble ask-answer-bubble is-loading">
+          <div class="dss-name">AI Assistant</div>
+          <p class="ask-typing">Looking at the report data<span>.</span><span>.</span><span>.</span></p>
+        </div>
+      </div>`;
+    askThread.appendChild(exchange);
+    while (askThread.children.length > ASK_KEEP) askThread.firstElementChild.remove();
+    askClear.hidden = false;
+    exchange.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    return exchange.querySelector('.ask-answer-bubble');
+  }
+
+  async function askData(question) {
+    askButton.disabled = true;
+    askInput.value = '';
+    const bubble = addExchange(question);
+    try {
+      const result = await apiRequest('askData', { question });
+      const asOf = new Date(String(result.asOf).replace(' ', 'T'));
+      const time = Number.isNaN(asOf.getTime()) ? '' : ` · data as of ${asOf.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+      bubble.className = `dss-bubble ask-answer-bubble${result.answerable ? '' : ' is-unanswerable'}`;
+      bubble.innerHTML = `
+        <div class="dss-name">AI Assistant</div>
+        ${formatAnswer(result.answer)}
+        <p class="ask-data-note">AI answer from report statistics${escapeHTML(time)}. Check important numbers before acting.</p>`;
+    } catch (error) {
+      bubble.className = 'dss-bubble ask-answer-bubble is-error';
+      bubble.innerHTML = `<div class="dss-name">AI Assistant</div><p>${escapeHTML(error.message || 'The AI assistant could not answer right now.')}</p>`;
+    } finally {
+      askButton.disabled = false;
+      askInput.focus();
+    }
+  }
+
+  askForm.addEventListener('submit', event => {
+    event.preventDefault();
+    const question = askInput.value.trim();
+    if (question.length >= 5 && !askButton.disabled) askData(question);
+  });
+  document.querySelectorAll('.ask-data-example').forEach(button => {
+    button.addEventListener('click', () => { if (!askButton.disabled) askData(button.textContent); });
+  });
+  askClear.addEventListener('click', () => {
+    askThread.innerHTML = '';
+    askClear.hidden = true;
+  });
+
   document.getElementById('saveDssSnapshotBtn').addEventListener('click', async () => {
     try {
       await apiRequest('saveDssSnapshot');
@@ -723,7 +935,7 @@ function initAdminDashboardPage() {
   });
 
   // ----- Admin accounts (super admins only) -----
-  const LEVEL_LABELS = { super: 'Super admin', staff: 'Staff', viewer: 'Viewer' };
+  const LEVEL_LABELS = { super: 'Super admin', staff: 'Admin' };
 
   async function loadAdmins() {
     const body = document.getElementById('adminAccountsBody');
@@ -1535,7 +1747,7 @@ function initAdminDashboardPage() {
       body.innerHTML = reports.length
         ? reports.map(item => createIncidentRowHTML(item, { readOnly: true, archived: true })).join('')
         : `<tr><td colspan="7" class="admin-empty-state">${search ? 'No archived incidents match your search.' : 'No archived reports.'}</td></tr>`;
-      if (!search) document.getElementById('archivedNavCount').textContent = result.pagination.total;
+      if (!search) document.getElementById('archivedCount').textContent = `${result.pagination.total} archived`;
       renderPagination('archivedPagination', result.pagination, page => {
         archivedPage = page;
         renderArchivedReports();
@@ -1700,8 +1912,7 @@ async function startAdminDashboard() {
     }
     document.getElementById('adminName').textContent = `Welcome, ${result.user.fullName || result.user.username}`;
     // Show only what this administrator's level allows (the server enforces it as well).
-    document.body.dataset.adminLevel = result.user.adminLevel || 'viewer';
-    document.getElementById('viewOnlyBadge').hidden = result.user.adminLevel !== 'viewer';
+    document.body.dataset.adminLevel = result.user.adminLevel || 'staff';
     window.fillAccountDetails(result.user);
     initAdminDashboardPage();
   } catch (error) {
