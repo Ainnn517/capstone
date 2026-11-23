@@ -58,7 +58,10 @@ async function apiRequest(action, payload = {}, method = 'POST') {
   }
 
   if (!response.ok || !data.success) {
-    throw new Error(data.message || 'Request failed.');
+    const error = new Error(data.message || 'Request failed.');
+    // Seconds to wait, when the server asks the resident to slow down.
+    if (data.retryAfter) error.retryAfter = Number(data.retryAfter);
+    throw error;
   }
 
   return data;
@@ -318,15 +321,16 @@ function initResidentPortalPage() {
     `;
   }
 
-  // The report's photos (tap to open full size) and video.
+  // The report's photos (tap to open in the photo viewer) and video.
   function mediaGalleryHTML(item) {
     const files = item.attachments || [];
     if (!files.length) return '';
+    const photoSrcs = files.filter(file => file.type !== 'video').map(file => `/api/attachments/${encodeURIComponent(file.id)}`);
     return `<div class="issue-media">${files.map((file, index) => {
       const src = `/api/attachments/${encodeURIComponent(file.id)}`;
       return file.type === 'video'
         ? `<video class="issue-media-video" src="${src}" controls preload="metadata" aria-label="Video for report ${escapeHTML(item.tracking)}"></video>`
-        : `<a href="${src}" target="_blank" rel="noopener"><img src="${src}" alt="Photo ${index + 1} for report ${escapeHTML(item.tracking)}" loading="lazy"></a>`;
+        : `<a href="${src}" target="_blank" rel="noopener" data-photo-viewer data-photos="${photoSrcs.join(',')}" data-index="${photoSrcs.indexOf(src)}" data-label="Photo for report ${escapeHTML(item.tracking)}"><img src="${src}" alt="Photo ${index + 1} for report ${escapeHTML(item.tracking)}" loading="lazy"></a>`;
     }).join('')}</div>`;
   }
 
@@ -416,7 +420,7 @@ function initResidentPortalPage() {
         <div class="issue-actions mt-2">
           <button class="btn btn-sm btn-outline-secondary" type="button" data-report-history="${escapeHTML(item.id)}">Status history</button>
           ${item.stage === 'Submitted' ? `<button class="btn btn-sm btn-outline-secondary" type="button" data-report-edit="${escapeHTML(item.id)}">Edit</button>` : ''}
-          ${['Submitted', 'Validated'].includes(item.stage) ? `<button class="btn btn-sm btn-outline-danger" type="button" data-report-withdraw="${escapeHTML(item.id)}">Withdraw</button>` : ''}
+          ${item.stage === 'Submitted' ? `<button class="btn btn-sm btn-outline-danger" type="button" data-report-withdraw="${escapeHTML(item.id)}">Withdraw</button>` : ''}
         </div>
         <ol class="report-history mt-2" data-history-for="${escapeHTML(item.id)}" hidden></ol>
       </article>
@@ -470,7 +474,7 @@ function initResidentPortalPage() {
     }
   });
 
-  // Edit (before review) and withdraw (before dispatch) a resident's own report.
+  // Edit (before review) and withdraw (also before review) a resident's own report.
   const editDialog = document.getElementById('editReportDialog');
   let editingReportId = null;
 
@@ -530,14 +534,13 @@ function initResidentPortalPage() {
 
     const withdrawButton = event.target.closest('[data-report-withdraw]');
     if (withdrawButton) {
-      const reason = await window.promptAction(
-        'Withdraw this report? The barangay will stop working on it. You can tell them why (optional).',
-        { required: false, maxLength: 200, placeholder: 'For example: the problem was fixed', confirmLabel: 'Withdraw report' }
+      const confirmed = await window.confirmAction(
+        'Withdraw this report? It will be deleted right away, with its photos and history, and cannot be restored.'
       );
-      if (reason === null) return;
+      if (!confirmed) return;
       try {
-        await apiRequest('withdrawReport', { id: withdrawButton.dataset.reportWithdraw, reason });
-        window.showToast('Your report has been withdrawn.', 'success');
+        await apiRequest('withdrawReport', { id: withdrawButton.dataset.reportWithdraw });
+        window.showToast('Your report has been withdrawn and deleted.', 'success');
         await render();
       } catch (error) {
         window.showToast(error.message, 'error');
@@ -766,8 +769,35 @@ function initResidentPortalPage() {
   });
 
   // Validate and submit a new report.
+  // Submit button: disabled while a report is being sent, then for a minute after it is sent
+  // (the server allows one report a minute), with a countdown. Stops double taps creating
+  // the same report twice.
+  const submitButton = document.querySelector('#issueForm button[type="submit"]');
+  const SUBMIT_LABEL = 'Submit Issue & Generate Tracking ID';
+  let sending = false;
+  let cooldownTimer = null;
+  function startSubmitCooldown(seconds) {
+    clearInterval(cooldownTimer);
+    const until = Date.now() + seconds * 1000;
+    const tick = () => {
+      const left = Math.ceil((until - Date.now()) / 1000);
+      if (left <= 0) {
+        clearInterval(cooldownTimer);
+        cooldownTimer = null;
+        submitButton.disabled = false;
+        submitButton.textContent = window.t(SUBMIT_LABEL);
+        return;
+      }
+      submitButton.disabled = true;
+      submitButton.textContent = window.t('You can send another report in {seconds}s', { seconds: left });
+    };
+    tick();
+    cooldownTimer = setInterval(tick, 1000);
+  }
+
   document.getElementById('issueForm').addEventListener('submit', async function (e) {
     e.preventDefault();
+    if (sending || cooldownTimer) return;
 
     const categoryValue = document.getElementById('category').value.trim();
     const phase = phaseSel.value;
@@ -820,6 +850,9 @@ function initResidentPortalPage() {
 
     document.getElementById('submitAlert').innerHTML = '';
 
+    sending = true;
+    submitButton.disabled = true;
+    submitButton.textContent = window.t('Sending your report…');
     try {
       const payload = new FormData();
       payload.append('category', categoryValue);
@@ -834,6 +867,8 @@ function initResidentPortalPage() {
       if (videoInput.files[0]) payload.append('video', videoInput.files[0]);
 
       const result = await apiRequest('createReport', payload);
+      sending = false;
+      startSubmitCooldown(Number(result.nextReportIn ?? 60));
 
       this.reset();
       hideSimilar();
@@ -862,6 +897,14 @@ function initResidentPortalPage() {
       await render();
     } catch (error) {
       document.getElementById('submitAlert').innerHTML = `<div class="alert alert-danger" role="alert">${escapeHTML(error.message)}</div>`;
+      if (error.retryAfter) {
+        startSubmitCooldown(error.retryAfter);
+      } else if (!cooldownTimer) {
+        submitButton.disabled = false;
+        submitButton.textContent = window.t(SUBMIT_LABEL);
+      }
+    } finally {
+      sending = false;
     }
   });
 

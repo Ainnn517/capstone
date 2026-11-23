@@ -9,6 +9,7 @@ use App\Models\Location;
 use App\Models\Notification;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\StreetUpdateService;
 use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
@@ -81,9 +82,9 @@ class StreetUpdatesTest extends TestCase
 
     public function test_messages_read_naturally_for_every_category(): void
     {
-        $this->assertSame('a Clogged Drainage issue', \App\Services\StreetUpdateService::issuePhrase('Clogged Drainage'));
-        $this->assertSame('an Electrical issue', \App\Services\StreetUpdateService::issuePhrase('Electrical'));
-        $this->assertSame('a community concern', \App\Services\StreetUpdateService::issuePhrase('Others'));
+        $this->assertSame('a Clogged Drainage issue', StreetUpdateService::issuePhrase('Clogged Drainage'));
+        $this->assertSame('an Electrical issue', StreetUpdateService::issuePhrase('Electrical'));
+        $this->assertSame('a community concern', StreetUpdateService::issuePhrase('Others'));
 
         $report = $this->report('Others', 1);
         $this->move($report, 'Validated', 'Unassigned');

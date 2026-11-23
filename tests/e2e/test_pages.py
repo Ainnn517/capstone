@@ -2,6 +2,7 @@
 
 import re
 import pytest
+from playwright.sync_api import expect
 
 from conftest import log_in, open_resident_view
 
@@ -36,7 +37,13 @@ def test_all_views_render_cleanly(app, new_page, mail, size):
 
     log_in(page, app, "e2eadmin", mail=mail)
     for view in ("dashboard", "analytics", "incidents", "resolved", "archived", "referenceData", "account", "residents", "pendingApprovals"):
+        if size is PHONE:
+            # Phones keep the admin menu behind the ☰ button; choosing a view closes it again.
+            page.click("#adminMenuToggle")
+            expect(page.locator("#adminMenu")).to_have_class(re.compile(r"\bopen\b"))
         page.click(f"[data-admin-view={view}]")
+        if size is PHONE:
+            expect(page.locator("#adminMenu")).not_to_have_class(re.compile(r"\bopen\b"))
         page.wait_for_load_state("networkidle")
         check(f"admin/{view}")
 

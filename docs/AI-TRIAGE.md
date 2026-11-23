@@ -16,7 +16,7 @@ description ──► AI model (if configured) ──► validated answer ──
                keyword rules (English, Tagalog, Bisaya) ──► suggestion shown
 ```
 
-- **AI path:** `App\Services\Triage\AnthropicTriageModel` (or `GeminiTriageModel` / `OllamaTriageModel`, see below) calls Claude (`ANTHROPIC_MODEL`, default `claude-opus-5-5`, low effort) with a fixed JSON output schema. The category must be one of the existing categories, and duplicate IDs must come from the candidate list the server supplied; anything else is discarded.
+- **AI path:** `App\Services\Triage\AnthropicTriageModel` (or `GeminiTriageModel`, see below) calls Claude (`ANTHROPIC_MODEL`, default `claude-opus-5-5`, low effort) with a fixed JSON output schema. The category must be one of the existing categories, and duplicate IDs must come from the candidate list the server supplied; anything else is discarded.
 - **Rule path:** `App\Services\Triage\KeywordCategorizer` counts whole-word keyword matches per category (`config/triage.php`). Ties produce no suggestion. For duplicates, an open report in the same category at the same location is flagged.
 - **Fail-safe:** an AI error never blocks reporting. Results are cached for 30 minutes so identical requests do not call the AI again.
 
@@ -51,28 +51,14 @@ The command reads `database/triage/evaluation-set.csv` (`description,expected_ca
 | `TRIAGE_AI_EFFORT` | `low` | Reasoning effort; low is enough for short classification |
 | `TRIAGE_AI_TIMEOUT` | `15` | Seconds before falling back to the rules |
 | `TRIAGE_AI_ENABLED` | `true` | Switch the AI off without removing the key |
-| `TRIAGE_AI_PROVIDER` | `anthropic` | `anthropic` (Claude, paid cloud), `gemini` (Google, free tier) or `ollama` (free, local) |
+| `TRIAGE_AI_PROVIDER` | `anthropic` | `anthropic` (Claude, paid cloud) or `gemini` (Google, free tier) |
 | `GEMINI_API_KEY` | empty | Enables Gemini when the provider is `gemini` |
 | `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Gemini model; Flash-Lite is the fastest and has a free tier |
-| `OLLAMA_URL` | `http://127.0.0.1:11434` | Where Ollama is running |
-| `OLLAMA_MODEL` | `qwen2.5:3b` | Local model; `qwen2.5:1.5b` is faster on a slow computer |
-| `OLLAMA_TIMEOUT` | `30` | Seconds before falling back to the rules (CPU-only computers are slow) |
 
 ## Google Gemini option
 
 Set `TRIAGE_AI_PROVIDER=gemini` and `GEMINI_API_KEY` (create a key in Google AI Studio) to use `App\Services\Triage\GeminiTriageModel`. It uses the same instructions, masking, answer schema and checks as the other models (`TriagePrompt`), sends a JSON schema so the answer is structured, and falls back to the keyword rules on any error, block, timeout or used-up quota (429, not retried).
 
 **Privacy:** on Google's free tier, Google may use the text it receives to improve its products; on the paid tier it does not. While Gemini is selected, the privacy notice names Google and says this. Because this adds a new recipient, raise `REGISTRATION_CONSENT_VERSION` when switching it on in production.
-
-## Free local option (Ollama)
-
-Set `TRIAGE_AI_PROVIDER=ollama` to run triage on a model served by [Ollama](https://ollama.com) on the same computer. It costs nothing, works without internet, and report text never leaves the server. It uses the same instructions, contact-detail masking, answer schema and answer checks as the cloud model (`App\Services\Triage\TriagePrompt`), and falls back to the keyword rules in the same way if Ollama is not running, the model is missing, or it times out.
-
-Trade-offs: on a computer without a graphics card a suggestion takes several seconds, and a small local model is usually less accurate on Tagalog and Bisaya than Claude. Measure it with `php artisan triage:evaluate --ai` (free with Ollama) and report the numbers next to the keyword rules.
-
-```sh
-curl -fsSL https://ollama.com/install.sh | sh   # install (asks for your password)
-ollama pull qwen2.5:3b                          # download the model (about 2 GB)
-```
 
 If you rename or add a category in Reference Data, update its keyword list in `config/triage.php`.

@@ -134,6 +134,21 @@ class ReportController extends ApiController
                 return $this->error('Select a valid report view.', 422);
             }
 
+            // Resolved view only: filter by the resident's answer to the fix.
+            $confirmation = $request->query('confirmation');
+            if ($confirmation && $confirmation !== 'all') {
+                if (! in_array($confirmation, ['confirmed', 'awaiting', 'accepted'], true)) {
+                    return $this->error('Select a valid confirmation filter.', 422);
+                }
+                match ($confirmation) {
+                    'confirmed' => $reportsQuery->where('status', 'Resolved')->whereNotNull('resident_confirmed_at'),
+                    'awaiting' => $reportsQuery->awaitingConfirmation(),
+                    'accepted' => $reportsQuery->where('status', 'Resolved')
+                        ->whereNull('resident_confirmed_at')
+                        ->where('date_resolved', '<=', now()->subDays((int) config('dss.resident_confirmation_days'))),
+                };
+            }
+
             $status = $request->query('status');
             if ($status && $status !== 'All Status') {
                 if (! in_array($status, self::STATUSES, true)) {
@@ -581,11 +596,14 @@ class ReportController extends ApiController
     public function store(Request $request): JsonResponse
     {
         $user = $this->currentUser();
-        $minuteKey = 'report-create-minute:'.$user->user_id;
         $dayKey = 'report-create-day:'.$user->user_id;
-        if (RateLimiter::tooManyAttempts($minuteKey, (int) config('security.report_creation_per_minute'))
-            || RateLimiter::tooManyAttempts($dayKey, (int) config('security.report_creation_per_day'))) {
-            return $this->error('You have submitted reports too frequently. Please try again later.', 429);
+        if (RateLimiter::tooManyAttempts($dayKey, (int) config('security.report_creation_per_day'))) {
+            return $this->error('You have reached today\'s limit for new reports. Please try again tomorrow.', 429);
+        }
+        // One report a minute per resident. Checked early here (before processing uploads) and
+        // again under a lock below, so a double tap can never create the same report twice.
+        if (($wait = $this->reportCooldownSeconds($user)) > 0) {
+            return $this->cooldownResponse($wait);
         }
 
         $this->normaliseLineBreaks($request, 'description');
@@ -632,7 +650,14 @@ class ReportController extends ApiController
         }
         $trackingCode = 'BR-'.now('UTC')->format('ymd-His').'-'.strtoupper(bin2hex(random_bytes(3)));
         try {
-            $report = DB::transaction(function () use ($user, $category, $location, $data, $latitude, $longitude, $trackingCode, $media, $minuteKey, $dayKey): IssueReport {
+            $report = DB::transaction(function () use ($user, $category, $location, $data, $latitude, $longitude, $trackingCode, $media, $dayKey): ?IssueReport {
+                // Requests from the same resident wait here one at a time, so two requests sent
+                // together cannot both pass the one-minute check.
+                User::query()->whereKey($user->user_id)->lockForUpdate()->first();
+                if ($this->reportCooldownSeconds($user) > 0) {
+                    return null;
+                }
+
                 $report = IssueReport::create([
                     'tracking_code' => $trackingCode,
                     'user_id' => $user->user_id,
@@ -668,7 +693,6 @@ class ReportController extends ApiController
                     ]);
                 }
 
-                RateLimiter::hit($minuteKey, 60);
                 RateLimiter::hit($dayKey, 86400);
 
                 return $report;
@@ -677,12 +701,44 @@ class ReportController extends ApiController
             Storage::disk('local')->delete(array_column($media, 'path'));
             throw $exception;
         }
+        if ($report === null) {
+            Storage::disk('local')->delete(array_column($media, 'path'));
+
+            return $this->cooldownResponse(max(1, $this->reportCooldownSeconds($user)));
+        }
 
         return response()->json([
             'success' => true,
             'id' => (string) $report->report_id,
             'tracking' => $trackingCode,
+            // Seconds until this resident may send another report.
+            'nextReportIn' => (int) config('security.report_cooldown_seconds'),
         ], 201);
+    }
+
+    // Seconds left before this resident may send another report (0 when they may). Measured
+    // by the database clock, the same clock that stamps date_submitted.
+    private function reportCooldownSeconds(User $user): int
+    {
+        $cooldown = (int) config('security.report_cooldown_seconds');
+        if ($cooldown <= 0) {
+            return 0;
+        }
+        $elapsed = IssueReport::query()
+            ->where('user_id', $user->user_id)
+            ->selectRaw('TIMESTAMPDIFF(SECOND, MAX(date_submitted), NOW()) as elapsed')
+            ->value('elapsed');
+
+        return $elapsed === null ? 0 : max(0, $cooldown - (int) $elapsed);
+    }
+
+    private function cooldownResponse(int $seconds): JsonResponse
+    {
+        return response()->json([
+            'success' => false,
+            'message' => "You just sent a report. Please wait {$seconds} second".($seconds === 1 ? '' : 's').' before sending another one.',
+            'retryAfter' => $seconds,
+        ], 429, ['Retry-After' => (string) $seconds]);
     }
 
     // Browsers send each line break in a form as two characters (\r\n) but count it as one
@@ -750,7 +806,16 @@ class ReportController extends ApiController
             if ($bytes === false || ! array_key_exists((string) $mime, Attachment::VIDEO_TYPES) || ! $this->looksLikeVideo($bytes)) {
                 return $this->error('Upload the video as MP4, WebM, or MOV.', 422);
             }
-            $bytes = $this->stripVideoMetadata($bytes, Attachment::VIDEO_TYPES[$mime]);
+            // iPhone MOV files are stored as MP4 (same picture and sound, repackaged): Chrome,
+            // Brave and Edge refuse to play video/quicktime. Kept as MOV only if that fails.
+            $mp4 = $mime === 'video/quicktime' && $this->ffmpegPath() !== null
+                ? $this->stripVideoMetadata($bytes, 'mp4')
+                : null;
+            if ($mp4 !== null) {
+                [$bytes, $mime] = [$mp4, 'video/mp4'];
+            } else {
+                $bytes = $this->stripVideoMetadata($bytes, Attachment::VIDEO_TYPES[$mime]);
+            }
             if ($bytes === null) {
                 return $this->error('The video could not be processed. Try a different video, or attach photos instead.', 422);
             }
@@ -765,8 +830,7 @@ class ReportController extends ApiController
     // bytes unchanged when ffmpeg is not installed, and null when ffmpeg rejects the file.
     private function stripVideoMetadata(string $bytes, string $extension): ?string
     {
-        $configured = trim((string) config('security.uploads.video_ffmpeg'));
-        $ffmpeg = $configured === '' ? null : (is_executable($configured) ? $configured : (new ExecutableFinder)->find($configured));
+        $ffmpeg = $this->ffmpegPath();
         if ($ffmpeg === null) {
             return $bytes;
         }
@@ -779,7 +843,8 @@ class ReportController extends ApiController
             $process = new Process([
                 $ffmpeg, '-v', 'error', '-y', '-i', $input,
                 '-map', '0:v?', '-map', '0:a?', '-map_metadata', '-1', '-map_chapters', '-1',
-                '-c', 'copy', '-f', $format, $output,
+                // faststart puts the MP4 index first, so playback starts before the whole file loads.
+                '-c', 'copy', ...($format === 'mp4' ? ['-movflags', '+faststart'] : []), '-f', $format, $output,
             ]);
             $process->setTimeout(60)->run();
             $clean = $process->isSuccessful() ? file_get_contents($output) : false;
@@ -789,6 +854,16 @@ class ReportController extends ApiController
             @unlink($input);
             @unlink($output);
         }
+    }
+
+    private function ffmpegPath(): ?string
+    {
+        $configured = trim((string) config('security.uploads.video_ffmpeg'));
+        if ($configured === '') {
+            return null;
+        }
+
+        return is_executable($configured) ? $configured : (new ExecutableFinder)->find($configured);
     }
 
     // MP4 and MOV files carry "ftyp" at byte 4; WebM files start with the EBML marker.
@@ -856,16 +931,14 @@ class ReportController extends ApiController
         });
     }
 
-    // Resident: cancel a report before a team has been dispatched.
-    public function withdraw(Request $request, int $id): JsonResponse
+    // Resident: cancel a report before the barangay has reviewed it. The report is deleted right
+    // away with its history, notifications and attachments (the database cascades the rows).
+    // Once reviewed, it stays on record and the resident contacts the barangay office instead.
+    public function withdraw(int $id): JsonResponse
     {
         $user = $this->currentUser();
-        $reason = trim((string) $request->input('reason', ''));
-        if (mb_strlen($reason) > 200) {
-            return $this->error('Keep the reason under 200 characters.', 422);
-        }
-
-        return DB::transaction(function () use ($user, $id, $reason): JsonResponse {
+        $storedFiles = [];
+        $result = DB::transaction(function () use ($user, $id, &$storedFiles): JsonResponse {
             $report = IssueReport::query()
                 ->where('report_id', $id)
                 ->where('user_id', $user->user_id)
@@ -875,24 +948,29 @@ class ReportController extends ApiController
             if (! $report) {
                 return $this->error('Report not found.', 404);
             }
-            if (! in_array($report->status, ['Submitted', 'Validated'], true)) {
-                return $this->error($report->status === 'Dispatched'
-                    ? 'A team has already been sent, so this report can no longer be withdrawn. Contact the barangay office if it is no longer needed.'
-                    : 'This report is already closed.', 409);
+            if ($report->status !== 'Submitted') {
+                return $this->error(match ($report->status) {
+                    'Validated', 'Dispatched' => 'The barangay has already reviewed this report, so it can no longer be withdrawn. Contact the barangay office if it is no longer needed.',
+                    default => 'This report is already closed.',
+                }, 409);
             }
 
-            $oldStatus = $report->status;
-            $report->update(['status' => 'Withdrawn', 'date_resolved' => null]);
-            StatusLog::create([
-                'report_id' => $report->report_id,
-                'changed_by' => $user->user_id,
-                'old_status' => $oldStatus,
-                'new_status' => 'Withdrawn',
-                'remarks' => $reason !== '' ? "Withdrawn by the resident: {$reason}" : 'Withdrawn by the resident.',
-            ]);
+            $storedFiles = Attachment::query()
+                ->where('report_id', $report->report_id)
+                ->whereNotNull('file_path')
+                ->pluck('file_path')
+                ->all();
+            $report->delete();
 
             return response()->json(['success' => true]);
         });
+
+        // Delete files only after the commit, so a rollback never loses a photo.
+        if ($result->getStatusCode() === 200) {
+            app(AttachmentFileRemover::class)->remove($storedFiles);
+        }
+
+        return $result;
     }
 
     // The resident confirms that a resolved report is really fixed.

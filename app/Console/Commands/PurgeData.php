@@ -15,7 +15,7 @@ class PurgeData extends Command
 {
     protected $signature = 'data:purge {--dry-run : Show what would be deleted without deleting anything}';
 
-    protected $description = 'Delete old rejected applications, unverified sign-ups, archived reports, audit entries, and expired reset links';
+    protected $description = 'Delete old rejected applications, unverified sign-ups, archived and withdrawn reports, audit entries, and expired reset links';
 
     public function handle(AttachmentFileRemover $files): int
     {
@@ -48,6 +48,11 @@ class PurgeData extends Command
                 fn ($query) => $query->whereRaw('1 = 0'))
             ->get();
 
+        // Withdrawing now deletes a report at once; this removes any withdrawn report left from
+        // before that change.
+        $withdrawn = IssueReport::query()->where('status', 'Withdrawn')->get();
+        $reportIds = $archived->pluck('report_id')->merge($withdrawn->pluck('report_id'))->unique()->values();
+
         $auditQuery = AdminAuditLog::query()
             ->when(($days['audit_log_days'] ?? 0) > 0,
                 fn ($query) => $query->where('created_at', '<', now()->subDays($days['audit_log_days'])),
@@ -60,6 +65,7 @@ class PurgeData extends Command
             'rejected_applications' => $rejected->count(),
             'unverified_registrations' => $unverified->count(),
             'archived_reports' => $archived->count(),
+            'withdrawn_reports' => $reportIds->count() - $archived->count(),
             'audit_entries' => $auditQuery->count(),
             'expired_reset_links' => $tokenQuery->count(),
         ];
@@ -77,17 +83,17 @@ class PurgeData extends Command
             return self::SUCCESS;
         }
 
-        $paths = DB::transaction(function () use ($rejected, $unverified, $archived, $auditQuery, $tokenQuery, $summary): array {
+        $paths = DB::transaction(function () use ($rejected, $unverified, $reportIds, $auditQuery, $tokenQuery, $summary): array {
             foreach ($rejected->concat($unverified) as $user) {
                 DB::table('PASSWORD_RESET_TOKENS')->where('email', $user->email)->delete();
                 $user->delete();
             }
             $paths = Attachment::query()
-                ->whereIn('report_id', $archived->pluck('report_id'))
+                ->whereIn('report_id', $reportIds)
                 ->whereNotNull('file_path')
                 ->pluck('file_path')
                 ->all();
-            IssueReport::query()->whereIn('report_id', $archived->pluck('report_id'))->delete();
+            IssueReport::query()->whereIn('report_id', $reportIds)->delete();
             $auditQuery->delete();
             $tokenQuery->delete();
             AdminAuditLog::create([

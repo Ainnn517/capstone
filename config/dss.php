@@ -15,7 +15,9 @@ return [
     'high_urgency_threshold' => 20,
 
     // Target days to resolve an open report, by priority; older open reports are overdue.
-    'resolution_target_days' => ['Critical' => 2, 'High' => 5, 'Normal' => 10],
+    // Set from the barangay's actual resolution times (Nov 2026): Public Safety averaged half
+    // a day, so Critical is 1 day; Normal reports took at most 3.5 days, so 10 was too loose.
+    'resolution_target_days' => ['Critical' => 1, 'High' => 5, 'Normal' => 5],
 
     // Team suggestions learn from resolved reports in this window, once a team has at
     // least this many resolved reports in the category.

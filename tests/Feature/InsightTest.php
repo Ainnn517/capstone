@@ -58,6 +58,19 @@ class InsightTest extends TestCase
         $this->assertSame('Engineering Team', $suggestion['team']);
     }
 
+    public function test_resolution_targets_are_one_day_critical_and_five_days_otherwise(): void
+    {
+        $insights = app(InsightService::class);
+        $this->assertSame(1, $insights->targetDays('Critical'));
+        $this->assertSame(5, $insights->targetDays('High'));
+        $this->assertSame(5, $insights->targetDays('Normal'));
+
+        // A Normal report is overdue after 5 days (it used to take 10), a Critical one after 1.
+        $this->assertFalse($insights->isOverdue('Submitted', now()->subDays(4)->toDateTimeString(), 'Normal'));
+        $this->assertTrue($insights->isOverdue('Submitted', now()->subDays(6)->toDateTimeString(), 'Normal'));
+        $this->assertTrue($insights->isOverdue('Validated', now()->subHours(30)->toDateTimeString(), 'Critical'));
+    }
+
     public function test_open_reports_past_their_target_are_flagged_overdue(): void
     {
         // Road Damage has weight 3, so priority High with a 5-day target.

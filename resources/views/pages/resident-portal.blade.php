@@ -8,6 +8,7 @@
   <title>Barangay Issue Reporting System - Resident Portal</title>
   <link rel="stylesheet" href="{{ \App\Support\Asset::url('/frontend/css/resident-portal.css') }}">
   <link rel="stylesheet" href="{{ \App\Support\Asset::url('/frontend/css/notifications.css') }}">
+  <link rel="stylesheet" href="{{ \App\Support\Asset::url('/frontend/css/photo-viewer.css') }}">
   <link rel="stylesheet" href="{{ \App\Support\Asset::url('/frontend/css/account.css') }}">
   <link rel="stylesheet" href="{{ \App\Support\Asset::url('/frontend/vendor/uicons-regular-rounded/css/uicons-regular-rounded.css') }}">
 </head>
@@ -240,6 +241,7 @@
   <script src="{{ \App\Support\Asset::url('/frontend/js/password-toggle.js') }}" nonce="{{ app('csp.nonce') }}"></script>
   <script src="{{ \App\Support\Asset::url('/frontend/js/account-security.js') }}" nonce="{{ app('csp.nonce') }}"></script>
   <script src="{{ \App\Support\Asset::url('/frontend/js/leaflet-loader.js') }}" nonce="{{ app('csp.nonce') }}"></script>
+  <script src="{{ \App\Support\Asset::url('/frontend/js/photo-viewer.js') }}" nonce="{{ app('csp.nonce') }}"></script>
   <script src="{{ \App\Support\Asset::url('/frontend/js/resident-portal.js') }}" nonce="{{ app('csp.nonce') }}"></script>
 
 </body>

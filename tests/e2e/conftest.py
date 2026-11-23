@@ -54,6 +54,8 @@ ENV = {
     "ADMIN_TWO_FACTOR": "true",
     "EMAIL_VERIFICATION_REQUIRED": "true",
     "TRIAGE_AI_ENABLED": "false",
+    # Tests file several reports in a row; the one-minute wait is tested on its own.
+    "REPORT_COOLDOWN_SECONDS": os.environ.get("E2E_REPORT_COOLDOWN_SECONDS", "0"),
     "ANTHROPIC_API_KEY": "",
     "PILOT_ADMIN_USERNAME": "",
     "PILOT_RESIDENT_USERNAME": "",

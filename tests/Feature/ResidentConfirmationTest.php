@@ -171,6 +171,26 @@ class ResidentConfirmationTest extends TestCase
         $this->actingAs($this->resident)->postJson("/api/reports/{$open->report_id}/confirm")->assertStatus(409);
     }
 
+    public function test_admin_can_filter_resolved_reports_by_resident_confirmation(): void
+    {
+        $confirmed = $this->resolvedReport();
+        $confirmed->update(['resident_confirmed_at' => now()]);
+        $awaiting = $this->resolvedReport();
+        $noReply = $this->resolvedReport(resolvedDaysAgo: 8);
+        $admin = User::factory()->admin()->create();
+
+        foreach (['confirmed' => $confirmed, 'awaiting' => $awaiting, 'accepted' => $noReply] as $filter => $report) {
+            $this->actingAs($admin)->getJson("/api/reports?view=resolved&confirmation={$filter}")->assertOk()
+                ->assertJsonCount(1, 'reports')
+                ->assertJsonPath('reports.0.id', (string) $report->report_id)
+                ->assertJsonPath('reports.0.confirmation', $filter)
+                ->assertJsonPath('pagination.total', 1);
+        }
+
+        $this->actingAs($admin)->getJson('/api/reports?view=resolved&confirmation=all')->assertOk()->assertJsonCount(3, 'reports');
+        $this->actingAs($admin)->getJson('/api/reports?view=resolved&confirmation=bogus')->assertStatus(422);
+    }
+
     private function resolvedReport(int $resolvedDaysAgo = 1, int $reopenCount = 0): IssueReport
     {
         return IssueReport::create([

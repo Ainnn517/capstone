@@ -36,6 +36,6 @@ The DSS is a configurable heuristic, not a prediction model. Its exact formula, 
 - [Deployment, mail, backups, and testing](./DEPLOYMENT.md)
 - [Privacy notice](./resources/views/pages/privacy.blade.php)
 - [Data breach response](./docs/BREACH-RESPONSE.md)
-- [AI triage](./docs/AI-TRIAGE.md) and [Ask the data](./docs/DATA-ASSISTANT.md)
+- [How AI is used](./docs/AI-USE.md): the rules, then [AI triage](./docs/AI-TRIAGE.md) and [Ask the data](./docs/DATA-ASSISTANT.md)
 
 Never commit `.env`, passwords, API keys, or local configuration. For public deployment, expose only `public/`, use HTTPS, and review the deployment and privacy checklists first.

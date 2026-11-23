@@ -7,6 +7,7 @@ use App\Models\Attachment;
 use App\Models\Category;
 use App\Models\IssueReport;
 use App\Models\Location;
+use App\Models\StatusLog;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -50,7 +51,7 @@ class DataPurgeTest extends TestCase
         $this->assertDatabaseHas('USERS', ['user_id' => $recentRejected->user_id]);
         $this->assertDatabaseHas('USERS', ['user_id' => $oldRejectedWithReport->user_id]);
         $this->assertDatabaseMissing('ISSUE_REPORT', ['report_id' => $oldArchived->report_id]);
-        Storage::disk('local')->assertMissing($path);
+        $this->localDisk()->assertMissing($path);
         $this->assertDatabaseHas('ISSUE_REPORT', ['report_id' => $recentArchived->report_id]);
         $this->assertDatabaseHas('ISSUE_REPORT', ['report_id' => $active->report_id]);
         $this->assertDatabaseMissing('ADMIN_AUDIT_LOG', ['action' => 'old']);
@@ -59,9 +60,44 @@ class DataPurgeTest extends TestCase
         $this->assertDatabaseMissing('PASSWORD_RESET_TOKENS', ['email' => $resident->email]);
     }
 
+    public function test_purge_removes_withdrawn_reports_left_from_before_instant_deletion(): void
+    {
+        Storage::fake('local');
+        $resident = User::factory()->create();
+
+        $leftover = $this->withdrawnReport($resident, daysAgo: 1);
+        $path = 'report-attachments/'.str_repeat('d', 64).'.jpg';
+        Storage::disk('local')->put($path, 'photo');
+        Attachment::create(['report_id' => $leftover->report_id, 'mime_type' => 'image/jpeg', 'file_path' => $path]);
+        $active = $this->report($resident);
+
+        $this->artisan('data:purge')->assertSuccessful();
+
+        $this->assertDatabaseMissing('ISSUE_REPORT', ['report_id' => $leftover->report_id]);
+        $this->assertDatabaseMissing('STATUS_LOG', ['report_id' => $leftover->report_id]);
+        $this->localDisk()->assertMissing($path);
+        $this->assertDatabaseHas('ISSUE_REPORT', ['report_id' => $active->report_id]);
+        $this->assertSame(1, AdminAuditLog::where('action', 'scheduled_data_purge')->first()->details['withdrawn_reports']);
+    }
+
     public function test_purge_is_scheduled_daily(): void
     {
         $this->artisan('schedule:list')->expectsOutputToContain('data:purge')->assertSuccessful();
+    }
+
+    private function withdrawnReport(User $resident, int $daysAgo): IssueReport
+    {
+        $report = $this->report($resident);
+        $report->update(['status' => 'Withdrawn']);
+        StatusLog::create([
+            'report_id' => $report->report_id,
+            'changed_by' => $resident->user_id,
+            'old_status' => 'Submitted',
+            'new_status' => 'Withdrawn',
+            'remarks' => 'Withdrawn by the resident.',
+        ])->forceFill(['changed_at' => now()->subDays($daysAgo)])->save();
+
+        return $report;
     }
 
     private function report(User $resident, ?int $archivedDaysAgo = null): IssueReport

@@ -15,8 +15,6 @@
 | - "gemini": Google Gemini, a cloud service with a free tier. Used only when
 |   GEMINI_API_KEY is set. On the free tier Google may use the text it receives
 |   to improve its products; the privacy notice says so while Gemini is selected.
-| - "ollama": a free model running on this computer through Ollama. Report
-|   text never leaves the server. Slower on a computer without a graphics card.
 | Without the AI, or when the AI call fails, times out, or declines, the keyword
 | rules below are used, so reporting never depends on the AI.
 |
@@ -42,16 +40,6 @@ return [
         'fallback_models' => env('GEMINI_FALLBACK_MODELS', 'gemini-3.1-flash-lite'),
         // Time each model gets for a triage suggestion before the next one is tried.
         'model_timeout_seconds' => (float) env('GEMINI_MODEL_TIMEOUT', 8),
-    ],
-
-    // Local model through Ollama (provider "ollama"). Qwen 2.5 handles English, Tagalog and
-    // Bisaya reasonably at a small size; try "qwen2.5:1.5b" on a slow computer.
-    'ollama' => [
-        'url' => env('OLLAMA_URL', 'http://127.0.0.1:11434'),
-        'model' => env('OLLAMA_MODEL', 'qwen2.5:3b'),
-        // Runs on the CPU without a graphics card, so it gets more time than the cloud model.
-        'timeout_seconds' => (float) env('OLLAMA_TIMEOUT', 30),
-        'keep_alive' => env('OLLAMA_KEEP_ALIVE', '30m'),
     ],
 
     // Duplicate detection looks at open, unarchived reports at the same location.

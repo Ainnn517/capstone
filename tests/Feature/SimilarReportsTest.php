@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\IssueReport;
 use App\Models\Location;
 use App\Models\User;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class SimilarReportsTest extends TestCase
@@ -42,7 +43,7 @@ class SimilarReportsTest extends TestCase
         ]);
     }
 
-    private function check(string $category = 'Clogged Drainage'): \Illuminate\Testing\TestResponse
+    private function check(string $category = 'Clogged Drainage'): TestResponse
     {
         return $this->actingAs($this->resident)
             ->getJson('/api/reports/similar?'.http_build_query(['category' => $category, 'location_id' => $this->lawaan->location_id]));

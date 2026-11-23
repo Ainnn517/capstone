@@ -8,6 +8,7 @@
   <title>Barangay Command Center - Operations Dashboard</title>
   <link rel="stylesheet" href="{{ \App\Support\Asset::url('/frontend/css/admin-dashboard.css') }}">
   <link rel="stylesheet" href="{{ \App\Support\Asset::url('/frontend/css/notifications.css') }}">
+  <link rel="stylesheet" href="{{ \App\Support\Asset::url('/frontend/css/photo-viewer.css') }}">
   <link rel="stylesheet" href="{{ \App\Support\Asset::url('/frontend/css/account.css') }}">
   <link rel="stylesheet" href="{{ \App\Support\Asset::url('/frontend/vendor/uicons-regular-rounded/css/uicons-regular-rounded.css') }}">
 </head>
@@ -16,10 +17,14 @@
   <!-- Command Center Header Nav -->
   <nav class="navbar navbar-dark">
     <div class="container-fluid px-4">
+      <button id="adminMenuToggle" class="menu-toggle" type="button" aria-label="Open menu" aria-controls="adminMenu" aria-expanded="false">
+        <span class="menu-bars" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span id="adminMenuBadge" class="menu-badge" aria-label="Pending approvals" hidden></span>
+      </button>
       <div class="d-flex gap-2 align-items-center">
         <span id="adminName" class="text-white-50 small">Welcome</span>
       </div>
-      <span id="liveStatus" class="live-status small" title="The dashboard checks for new reports every 30 seconds">
+      <span id="liveStatus" class="live-status small" title="The dashboard checks for new reports every 10 seconds">
         <span class="live-dot" aria-hidden="true"></span><span id="liveStatusText">Live</span>
       </span>
     </div>
@@ -27,8 +32,12 @@
 
   <!-- Main Container -->
   <main class="container-fluid page-wrap px-3 px-lg-4 admin-layout">
-    <aside class="admin-sidebar card" aria-label="Admin navigation">
-      <p class="sidebar-label">Overview</p>
+    <div id="adminMenuBackdrop" class="menu-backdrop" hidden></div>
+    <aside id="adminMenu" class="admin-sidebar card" aria-label="Admin navigation">
+      <div class="menu-head">
+        <p class="sidebar-label">Overview</p>
+        <button id="adminMenuClose" class="menu-close" type="button" aria-label="Close menu">&times;</button>
+      </div>
       <button class="sidebar-link active" type="button" data-admin-view="dashboard" aria-current="page">
         <i class="fi fi-rr-dashboard sidebar-icon" aria-hidden="true"></i>
         Dashboard
@@ -233,7 +242,6 @@
                 <option>Validated</option>
                 <option>Dispatched</option>
                 <option>Rejected</option>
-                <option>Withdrawn</option>
               </select>
               <select id="filterPriority" class="form-select form-select-sm" aria-label="Filter by priority">
                 <option>All Priority</option>
@@ -313,6 +321,12 @@
               <small class="text-secondary">Completed reports are read-only and cannot be changed.</small>
             </div>
             <div class="d-flex align-items-center gap-2 flex-wrap">
+              <select id="resolvedConfirmation" class="form-select form-select-sm w-auto" aria-label="Filter resolved incidents by resident confirmation">
+                <option value="all">All confirmations</option>
+                <option value="confirmed">Resident confirmed</option>
+                <option value="awaiting">Awaiting resident</option>
+                <option value="accepted">No reply · closed</option>
+              </select>
               <input id="resolvedSearch" class="form-control form-control-sm report-search" type="search" maxlength="100" placeholder="Search code, resident, text" aria-label="Search resolved incidents by tracking code, resident, description or landmark">
               <span id="resolvedCount" class="badge-soft soft-green">0 resolved</span>
             </div>
@@ -641,6 +655,7 @@
   <script src="{{ \App\Support\Asset::url('/frontend/js/password-toggle.js') }}" nonce="{{ app('csp.nonce') }}"></script>
   <script src="{{ \App\Support\Asset::url('/frontend/js/account-security.js') }}" nonce="{{ app('csp.nonce') }}"></script>
   <script src="{{ \App\Support\Asset::url('/frontend/js/leaflet-loader.js') }}" nonce="{{ app('csp.nonce') }}"></script>
+  <script src="{{ \App\Support\Asset::url('/frontend/js/photo-viewer.js') }}" nonce="{{ app('csp.nonce') }}"></script>
   <script src="{{ \App\Support\Asset::url('/frontend/js/admin-dashboard.js') }}" nonce="{{ app('csp.nonce') }}"></script>
 
 </body>

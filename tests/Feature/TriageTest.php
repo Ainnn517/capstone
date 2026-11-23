@@ -185,6 +185,20 @@ class TriageTest extends TestCase
         $this->assertSame(['id', 'text'], array_keys($payload['open_reports_same_location'][0]));
     }
 
+    public function test_categories_get_keyword_hints_and_others_goes_last(): void
+    {
+        $prepared = AnthropicTriageModel::prepareCategories([
+            ['name' => 'Others', 'description' => null],
+            ['name' => 'Clogged Drainage', 'description' => null],
+            ['name' => 'Streetlights', 'description' => 'Broken or missing street lamps.'],
+        ]);
+
+        $this->assertSame(['Clogged Drainage', 'Streetlights', 'Others'], array_column($prepared, 'name'));
+        $this->assertStringContainsString('canal', $prepared[0]['description']);
+        $this->assertStringStartsWith('Broken or missing street lamps. Examples: streetlight', $prepared[1]['description'], 'An admin-written description is kept, followed by examples.');
+        $this->assertSame('Only when no other category fits.', $prepared[2]['description']);
+    }
+
     public function test_real_ai_is_never_called_without_an_api_key(): void
     {
         $this->assertFalse(app(AnthropicTriageModel::class)->available());

@@ -43,7 +43,7 @@ class ReportMediaTest extends TestCase
         $this->assertSame(['image/jpeg', 'image/png', 'image/jpeg', 'video/mp4'], $files->pluck('mime_type')->all());
         foreach ($files as $file) {
             $this->assertMatchesRegularExpression(Attachment::STORED_PATH, $file->file_path);
-            Storage::disk('local')->assertExists($file->file_path);
+            $this->localDisk()->assertExists($file->file_path);
         }
 
         $listed = $this->actingAs($this->resident)->getJson('/api/reports')->assertOk()->json('reports.0');
@@ -127,6 +127,63 @@ class ReportMediaTest extends TestCase
             array_map('unlink', glob($dir.'/*'));
             rmdir($dir);
         }
+    }
+
+    public function test_mov_videos_are_stored_as_mp4_so_every_browser_can_play_them(): void
+    {
+        $mov = $this->realMov();
+        config(['security.uploads.video_ffmpeg' => 'ffmpeg']);
+
+        $this->submit(['video' => UploadedFile::fake()->createWithContent('clip.mov', $mov)])->assertCreated();
+
+        $video = Attachment::query()->latest('attachment_id')->firstOrFail();
+        $this->assertSame('video/mp4', $video->mime_type);
+        $this->assertStringEndsWith('.mp4', $video->file_path);
+        $this->assertSame('video/mp4', (new \finfo(FILEINFO_MIME_TYPE))->buffer(Storage::disk('local')->get($video->file_path)));
+        $this->actingAs($this->resident)->get("/api/attachments/{$video->attachment_id}")
+            ->assertOk()->assertHeader('Content-Type', 'video/mp4');
+    }
+
+    public function test_stored_mov_videos_can_be_converted_to_mp4(): void
+    {
+        $mov = $this->realMov();
+        config(['security.uploads.video_ffmpeg' => 'ffmpeg']);
+        $report = IssueReport::create([
+            'tracking_code' => 'BR-TEST-MOV',
+            'user_id' => $this->resident->user_id,
+            'category_id' => Category::where('name', 'Road Damage')->value('category_id'),
+            'description' => 'A large pothole near the corner.',
+            'location_id' => $this->location->location_id,
+            'status' => 'Submitted',
+        ]);
+        $oldPath = 'report-attachments/'.str_repeat('e', 64).'.mov';
+        Storage::disk('local')->put($oldPath, $mov);
+        $video = Attachment::create(['report_id' => $report->report_id, 'mime_type' => 'video/quicktime', 'file_path' => $oldPath]);
+
+        $this->artisan('attachments:convert-mov', ['--dry-run' => true])->expectsOutput('MOV videos found: 1')->assertSuccessful();
+        $this->localDisk()->assertExists($oldPath);
+
+        $this->artisan('attachments:convert-mov')->expectsOutput('Converted 1 video(s) to MP4.')->assertSuccessful();
+
+        $video->refresh();
+        $this->assertSame('video/mp4', $video->mime_type);
+        $this->assertStringEndsWith('.mp4', $video->file_path);
+        $this->localDisk()->assertExists($video->file_path);
+        $this->localDisk()->assertMissing($oldPath);
+    }
+
+    // A real one-second MOV clip made with ffmpeg; tests that need it are skipped without ffmpeg.
+    private function realMov(): string
+    {
+        $file = tempnam(sys_get_temp_dir(), 'mov').'.mov';
+        exec('ffmpeg -v error -y -f lavfi -i testsrc=size=64x48:rate=10 -t 1 -c:v mpeg4 '.escapeshellarg($file).' 2>&1', $output, $code);
+        if ($code !== 0 || ! is_file($file)) {
+            $this->markTestSkipped('ffmpeg is not installed.');
+        }
+        $bytes = file_get_contents($file);
+        @unlink($file);
+
+        return $bytes;
     }
 
     private function submit(array $files)

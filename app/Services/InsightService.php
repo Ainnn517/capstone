@@ -94,7 +94,7 @@ class InsightService
     // Target days to resolve a report of this priority.
     public function targetDays(string $priority): int
     {
-        return (int) (config('dss.resolution_target_days')[$priority] ?? 10);
+        return (int) (config('dss.resolution_target_days')[$priority] ?? 5);
     }
 
     public function isOverdue(string $status, ?string $submittedAt, string $priority): bool

@@ -130,6 +130,20 @@ body {
 .mt-1 { margin-top: 0.25rem; }
 .mt-3 { margin-top: 1rem; }
 .mt-4 { margin-top: 1.5rem; }
+/* More Bootstrap-style utilities the markup uses but that were never defined, so they did
+   nothing (for example Reference Data rows had no divider or spacing between items). */
+.mb-2 { margin-bottom: 0.5rem; }
+.mt-2 { margin-top: 0.5rem; }
+.ms-1 { margin-left: 0.25rem; }
+.py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+.py-5 { padding-top: 3rem; padding-bottom: 3rem; }
+.border-top { border-top: 1px solid rgba(255, 255, 255, .18); }
+.d-block { display: block; }
+.flex-column { flex-direction: column; }
+.align-items-start { align-items: flex-start; }
+.text-center { text-align: center; }
+.text-danger { color: #ffb4b4; }
+.w-auto { width: auto; }
 
 /* Bootstrap-style utilities used in the markup. This project does not load Bootstrap,
    so `p-4` used to do nothing and cards had no inner padding. */
@@ -142,15 +156,6 @@ h1, h2, h3, h4, h5, h6 { margin-top: 0; }
 
 /* Reference data rows: stretch Save/Delete so they line up with the Add buttons. */
 [data-reference-row] > :last-child .btn { flex: 1; }
-
-.brand-dot {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #35b779;
-  margin-right: 7px;
-}
 
 .card {
   border: 1px solid rgba(255, 255, 255, .25);
@@ -1000,14 +1005,6 @@ td .badge-soft.confirm-badge { white-space: normal; }
   .incident-filters {
     flex: 1 1 100%;
   }
-  .admin-sidebar {
-    position: static;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
-    padding: 0.65rem;
-  }
-  .sidebar-label { grid-column: 1 / -1; }
-  .sidebar-link { width: 100%; }
   .col-xl-3, .col-xl-4, .col-xl-8 { flex: 0 0 100%; max-width: 100%; }
 }
 
@@ -1016,16 +1013,9 @@ td .badge-soft.confirm-badge { white-space: normal; }
   .admin-panel { padding: 1rem; }
   .incident-filters .form-select { flex: 1 1 100%; }
   .incident-filters .btn { width: 100%; }
-  .admin-sidebar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .sidebar-link { padding: 0.65rem 0.45rem; font-size: 0.78rem; }
-  .sidebar-count { margin-left: 0; }
   .resident-card-heading { flex-direction: column; gap: 0.65rem; }
   .col-6 { flex: 0 0 50%; max-width: 50%; }
   .col-lg-5, .col-lg-7 { flex: 0 0 100%; max-width: 100%; }
-  .navbar > .container-fluid {
-    flex-direction: column;
-    align-items: flex-end;
-  }
 }
 
 /* Triage assistant panel in the report action dialog. */
@@ -1051,10 +1041,7 @@ td .badge-soft.confirm-badge { white-space: normal; }
   border: 0;
   border-top: 1px solid rgba(255, 255, 255, .18);
 }
-@media (max-width: 900px) {
-  .sidebar-divider { grid-column: 1 / -1; }
-  .admin-sidebar .sidebar-link + .sidebar-label { margin-top: 0.25rem; }
-}
+
 
 /* Most reported locations: horizontal bars; JS sets the height from the number of bars. */
 .top-locations-chart { position: relative; height: 320px; }
@@ -1206,11 +1193,7 @@ tr.row-priority-normal > td:first-child { box-shadow: inset 4px 0 #22a06b; }
 
 /* Priority badges in tables must not break mid-word ("Critica / l"). */
 td .badge-soft { white-space: nowrap; }
-@media (max-width: 600px) {
-  /* Phones: the menu is narrow, so the counters move to their own line under the label. */
-  .sidebar-link:has(.priority-counts) { flex-wrap: wrap; row-gap: 0.35rem; }
-  .sidebar-link .priority-counts { flex-basis: 100%; margin-left: 0; padding-left: 1.85rem; }
-}
+
 
 /* Report action dialog: never taller than the window. The title and the Save/Cancel buttons
    stay visible and only the middle section scrolls. */
@@ -1279,3 +1262,186 @@ td .badge-soft { white-space: nowrap; }
 .resident-card .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .resident-address { margin-top: 0.25rem; }
 .resident-card a[href^="tel:"] { color: inherit; }
+
+/* Phones and small tablets: tables keep readable column widths and scroll sideways inside
+   their card, instead of squeezing every column into the screen width until the text and
+   badges run into each other. */
+@media (max-width: 900px) {
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, .35) transparent;
+    padding-bottom: 0.35rem;
+  }
+  /* Columns size to their content (badges, thumbnails, buttons) instead of fixed
+     percentages, so nothing touches the next column; headings break only between words. */
+  .table { min-width: 900px; table-layout: auto; }
+  .table th,
+  .table td { overflow-wrap: break-word; }
+  .table thead th { overflow-wrap: normal; word-break: normal; }
+  /* Report tables (incidents, resolved, archived): fixed column widths so no column
+     takes the space of the others. */
+  .table:not([aria-label]) { min-width: 940px; width: 940px; table-layout: fixed; }
+  .table:not([aria-label]) th:nth-child(1) { width: 150px; }
+  .table:not([aria-label]) th:nth-child(2) { width: 170px; }
+  .table:not([aria-label]) th:nth-child(3) { width: 160px; }
+  .table:not([aria-label]) th:nth-child(4) { width: 120px; }
+  .table:not([aria-label]) th:nth-child(5) { width: 115px; }
+  .table:not([aria-label]) th:nth-child(6) { width: 115px; }
+  .table:not([aria-label]) th:nth-child(7) { width: 110px; }
+  .table td:has(> .badge-soft),
+  .table td:has(img) { white-space: nowrap; }
+  .table[aria-label="Resolution times by category"] { min-width: 640px; }
+  .table[aria-label="Administrator accounts"] { min-width: 720px; }
+}
+
+/* Resident cards: long names and emails wrap inside the card, and on phones the badges
+   sit under the name instead of being pushed against the card edge. */
+.resident-card,
+.resident-card-heading > div { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .resident-card { padding: 1rem; }
+  .resident-card-heading > .align-items-end { flex-direction: row !important; flex-wrap: wrap; align-items: flex-start !important; }
+  .complaint-heading { flex-direction: column; gap: 0.5rem; }
+}
+
+/* Phones: each Reference Data item is a stacked group of fields, so give it room and a
+   clear divider; search boxes span the full width like the dropdowns beside them. */
+@media (max-width: 767px) {
+  [data-reference-row] { padding-top: 1rem; padding-bottom: 1rem; margin-top: 0; }
+}
+@media (max-width: 600px) {
+  .form-control.report-search,
+  #resolvedConfirmation,
+  .resident-filter { flex: 1 1 100%; width: 100%; }
+}
+
+/* ☰ menu (same look as the resident page). On desktop it hides or shows the sidebar so the
+   content can use the full width; at 900px and below the sidebar becomes a drawer that slides
+   in from the left. */
+.menu-toggle {
+  position: relative;
+  display: inline-grid;
+  margin-right: auto;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 2.6rem;
+  height: 2.6rem;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, .25);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .1);
+  cursor: pointer;
+}
+.menu-toggle:hover, .menu-toggle:focus-visible { background: rgba(255, 255, 255, .2); }
+.menu-bars { display: grid; gap: 4px; width: 1.25rem; }
+.menu-bars span { display: block; height: 2px; border-radius: 2px; background: #fff; }
+.menu-badge {
+  position: absolute; top: -6px; right: -6px; min-width: 1.15rem; padding: 0.05rem 0.3rem;
+  border-radius: 999px; background: #dc3545; color: #fff; font-size: 0.68rem; font-weight: 800; line-height: 1.4;
+}
+.menu-badge[hidden] { display: none; }
+
+.menu-head { display: flex; align-items: center; justify-content: space-between; }
+.menu-head .sidebar-label { margin: 0 0 0.45rem; }
+.menu-close {
+  display: none;
+  width: 2.2rem; height: 2.2rem; border: 0; border-radius: 8px;
+  background: transparent; color: #fff; font-size: 1.6rem; line-height: 1; cursor: pointer;
+}
+.menu-close:hover, .menu-close:focus-visible { background: rgba(255, 255, 255, .14); }
+
+.menu-backdrop { position: fixed; inset: 0; z-index: 25; background: rgba(0, 0, 0, .45); }
+.menu-backdrop[hidden] { display: none; }
+
+/* Desktop: the sidebar scrolls on its own when it is taller than the window, and scrolling
+   over it never scrolls the page behind it. */
+@media (min-width: 901px) {
+  .admin-sidebar {
+    max-height: calc(100vh - 100px - 1rem);
+    max-height: calc(100dvh - 100px - 1rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, .3) transparent;
+  }
+}
+
+/* Desktop: sidebar hidden with the ☰ button. */
+@media (min-width: 901px) {
+  body.sidebar-collapsed .admin-layout { grid-template-columns: minmax(0, 1fr); }
+  body.sidebar-collapsed .admin-sidebar { display: none; }
+}
+
+@media (max-width: 900px) {
+  .navbar > .container-fluid { justify-content: space-between; }
+  .navbar > .container-fluid > .live-status { margin-left: auto; }
+  .menu-close { display: inline-block; }
+  .menu-head .sidebar-label { margin: 0; }
+  body.menu-open { overflow: hidden; }
+
+  .admin-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    width: min(280px, 85vw);
+    padding: 1rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-radius: 0 14px 14px 0;
+    background: rgba(38, 62, 47, .97);
+    transform: translateX(-105%);
+    visibility: hidden;
+    transition: transform .25s ease, visibility 0s linear .25s;
+  }
+  .admin-sidebar.open {
+    transform: none;
+    visibility: visible;
+    transition: transform .25s ease;
+    box-shadow: 8px 0 30px rgba(0, 0, 0, .35);
+  }
+  .admin-sidebar .sidebar-link { flex: 0 0 auto; }
+}
+@media (max-width: 600px) {
+  /* Phones: a compact bar. The welcome text and live status sit in two short lines to the
+     right of the ☰ button instead of two tall rows. */
+  .navbar { padding: 0.45rem 0; }
+  .navbar > .container-fluid {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 0.75rem;
+    row-gap: 0.1rem;
+    align-items: center;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  .navbar > .container-fluid > .menu-toggle { grid-row: 1 / span 2; width: 2.3rem; height: 2.3rem; }
+  .navbar > .container-fluid > .d-flex,
+  .navbar > .container-fluid > .live-status {
+    justify-self: end;
+    min-width: 0;
+    max-width: 100%;
+    margin-left: 0;
+    font-size: 0.75rem;
+    line-height: 1.25;
+  }
+  .navbar > .container-fluid > .d-flex > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.75rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) { .admin-sidebar { transition: none !important; } }
+
+/* "View photos" and "Play video" links in the Resident Upload column. */
+.media-links { display: flex; flex-direction: column; align-items: flex-start; gap: 0.35rem; }
+.media-link { color: #bfe9d2; font-size: 0.85rem; font-weight: 700; text-decoration: underline; white-space: nowrap; }
+.media-link:hover, .media-link:focus-visible { color: #fff; }

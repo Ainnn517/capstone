@@ -2,11 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Models\Attachment;
 use App\Models\Category;
 use App\Models\IssueReport;
 use App\Models\Location;
+use App\Models\StatusLog;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ResidentReportChangesTest extends TestCase
@@ -59,61 +62,65 @@ class ResidentReportChangesTest extends TestCase
         $this->assertSame('A large pothole near the corner.', $mine->fresh()->description);
     }
 
-    public function test_resident_can_withdraw_before_dispatch_and_it_becomes_read_only(): void
+    public function test_withdrawing_before_review_deletes_the_report_and_its_files(): void
     {
-        foreach (['Submitted', 'Validated'] as $status) {
+        Storage::fake('local');
+        foreach (['Submitted'] as $status) {
             $report = $this->report($status);
+            $path = 'report-attachments/'.hash('sha256', $status).'.jpg';
+            Storage::disk('local')->put($path, 'photo');
+            Attachment::create(['report_id' => $report->report_id, 'mime_type' => 'image/jpeg', 'file_path' => $path]);
+            StatusLog::create(['report_id' => $report->report_id, 'changed_by' => $this->resident->user_id, 'old_status' => null, 'new_status' => 'Submitted']);
 
             $this->actingAs($this->resident)
-                ->postJson('/api/reports/'.$report->report_id.'/withdraw', ['reason' => 'The problem was fixed.'])
+                ->postJson('/api/reports/'.$report->report_id.'/withdraw')
                 ->assertOk();
 
-            $this->assertSame('Withdrawn', $report->fresh()->status);
-            $this->assertDatabaseHas('STATUS_LOG', [
-                'report_id' => $report->report_id,
-                'old_status' => $status,
-                'new_status' => 'Withdrawn',
-                'remarks' => 'Withdrawn by the resident: The problem was fixed.',
-            ]);
+            $this->assertDatabaseMissing('ISSUE_REPORT', ['report_id' => $report->report_id]);
+            $this->assertDatabaseMissing('STATUS_LOG', ['report_id' => $report->report_id]);
+            $this->assertDatabaseMissing('ATTACHMENT', ['report_id' => $report->report_id]);
+            $this->localDisk()->assertMissing($path);
         }
 
-        // Administrators can no longer change a withdrawn report.
-        $this->actingAs(User::factory()->admin()->create())
-            ->postJson('/api/reports/update', [
-                'id' => $report->report_id,
-                'status' => 'Withdrawn',
-                'assignee' => 'Unassigned',
-                'dispatchNote' => 'Trying to reopen.',
-            ])
-            ->assertStatus(409);
+        // Another resident's report cannot be withdrawn.
+        $other = $this->report('Submitted');
+        $this->actingAs(User::factory()->create())
+            ->postJson('/api/reports/'.$other->report_id.'/withdraw')
+            ->assertNotFound();
+        $this->assertDatabaseHas('ISSUE_REPORT', ['report_id' => $other->report_id]);
     }
 
-    public function test_dispatched_or_closed_reports_cannot_be_withdrawn(): void
+    public function test_reviewed_or_closed_reports_cannot_be_withdrawn(): void
     {
         $team = Team::create(['name' => 'Field Team A']);
-        $dispatched = $this->report('Dispatched', $team);
-        $this->actingAs($this->resident)
-            ->postJson('/api/reports/'.$dispatched->report_id.'/withdraw')
-            ->assertStatus(409)
-            ->assertJsonPath('message', 'A team has already been sent, so this report can no longer be withdrawn. Contact the barangay office if it is no longer needed.');
+        $message = 'The barangay has already reviewed this report, so it can no longer be withdrawn. Contact the barangay office if it is no longer needed.';
+        foreach (['Validated' => null, 'Dispatched' => $team] as $status => $assigned) {
+            $report = $this->report($status, $assigned);
+            $this->actingAs($this->resident)
+                ->postJson('/api/reports/'.$report->report_id.'/withdraw')
+                ->assertStatus(409)
+                ->assertJsonPath('message', $message);
+            $this->assertSame($status, $report->fresh()->status);
+        }
 
         $resolved = $this->report('Resolved', $team);
-        $this->postJson('/api/reports/'.$resolved->report_id.'/withdraw')->assertStatus(409);
-        $this->assertSame('Dispatched', $dispatched->fresh()->status);
+        $this->postJson('/api/reports/'.$resolved->report_id.'/withdraw')
+            ->assertStatus(409)
+            ->assertJsonPath('message', 'This report is already closed.');
+        $this->assertDatabaseHas('ISSUE_REPORT', ['report_id' => $resolved->report_id]);
     }
 
-    public function test_withdrawn_reports_count_as_past_and_leave_the_open_queue(): void
+    public function test_withdrawn_reports_leave_every_list_and_the_open_queue(): void
     {
         $open = $this->report('Submitted');
         $withdrawn = $this->report('Submitted');
         $this->actingAs($this->resident)->postJson('/api/reports/'.$withdrawn->report_id.'/withdraw')->assertOk();
 
         $this->getJson('/api/reports?view=current')->assertJsonCount(1, 'reports')->assertJsonPath('reports.0.id', (string) $open->report_id);
-        $this->getJson('/api/reports?view=past')->assertJsonCount(1, 'reports')->assertJsonPath('reports.0.stage', 'Withdrawn');
+        $this->getJson('/api/reports?view=past')->assertJsonCount(0, 'reports');
 
         $this->actingAs(User::factory()->admin()->create())
-            ->getJson('/api/analytics/summary')
-            ->assertJsonPath('summary.openByPriority.high', 1);
+            ->getJson('/api/reports?view=active')->assertJsonCount(1, 'reports');
     }
 
     private function report(string $status, ?Team $team = null): IssueReport

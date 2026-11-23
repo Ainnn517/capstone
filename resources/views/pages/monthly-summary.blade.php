@@ -8,12 +8,15 @@
 </head>
 <body>
   <div class="summary-actions">
-    <form method="get" action="{{ route('admin.summary', [], false) }}" class="summary-month">
+    <form id="summaryMonthForm" method="get" action="{{ route('admin.summary', [], false) }}" class="summary-month">
       <label for="month">Month</label>
-      <input id="month" name="month" type="month" value="{{ $month->format('Y-m') }}" max="{{ now()->format('Y-m') }}">
+      <input id="month" name="month" type="month" value="{{ $month->format('Y-m') }}" min="2000-01" max="{{ now()->format('Y-m') }}">
       <button type="submit">Show</button>
     </form>
-    <button id="printSummary" type="button" class="summary-print">Print or save as PDF</button>
+    <div class="summary-buttons">
+      <a class="summary-csv" href="/api/reports/export?from={{ $month->startOfMonth()->format('Y-m-d') }}&amp;to={{ $month->endOfMonth()->format('Y-m-d') }}">Download CSV</a>
+      <button id="printSummary" type="button" class="summary-print">Print or save as PDF</button>
+    </div>
   </div>
 
   <main class="summary-page">
@@ -32,7 +35,7 @@
       <div><strong>{{ $totals['stillOpen'] }}</strong><span>Submitted and still open</span></div>
       <div><strong>{{ \App\Services\MonthlySummaryService::duration($totals['averageDays']) }}</strong><span>Average time to resolve</span></div>
     </section>
-    <p class="summary-note">Also this month: {{ $totals['rejected'] }} rejected and {{ $totals['withdrawn'] }} withdrawn by residents.</p>
+    <p class="summary-note">Also this month: {{ $totals['rejected'] }} {{ $totals['rejected'] === 1 ? 'report was' : 'reports were' }} rejected.</p>
 
     <h2>By category</h2>
     @if (count($categories))
@@ -100,6 +103,24 @@
 
   <script nonce="{{ app('csp.nonce') }}">
     document.getElementById('printSummary').addEventListener('click', () => window.print());
+
+    // Show the chosen month straight away, without needing the Show button. A short pause
+    // lets someone finish typing a year before the page reloads. Both events, because some
+    // browsers (Firefox) treat the month box as text and report "change" only on leaving it.
+    const monthInput = document.getElementById('month');
+    let monthTimer;
+    const showChosenMonth = () => {
+      clearTimeout(monthTimer);
+      monthTimer = setTimeout(() => {
+        const value = monthInput.value;
+        if (/^\d{4}-\d{2}$/.test(value) && value >= monthInput.min && value <= monthInput.max
+            && value !== monthInput.defaultValue) {
+          document.getElementById('summaryMonthForm').submit();
+        }
+      }, 600);
+    };
+    monthInput.addEventListener('input', showChosenMonth);
+    monthInput.addEventListener('change', showChosenMonth);
   </script>
 </body>
 </html>

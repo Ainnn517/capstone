@@ -104,8 +104,8 @@ class AccountAndReportSafeguardsTest extends TestCase
             ->deleteJson('/api/reports/'.$deletedReport->report_id.'/archived')
             ->assertOk();
 
-        Storage::disk('local')->assertMissing($deletedPath);
-        Storage::disk('local')->assertExists($keptPath);
+        $this->localDisk()->assertMissing($deletedPath);
+        $this->localDisk()->assertExists($keptPath);
         $this->assertDatabaseHas('ADMIN_AUDIT_LOG', ['action' => 'permanently_delete_archived_report']);
     }
 

@@ -35,7 +35,6 @@ class MonthlySummaryService
                 'submitted' => $submitted->count(),
                 'resolved' => $resolved->count(),
                 'rejected' => $submitted->where('status', 'Rejected')->count(),
-                'withdrawn' => $submitted->where('status', 'Withdrawn')->count(),
                 'stillOpen' => $submitted->whereNotIn('status', IssueReport::CLOSED_STATUSES)->count(),
                 'averageDays' => $this->averageDays($resolved),
             ],

@@ -27,7 +27,7 @@
       <li>Account details: your full name, username, email address, and password (stored only in scrambled, hashed form that no one can read).</li>
       <li>Your home address (village or phase, street, and house number or landmark) and, if you choose to give it, your mobile number. Barangay staff use these only to confirm that you live in the barangay and to contact you about your account or reports.</li>
       <li>Report details: issue category, description, selected area or street, optional landmark, optional GPS location, and optional photos (up to 5) and one short video.</li>
-      <li>Report history: when a report was submitted, edited, withdrawn, reviewed, assigned to a team, and resolved.</li>
+      <li>Report history: when a report was submitted, edited, reviewed, assigned to a team, and resolved.</li>
       <li>Your consent to this notice and the date you gave it.</li>
       <li>Short-lived security records, such as a count of failed sign-in attempts, used to protect accounts from misuse.</li>
       <li>Sign-in records: when you sign in or out, failed sign-in attempts, and password changes or resets, each with the internet (IP) address and browser used. These are kept to detect and investigate misuse of accounts. A failed attempt stores only a scrambled fingerprint of the username typed, never the password.</li>
@@ -58,13 +58,23 @@
       <li><strong>OpenStreetMap</strong> provides the map pictures shown when you pin a report's location and on the administrators' hotspot map. Your browser downloads these map pictures directly from OpenStreetMap, which sees your internet address and the map area being viewed, but not your account or report details.</li>
     </ul>
 
-    <h2>Automated suggestions (AI-assisted triage)</h2>
+    <h2>How AI is used</h2>
+    <p>The system uses artificial intelligence (AI) under three rules:</p>
+    <ul>
+      <li><strong>AI only suggests and answers.</strong> Barangay administrators make every decision about a report, and you choose your own report's category.</li>
+      <li><strong>AI never changes anything.</strong> It cannot create, edit, approve, or delete reports or accounts.</li>
+      <li><strong>AI only sees what the system prepares for it.</strong> It never receives your name, account, email address, GPS location, or photos. The details are below.</li>
+    </ul>
+    <p>If the AI service is unavailable, the system keeps working: category suggestions come from keyword rules on the barangay's own system instead.</p>
+
+    <h3>Suggestions while reporting and reviewing</h3>
     <p>To help route reports faster, the system can suggest an issue category while you write a report, point out to administrators when several open reports at the same location may describe the same problem, and suggest which team to send based on how quickly past reports were resolved. These are suggestions only: you choose your report's category, and barangay administrators make every decision about status, priority, and assignment.</p>
     @if (config('triage.provider') === 'gemini')
     <p>When the AI feature is on, the text of report descriptions is sent to Gemini, an artificial intelligence service provided by Google, to produce these suggestions. Your name, username, email address, GPS location, and photos are not sent, and email addresses and phone numbers written inside a description are masked before sending. On Google's free tier, Google may use the text it receives to improve its products. When the feature is turned off, suggestions are produced on the barangay's own system using keyword rules, and no report text leaves the system.</p>
     @else
-    <p>When the AI feature uses the cloud service, the text of report descriptions is sent to an artificial intelligence service provided by Anthropic to produce these suggestions. Your name, username, email address, GPS location, and photos are not sent, and email addresses and phone numbers written inside a description are masked before sending. When the AI runs on the barangay's own computer, or the feature is turned off (keyword rules), suggestions are produced on the barangay's own system and no report text leaves the system.</p>
+    <p>When the AI feature uses the cloud service, the text of report descriptions is sent to an artificial intelligence service provided by Anthropic to produce these suggestions. Your name, username, email address, GPS location, and photos are not sent, and email addresses and phone numbers written inside a description are masked before sending. When the feature is turned off, suggestions are produced on the barangay's own system using keyword rules, and no report text leaves the system.</p>
     @endif
+    <h3>Questions about report statistics</h3>
     <p>Barangay administrators can also ask the AI questions about report statistics (for example, which street had the most reports this month). For these questions only counts, categories, street and area names, dates, and priority scores are shared with the AI service. Residents' names, accounts, contact details, report text, photos, and locations are never included.</p>
 
     <h2>How your information is protected</h2>
@@ -74,7 +84,7 @@
     <p>If personal information in the system is lost, stolen, or seen by someone who should not have it, and this could harm the people involved, the barangay will notify the National Privacy Commission and the affected residents within 72 hours of learning of it. The notice will explain what happened, what information was involved, what is being done about it, and what you can do to protect yourself.</p>
 
     <h2>Retention and deletion</h2>
-    <p>Reports and attachments are kept while they are active. Archived reports, with their attachments and history, are deleted automatically one year after archiving, or earlier when an administrator deletes them. Registration requests that were not approved are deleted 30 days after rejection, and sign-ups whose email address is never verified are deleted after 7 days. Administrator activity and sign-in records are kept for two years. Technical error logs are kept for 14 days. Daily encrypted backups are kept for 14 days, so deleted information can remain in a backup until that backup expires.</p>
+    <p>Reports and attachments are kept while they are active. Archived reports, with their attachments and history, are deleted automatically one year after archiving, or earlier when an administrator deletes them. Reports you withdraw are deleted right away, with their attachments and history. Registration requests that were not approved are deleted 30 days after rejection, and sign-ups whose email address is never verified are deleted after 7 days. Administrator activity and sign-in records are kept for two years. Technical error logs are kept for 14 days. Daily encrypted backups are kept for 14 days, so deleted information can remain in a backup until that backup expires.</p>
 
     <h2>Your rights</h2>
     <p>Under the Data Privacy Act, you have the right to be informed about how your information is used, to access it, to have mistakes corrected, to object to its processing, and to ask for it to be deleted when it is no longer needed. You may also file a complaint with the National Privacy Commission.</p>

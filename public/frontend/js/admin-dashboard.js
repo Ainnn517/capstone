@@ -116,31 +116,36 @@ function initAdminDashboardPage() {
     })[character]);
   }
 
-  // Table cell: the first photo, plus how many more photos and whether there is a video.
+  // Table cell: "View photos" and "Play video" links; both open in the full-screen viewer
+  // on this page (photo-viewer.js), which has a Back button.
   function attachmentCellHTML(item) {
     const files = item.attachments || [];
     if (!files.length) return '<span class="small text-secondary">None</span>';
     const photos = files.filter(file => file.type === 'image');
-    const hasVideo = files.some(file => file.type === 'video');
-    const thumb = item.attachmentId
-      ? `<a href="/api/attachments/${encodeURIComponent(item.attachmentId)}" target="_blank" rel="noopener" aria-label="View photos for ${escapeHTML(item.tracking)}"><img class="img-fluid rounded" src="/api/attachments/${encodeURIComponent(item.attachmentId)}" alt="Resident upload for ${escapeHTML(item.tracking)}" loading="lazy" style="width: 88px; height: 64px; object-fit: cover;"></a>`
-      : '';
-    const extras = [
-      photos.length > 1 ? `+${photos.length - 1} photo${photos.length > 2 ? 's' : ''}` : '',
-      hasVideo ? 'Video' : ''
-    ].filter(Boolean).join(' · ');
-    return `${thumb}${extras ? `<div class="small text-secondary mt-1">${extras}</div>` : ''}`;
+    const video = files.find(file => file.type === 'video');
+    const photoList = photos.map(file => `/api/attachments/${encodeURIComponent(file.id)}`);
+    const tracking = escapeHTML(item.tracking);
+    const links = [
+      photos.length
+        ? `<a class="media-link" href="${photoList[0]}" target="_blank" rel="noopener" data-photo-viewer data-photos="${photoList.join(',')}" data-label="Photo for ${tracking}">🖼 View ${photos.length === 1 ? 'photo' : `${photos.length} photos`}</a>`
+        : '',
+      video
+        ? `<a class="media-link" href="/api/attachments/${encodeURIComponent(video.id)}" target="_blank" rel="noopener" data-photo-viewer data-video data-label="Video for ${tracking}">▶ Play video</a>`
+        : ''
+    ].filter(Boolean);
+    return `<div class="media-links">${links.join('')}</div>`;
   }
 
-  // Manage window: every photo (opens full size) and the video player.
+  // Manage window: every photo (opens in the photo viewer) and the video player.
   function attachmentGalleryHTML(issue) {
     const files = issue.attachments || [];
     if (!files.length) return '';
+    const photoSrcs = files.filter(file => file.type !== 'video').map(file => `/api/attachments/${encodeURIComponent(file.id)}`);
     return `<div class="admin-media mt-2">${files.map((file, index) => {
       const src = `/api/attachments/${encodeURIComponent(file.id)}`;
       return file.type === 'video'
         ? `<video src="${src}" controls preload="metadata" aria-label="Video for ${escapeHTML(issue.tracking)}"></video>`
-        : `<a href="${src}" target="_blank" rel="noopener"><img src="${src}" alt="Photo ${index + 1} for ${escapeHTML(issue.tracking)}" loading="lazy"></a>`;
+        : `<a href="${src}" target="_blank" rel="noopener" data-photo-viewer data-photos="${photoSrcs.join(',')}" data-index="${photoSrcs.indexOf(src)}" data-label="Photo for ${escapeHTML(issue.tracking)}"><img src="${src}" alt="Photo ${index + 1} for ${escapeHTML(issue.tracking)}" loading="lazy"></a>`;
     }).join('')}</div>`;
   }
 
@@ -166,7 +171,12 @@ function initAdminDashboardPage() {
           priority: document.getElementById('filterPriority').value,
           q: document.getElementById('incidentSearch').value.trim()
         }, 'GET'),
-        apiRequest('getReports', { view: 'resolved', page: resolvedPage, q: document.getElementById('resolvedSearch').value.trim() }, 'GET'),
+        apiRequest('getReports', {
+          view: 'resolved',
+          page: resolvedPage,
+          confirmation: document.getElementById('resolvedConfirmation').value,
+          q: document.getElementById('resolvedSearch').value.trim()
+        }, 'GET'),
         apiRequest('getReportSummary', {}, 'GET'),
         apiRequest('getDssRecommendations', {}, 'GET')
       ]);
@@ -193,8 +203,10 @@ function initAdminDashboardPage() {
 
     document.getElementById('resolvedBody').innerHTML = resolvedReports.length
       ? resolvedReports.map(item => createIncidentRowHTML(item, { readOnly: true })).join('')
-      : `<tr><td colspan="7" class="admin-empty-state">${document.getElementById('resolvedSearch').value.trim() ? 'No resolved incidents match your search.' : 'No resolved incidents yet.'}</td></tr>`;
-    document.getElementById('resolvedCount').textContent = `${summary.summary.resolved} resolved`;
+      : `<tr><td colspan="7" class="admin-empty-state">${document.getElementById('resolvedSearch').value.trim() || document.getElementById('resolvedConfirmation').value !== 'all' ? 'No resolved incidents match your search or filter.' : 'No resolved incidents yet.'}</td></tr>`;
+    document.getElementById('resolvedCount').textContent = document.getElementById('resolvedConfirmation').value !== 'all'
+      ? `${resolvedResult.pagination?.total ?? resolvedReports.length} of ${summary.summary.resolved} resolved`
+      : `${summary.summary.resolved} resolved`;
     renderPriorityCounts(summary.summary.openByPriority || {});
     document.getElementById('mTotal').textContent = summary.summary.total;
     document.getElementById('mDispatch').textContent = summary.summary.dispatches;
@@ -460,6 +472,7 @@ function initAdminDashboardPage() {
     exportMonth.max = exportMonth.value;
     updateExportLinks();
   }
+  exportMonth.addEventListener('input', updateExportLinks);
   exportMonth.addEventListener('change', updateExportLinks);
 
   document.getElementById('hotspotMapScope').addEventListener('change', () => {
@@ -654,14 +667,18 @@ function initAdminDashboardPage() {
         responsive: true,
         maintainAspectRatio: false,
         animation: backgroundRefresh ? false : undefined,
+        // Bars run sideways, so hovering anywhere on a row picks that row (the y axis); the
+        // default x axis matched the wrong row and the tooltip often did not appear.
+        interaction: { mode: 'index', axis: 'y', intersect: false },
         plugins: {
           legend: { position: 'bottom', labels: { color: '#fff', boxWidth: 12 } },
           tooltip: {
             mode: 'index',
+            axis: 'y',
             intersect: false,
             // Skip categories with no reports for this place, and show its total at the bottom.
             filter: item => item.raw > 0,
-            callbacks: { footer: items => `Total: ${top[items[0].dataIndex].total}` }
+            callbacks: { footer: items => (items.length ? `Total: ${top[items[0].dataIndex].total}` : '') }
           }
         },
         scales: {
@@ -1598,6 +1615,10 @@ function initAdminDashboardPage() {
     incidentPage = 1;
     render();
   });
+  document.getElementById('resolvedConfirmation').addEventListener('change', () => {
+    resolvedPage = 1;
+    render();
+  });
   document.getElementById('filterPriority').addEventListener('change', () => {
     incidentPage = 1;
     render();
@@ -1758,9 +1779,76 @@ function initAdminDashboardPage() {
     }
   }
 
+  // ☰ menu. At 900px and narrower the sidebar is a drawer that closes after choosing a view,
+  // tapping outside it, pressing Escape, or the close button. On desktop the button hides or
+  // shows the sidebar, and the browser remembers the choice.
+  const adminMenu = document.getElementById('adminMenu');
+  const adminMenuToggle = document.getElementById('adminMenuToggle');
+  const adminMenuBackdrop = document.getElementById('adminMenuBackdrop');
+  const drawerQuery = window.matchMedia('(max-width: 900px)');
+  function setAdminMenu(open) {
+    const focusWasInMenu = adminMenu.contains(document.activeElement);
+    adminMenu.classList.toggle('open', open);
+    adminMenuBackdrop.hidden = !open;
+    document.body.classList.toggle('menu-open', open);
+    syncMenuButton();
+    if (open) {
+      (adminMenu.querySelector('.sidebar-link.active') || adminMenu.querySelector('.sidebar-link')).focus();
+    } else if (focusWasInMenu && drawerQuery.matches) {
+      adminMenuToggle.focus();
+    }
+  }
+  const SIDEBAR_KEY = 'adminSidebarCollapsed';
+  function setSidebarCollapsed(collapsed) {
+    document.body.classList.toggle('sidebar-collapsed', collapsed);
+    try { localStorage.setItem(SIDEBAR_KEY, collapsed ? '1' : '0'); } catch { /* private mode */ }
+    syncMenuButton();
+    // The content got wider or narrower: let the map and charts fit the new width.
+    window.dispatchEvent(new Event('resize'));
+  }
+  // The button's label and state follow whichever mode applies at the current width.
+  function syncMenuButton() {
+    const shown = drawerQuery.matches
+      ? adminMenu.classList.contains('open')
+      : !document.body.classList.contains('sidebar-collapsed');
+    adminMenuToggle.setAttribute('aria-expanded', String(shown));
+    adminMenuToggle.setAttribute('aria-label', shown ? 'Hide menu' : 'Show menu');
+    syncAdminMenuBadge();
+  }
+  try { document.body.classList.toggle('sidebar-collapsed', localStorage.getItem(SIDEBAR_KEY) === '1'); } catch { /* private mode */ }
+  adminMenuToggle.addEventListener('click', () => {
+    if (drawerQuery.matches) {
+      setAdminMenu(!adminMenu.classList.contains('open'));
+    } else {
+      setSidebarCollapsed(!document.body.classList.contains('sidebar-collapsed'));
+    }
+  });
+  document.getElementById('adminMenuClose').addEventListener('click', () => setAdminMenu(false));
+  adminMenuBackdrop.addEventListener('click', () => setAdminMenu(false));
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && adminMenu.classList.contains('open')) setAdminMenu(false);
+  });
+  drawerQuery.addEventListener('change', () => {
+    if (!drawerQuery.matches) setAdminMenu(false);
+    syncMenuButton();
+  });
+
+  // While the menu is hidden, the ☰ button shows the number of pending resident approvals.
+  const pendingNavCount = document.getElementById('pendingApprovalNavCount');
+  const adminMenuBadge = document.getElementById('adminMenuBadge');
+  function syncAdminMenuBadge() {
+    const text = pendingNavCount.textContent.trim();
+    const menuVisible = adminMenuToggle.getAttribute('aria-expanded') === 'true';
+    adminMenuBadge.textContent = text;
+    adminMenuBadge.hidden = menuVisible || text === '' || text === '0' || pendingNavCount.closest('[hidden]') !== null;
+  }
+  new MutationObserver(syncAdminMenuBadge).observe(pendingNavCount, { childList: true, characterData: true, subtree: true });
+  syncMenuButton();
+
   // Switch between dashboard sections.
   document.querySelectorAll('[data-admin-view]').forEach(button => {
     button.addEventListener('click', () => {
+      if (adminMenu.classList.contains('open')) setAdminMenu(false);
       const selectedView = button.dataset.adminView;
       document.querySelectorAll('[data-admin-view]').forEach(navButton => {
         const isActive = navButton === button;
@@ -1817,10 +1905,10 @@ function initAdminDashboardPage() {
   });
 
   // ----- Automatic refresh (real-time tracking) -----
-  // Every 30 seconds the dashboard reloads its data so new reports and sign-ups appear without
+  // Every 10 seconds the dashboard reloads its data so new reports and sign-ups appear without
   // a page reload. It waits while the admin is typing or has a dialog open, so nothing they are
   // doing is interrupted, and it pauses while the browser tab is hidden.
-  const AUTO_REFRESH_MS = 30000;
+  const AUTO_REFRESH_MS = 10000;
   let lastReportTotal = null;
   let lastPendingCount = null;
 
@@ -1840,17 +1928,33 @@ function initAdminDashboardPage() {
     lastPendingCount = count;
   }
 
+  let liveState = 'live';
+  let lastUpdated = null;
   function setLiveStatus(state, text) {
+    liveState = state;
     const status = document.getElementById('liveStatus');
     status.classList.toggle('is-paused', state === 'paused');
     status.classList.toggle('is-offline', state === 'offline');
     document.getElementById('liveStatusText').textContent = text;
   }
 
-  function markLive() {
-    const time = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
-    setLiveStatus('live', `Live · updated ${time}`);
+  // "Live · updated 5s ago", counted up every second; hovering shows the exact time.
+  function liveText() {
+    const seconds = Math.max(0, Math.round((Date.now() - lastUpdated) / 1000));
+    const ago = seconds < 3 ? 'just now' : seconds < 60 ? `${seconds}s ago` : `${Math.floor(seconds / 60)} min ago`;
+    return `Live · updated ${ago}`;
   }
+  function markLive() {
+    lastUpdated = Date.now();
+    setLiveStatus('live', liveText());
+    const time = new Date(lastUpdated).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+    document.getElementById('liveStatus').title = `Last updated at ${time}. The dashboard checks for new reports every 10 seconds.`;
+  }
+  setInterval(() => {
+    if (liveState === 'live' && lastUpdated !== null) {
+      document.getElementById('liveStatusText').textContent = liveText();
+    }
+  }, 1000);
 
   function adminIsBusy() {
     if (document.getElementById('actionModal').classList.contains('show')) return true;

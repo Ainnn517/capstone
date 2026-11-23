@@ -61,13 +61,6 @@ body {
   width: 100%;
 }
 
-.notification-button {
-  width: 2.6rem;
-  height: 2.6rem;
-  padding: 0;
-  font-size: 1.15rem;
-}
-
 .navbar-brand {
   font-weight: 800;
   text-decoration: none;
@@ -87,15 +80,6 @@ body {
 .navbar-dark .btn-light { color: #fff; }
 .small { font-size: 0.8rem; }
 .fw-semibold { font-weight: 600; }
-
-.brand-dot {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #35b779;
-  margin-right: 7px;
-}
 
 .card {
   border: 1px solid rgba(255, 255, 255, .25);
@@ -160,24 +144,6 @@ body {
 .btn-outline-primary:hover {
   color: #fff;
 }
-
-.position-relative { position: relative; }
-.position-absolute { position: absolute; }
-.top-0 { top: 0; }
-.start-100 { left: 100%; }
-.translate-middle {
-  transform: translate(-50%, -50%);
-}
-
-.badge {
-  display: inline-block;
-  font-size: 0.7rem;
-  padding: 0.25rem 0.45rem;
-  border-radius: 999px;
-  font-weight: 700;
-}
-.rounded-pill { border-radius: 999px; }
-.bg-danger { background: var(--r); color: #fff; }
 
 /* Report list, cards, and filters. */
 .page-wrap {
@@ -279,15 +245,6 @@ body {
   line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-}
-
-.issue-attachment {
-  display: block;
-  max-width: 100%;
-  max-height: 260px;
-  margin-top: 0.75rem;
-  border-radius: 10px;
-  object-fit: contain;
 }
 
 /* "Is the problem fixed?" after the barangay resolves a report. */
@@ -458,7 +415,6 @@ body {
 .gap-3 { gap: 0.75rem; }
 
 .text-secondary { color: rgba(255, 255, 255, .78); }
-.text-primary { color: #dcebe0; }
 .fw-bold { font-weight: 700; }
 .fw-medium { font-weight: 600; }
 
@@ -619,8 +575,6 @@ textarea.form-control {
   object-fit: cover;
   border-radius: 12px;
 }
-
-.d-none { display: none !important; }
 
 /* Updates page tabs: My Reports / My Street. */
 .updates-tabs { display: flex; gap: 0.35rem; border-bottom: 1px solid rgba(255, 255, 255, .18); }

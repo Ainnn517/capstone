@@ -41,6 +41,16 @@ body {
 }
 
 .summary-actions .summary-print { background: var(--accent); color: #fff; }
+.summary-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.summary-csv {
+  padding: 8px 16px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
 
 .summary-page {
   max-width: 860px;

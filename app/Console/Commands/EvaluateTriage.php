@@ -53,19 +53,16 @@ class EvaluateTriage extends Command
         if ($this->option('ai')) {
             if (! $model->available()) {
                 $this->error(match (config('triage.provider')) {
-                    'ollama' => 'The local AI is not available: check TRIAGE_AI_ENABLED, OLLAMA_URL and OLLAMA_MODEL.',
                     'gemini' => 'Gemini is not available: set GEMINI_API_KEY and TRIAGE_AI_ENABLED=true.',
                     default => 'The AI is not available: set ANTHROPIC_API_KEY and TRIAGE_AI_ENABLED=true.',
                 });
 
                 return self::FAILURE;
             }
-            $local = config('triage.provider') === 'ollama';
-            if (! $local && ! $this->confirm(sprintf('This sends %d descriptions to the AI service (%s) and may cost money. Continue?', count($rows), config('triage.provider')))) {
+            if (! $this->confirm(sprintf('This sends %d descriptions to the AI service (%s) and may cost money. Continue?', count($rows), config('triage.provider')))) {
                 return self::SUCCESS;
             }
             $label = match (config('triage.provider')) {
-                'ollama' => 'Local AI (Ollama '.config('triage.ollama.model').')',
                 'gemini' => 'Gemini ('.config('triage.gemini.model').')',
                 default => 'AI ('.config('triage.model').')',
             };

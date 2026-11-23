@@ -33,12 +33,9 @@ def test_resident_edits_then_withdraws_a_report(app, new_page):
     expect(card).to_contain_text("Correction: the canal is blocked")
     expect(card).to_contain_text("Clogged Drainage")
 
-    # Withdraw with a reason; it moves to Past and can no longer be changed.
+    # Withdrawing deletes the report: it is gone from both Current and Past.
     card.locator("[data-report-withdraw]").click()
-    page.fill(".app-prompt-input", "Neighbours cleared it themselves.")
-    page.locator(".app-prompt-dialog .app-confirm-button").click()
+    page.locator(".app-confirm-dialog .app-confirm-button").click()
     expect(page.locator("#issuesList")).not_to_contain_text("Correction: the canal is blocked")
     page.click("[data-report-filter=past]")
-    past = page.locator(".issue-card", has_text="Correction: the canal is blocked")
-    expect(past).to_contain_text("Withdrawn by you")
-    expect(past.locator("[data-report-edit], [data-report-withdraw]")).to_have_count(0)
+    expect(page.locator("#issuesList")).not_to_contain_text("Correction: the canal is blocked")
